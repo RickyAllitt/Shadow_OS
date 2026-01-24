@@ -24,6 +24,15 @@
     <section class="panel status-panel">
         <h2>STATUS</h2>
 
+        {% if player.in_penalty_zone %}
+        <div
+            style="background: var(--color-danger-dim); border: 1px solid var(--color-danger); color: var(--color-danger); padding: 10px; text-align: center; margin-bottom: 20px; font-weight: bold; animation: pulse 2s infinite;">
+            ⚠️ PENALTY ZONE ACTIVE ⚠️
+            <div style="font-size: 0.8em; font-weight: normal; margin-top: 5px;">Complete Penalty Quest to Restore
+                Access</div>
+        </div>
+        {% endif %}
+
         <div class="economy-box" style="margin-bottom: 20px;">
             <div class="gold-display" style="display: flex; align-items: center; gap: 10px; color: var(--color-gold);">
                 <span class="material-icons">monetization_on</span>
@@ -49,10 +58,14 @@
                 </span>
             </div>
 
-            <form action="/track_sleep" method="POST" style="display: flex; gap: 5px;">
-                <input type="number" name="hours" step="0.1" placeholder="Hours"
-                    style="width: 70px; padding: 5px; background: #000; border: 1px solid #333; color: white;" required>
-                <button type="submit" class="btn-small">LOG SPI</button>
+            <form action="/track_sleep" method="POST">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
+                    <input type="range" name="hours" min="0" max="12" step="0.5" value="6"
+                        oninput="document.getElementById('sleepVal').textContent = this.value + 'h'"
+                        style="flex-grow: 1; accent-color: var(--color-primary);">
+                    <span id="sleepVal" style="font-weight: bold; width: 40px; text-align: right;">6h</span>
+                </div>
+                <button type="submit" class="btn-small" style="width: 100%;">LOG SLEEP DATA</button>
             </form>
         </div>
     </section>
@@ -62,8 +75,12 @@
         <div
             style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid var(--color-primary-dim); padding-bottom: 10px;">
             <h2 style="margin: 0; border: none;">QUESTS</h2>
-            <button class="btn-small" onclick="document.getElementById('addQuestForm').toggleAttribute('hidden')">+
-                NEW</button>
+            <div style="display: flex; gap: 10px;">
+                <a href="{{ url_for('main.history_log') }}" class="btn-small">LOG</a>
+                <a href="{{ url_for('main.calendar_view') }}" class="btn-small">CALENDAR</a>
+                <button class="btn-small" onclick="document.getElementById('addQuestForm').toggleAttribute('hidden')">+
+                    NEW</button>
+            </div>
         </div>
 
         <form id="addQuestForm" action="/add_quest" method="POST" hidden
@@ -151,6 +168,8 @@
                     </div>
                 </div>
                 <div style="display: flex; gap: 5px; align-items: center;">
+                    <a href="{{ url_for('main.architect_breakdown', quest_id=quest.id) }}" title="Break Down with AI"
+                        style="color: #b19cd9; font-size: 1.2em; text-decoration: none; padding: 0 5px;">⚡</a>
                     <a href="/edit_quest/{{ quest.id }}" title="Edit"
                         style="color: #666; font-size: 1.2em; text-decoration: none; padding: 0 5px;">✎</a>
                     <a href="/delete_quest/{{ quest.id }}" title="Delete"
@@ -213,6 +232,8 @@
                     </div>
                 </div>
                 <div style="display: flex; gap: 5px; align-items: center;">
+                    <a href="{{ url_for('main.architect_breakdown', quest_id=quest.id) }}" title="Break Down with AI"
+                        style="color: #b19cd9; font-size: 1.2em; text-decoration: none; padding: 0 5px;">⚡</a>
                     <a href="/edit_quest/{{ quest.id }}" title="Edit"
                         style="color: #666; font-size: 1.2em; text-decoration: none; padding: 0 5px;">✎</a>
                     <a href="/delete_quest/{{ quest.id }}" title="Delete"
@@ -253,6 +274,8 @@
                     {% endif %}
                 </div>
                 <div style="display: flex; gap: 5px; align-items: center;">
+                    <a href="{{ url_for('main.architect_breakdown', quest_id=quest.id) }}" title="Break Down with AI"
+                        style="color: #b19cd9; font-size: 1.2em; text-decoration: none; padding: 0 5px;">⚡</a>
                     <a href="/edit_quest/{{ quest.id }}" title="Edit"
                         style="color: #666; font-size: 1.2em; text-decoration: none; padding: 0 5px;">✎</a>
                     <a href="/delete_quest/{{ quest.id }}" title="Delete"

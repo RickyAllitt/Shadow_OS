@@ -1,0 +1,67 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="panel" style="border-color: var(--color-primary); min-height: 80vh;">
+
+    <div
+        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--color-primary-dim); padding-bottom: 15px;">
+        <h2 style="margin: 0; color: var(--color-primary);">MISSION LOG</h2>
+        <a href="{{ url_for('main.dashboard') }}" class="btn-small">BACK TO DASHBOARD</a>
+    </div>
+
+    {% if history %}
+    <table style="width: 100%; border-collapse: collapse; color: var(--color-text-main);">
+        <thead>
+            <tr style="border-bottom: 1px solid #333; text-align: left;">
+                <th style="padding: 10px; color: var(--color-text-muted);">DATE</th>
+                <th style="padding: 10px; color: var(--color-text-muted);">QUEST</th>
+                <th style="padding: 10px; color: var(--color-text-muted);">RANK</th>
+                <th style="padding: 10px; color: var(--color-text-muted);">REWARD</th>
+                <th style="padding: 10px; color: var(--color-text-muted);">STATUS</th>
+            </tr>
+        </thead>
+        {% for quest in history %}
+        <tr class="log-row">
+            <td style="padding: 10px; font-size: 0.9em; color: #888;">
+                {% if quest.completed_at %}
+                {{ quest.completed_at.strftime('%b %d, %H:%M') }}
+                {% else %}
+                -
+                {% endif %}
+            </td>
+            <td style="padding: 10px;">
+                <span
+                    style="font-weight: bold; color: {{ 'var(--color-danger)' if quest.is_penalty else 'var(--color-text-main)' }};">
+                    {{ quest.title }}
+                </span>
+            </td>
+            <td style="padding: 10px;">
+                <span class="rank-badge"
+                    style="font-size: 0.8em; padding: 2px 6px; 
+                               border: 1px solid {{ 'var(--color-gold)' if quest.rank == 'S' else ('var(--color-primary)' if quest.rank == 'A' else '#555') }};
+                               color: {{ 'var(--color-gold)' if quest.rank == 'S' else ('var(--color-primary)' if quest.rank == 'A' else '#aaa') }};">
+                    {{ quest.rank }}
+                </span>
+            </td>
+            <td style="padding: 10px; font-size: 0.9em; color: #aaa;">
+                {% if quest.is_penalty %}
+                <span style="color: var(--color-danger);">SURVIVAL</span>
+                {% else %}
+                +{{ quest.xp_reward }} XP
+                {% endif %}
+            </td>
+            <td style="padding: 10px;">
+                <span style="color: var(--color-success);">COMPLETED</span>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div style="text-align: center; padding: 50px; color: #666;">
+        NO ENTERIES IN LOG. START YOUR JOURNEY.
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

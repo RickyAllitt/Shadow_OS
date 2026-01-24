@@ -255,3 +255,18 @@ a {
     background: var(--color-danger);
     box-shadow: 0 0 5px var(--color-danger);
 }
+
+/* LOG TABLE STYLES */
+.log-table th {
+    color: var(--color-text-muted);
+    padding: 10px;
+}
+
+.log-row {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: background 0.2s;
+}
+
+.log-row:hover {
+    background: rgba(255, 255, 255, 0.05);
+}

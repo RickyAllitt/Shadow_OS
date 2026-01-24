@@ -1,0 +1,59 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="panel" style="border-color: var(--color-primary); min-height: 80vh;">
+
+    <!-- HEADER: Navigation & Config -->
+    <div
+        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--color-primary-dim); padding-bottom: 15px;">
+        <div style="display: flex; gap: 10px;">
+            <a href="{{ url_for('main.calendar_view', year=prev_year, month=prev_month) }}" class="btn-small"
+                style="font-size: 1.2em;">&lt;</a>
+            <h2 style="margin: 0; color: var(--color-primary); font-size: 1.5em;">{{ month_name }} {{ year }}</h2>
+            <a href="{{ url_for('main.calendar_view', year=next_year, month=next_month) }}" class="btn-small"
+                style="font-size: 1.2em;">&gt;</a>
+        </div>
+
+        <a href="{{ url_for('main.dashboard') }}" class="btn-small">BACK TO DASHBOARD</a>
+    </div>
+
+    <!-- CALENDAR GRID -->
+    <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; text-align: center;">
+
+        <!-- Day Headers -->
+        <div style="color: var(--color-text-muted); font-weight: bold;">MON</div>
+        <div style="color: var(--color-text-muted); font-weight: bold;">TUE</div>
+        <div style="color: var(--color-text-muted); font-weight: bold;">WED</div>
+        <div style="color: var(--color-text-muted); font-weight: bold;">THU</div>
+        <div style="color: var(--color-text-muted); font-weight: bold;">FRI</div>
+        <div style="color: var(--color-text-muted); font-weight: bold;">SAT</div>
+        <div style="color: var(--color-text-muted); font-weight: bold;">SUN</div>
+
+        <!-- Weeks -->
+        {% for week in calendar %}
+        {% for day in week %}
+        {% if day == 0 %}
+        <div style="background: rgba(255,255,255,0.02); height: 100px; border-radius: 4px;"></div>
+        {% else %}
+        <div
+            style="background: rgba(0,0,0,0.5); border: 1px solid #333; height: 100px; border-radius: 4px; padding: 5px; text-align: left; overflow-y: auto;">
+            <span style="color: #666; font-size: 0.9em; display: block; margin-bottom: 5px;">{{ day }}</span>
+
+            <!-- Quests for this day -->
+            {% if day in quest_map %}
+            {% for quest in quest_map[day] %}
+            <a href="/edit_quest/{{ quest.id }}" title="{{ quest.title }}"
+                style="display: block; margin-bottom: 3px; font-size: 0.75em; padding: 2px 4px; background: #222; border-left: 2px solid {{ 'var(--color-primary)' if quest.rank in ['B','A','S'] else '#666' }}; color: #ccc; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                {{ quest.rank }} - {{ quest.title }}
+            </a>
+            {% endfor %}
+            {% endif %}
+        </div>
+        {% endif %}
+        {% endfor %}
+        {% endfor %}
+
+    </div>
+
+</div>
+{% endblock %}

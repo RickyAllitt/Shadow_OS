@@ -75,6 +75,7 @@ class Quest(db.Model):
     # Failure Condition (for daily use)
     start_date = db.Column(db.DateTime, nullable=True)
     due_date = db.Column(db.DateTime, nullable=True)
+    completed_at = db.Column(db.DateTime, nullable=True)
     
     # Progress (0-100)
     progress = db.Column(db.Integer, default=0)

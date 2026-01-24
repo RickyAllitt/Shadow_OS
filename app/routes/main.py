@@ -92,6 +92,7 @@ def complete_quest(id):
     # POST: Execute Completion
     if not quest.is_completed:
         quest.is_completed = True
+        quest.completed_at = datetime.now(timezone.utc)
         player.xp += quest.xp_reward
         
         # Stat Buff Logic
@@ -107,79 +108,122 @@ def complete_quest(id):
             
             # TRIGGER THE NOTIFICATION
             flash('LEVEL UP!', 'levelup') 
+
+        # Penalty Clearance Logic
+        if quest.is_penalty:
+            player.in_penalty_zone = False
+            flash("PENALTY CLEARED. WELCOME BACK.", "success")
             
         db.session.commit()
         
     return redirect(url_for('main.dashboard'))
 
-@bp.route('/trigger_penalty')
-@login_required
-def trigger_penalty():
-    player = current_user
-    player.in_penalty_zone = True
-    
-    # Create the Punishment Quest
-    punishment = Quest(
-        title="PENALTY: 4 Hours No Phone",
-        rank="S", # Hard
-        xp_reward=0, # No gain, just survival
-        gold_reward=0,
-        is_penalty=True,
-        stat_reward="VIT" # You strictly gain discipline (VIT)
-    )
-    db.session.add(punishment)
-    db.session.commit()
-    
-    flash("YOU HAVE ENTERED THE PENALTY ZONE.", "penalty")
-    return redirect(url_for('main.dashboard'))
 
-@bp.route('/clear_penalty/<int:quest_id>')
-@login_required
-def clear_penalty(quest_id):
-    quest = db.session.get(Quest, quest_id)
-    player = current_user
-    
-    if quest.is_penalty:
-        db.session.delete(quest) # Remove the quest
-        player.in_penalty_zone = False
-        flash("SURVIVAL COMPLETE. PENALTY LIFTED.", "success")
-        db.session.commit()
-        
-    return redirect(url_for('main.dashboard'))
 
 @bp.route('/buy/<int:item_id>')
 @login_required
 def buy_item(item_id):
-    player = current_user
     item = db.session.get(RewardItem, item_id)
+    player = current_user
+    
+    # PENALTY CHECK
+    if player.in_penalty_zone:
+        flash("SYSTEM LOCK: Cannot access shop in Penalty Zone.", "error")
+        return redirect(url_for('main.dashboard'))
     
     if not item:
-        flash("Item not found.", "error")
         return redirect(url_for('main.dashboard'))
-
-    # RULE 1: The Penalty Zone Lock
-    if player.in_penalty_zone:
-        flash("⛔ ACCESS DENIED: Complete Penalty Quest first.", "error")
-        return redirect(url_for('main.dashboard'))
-
-    # RULE 2: Gold Check
+        
     if player.gold >= item.cost:
-        # Transaction
-        player.gold -= item.cost
-        
-        # Handle Limited Stock (if item is not infinite)
-        if item.stock > 0:
-            item.stock -= 1
-            
-        db.session.commit()
-        
-        # Success Feedback
-        flash(f"PURCHASE SUCCESSFUL: {item.name}", "success")
-        
+        if item.stock != -1 and item.stock <= 0:
+            flash("Out of Stock.", "error")
+        else:
+            player.gold -= item.cost
+            if item.stock > 0:
+                item.stock -= 1
+            db.session.commit()
+            flash(f"Purchased: {item.name}", "success")
     else:
-        flash("INSUFFICIENT FUNDS.", "error")
-
+        flash("Insufficient Funds.", "error")
+        
     return redirect(url_for('main.dashboard'))
+
+import calendar
+from datetime import timedelta
+
+@bp.route('/calendar')
+@bp.route('/calendar/<int:year>/<int:month>')
+@login_required
+def calendar_view(year=None, month=None):
+    now = datetime.now()
+    if year is None: year = now.year
+    if month is None: month = now.month
+    
+    # Adjust for month overflow/underflow (simple navigation logic)
+    if month > 12:
+        month = 1
+        year += 1
+    elif month < 1:
+        month = 12
+        year -= 1
+
+    # Get Calendar Grid
+    cal = calendar.monthcalendar(year, month)
+    
+    # Fetch Player's Active Quests with Due Dates
+    # Filter: Belong to player, has due_date, due_date is in this month
+    # Note: SQLite dates can be tricky. For robustness, we'll fetch all active active and filter python side
+    # or simple range query.
+    
+    start_date = datetime(year, month, 1)
+    # End date calculation
+    if month == 12:
+        end_date = datetime(year + 1, 1, 1)
+    else:
+        end_date = datetime(year, month + 1, 1)
+        
+    quests = Quest.query.filter(
+        Quest.player_id == current_user.id,
+        Quest.due_date >= start_date,
+        Quest.due_date < end_date
+    ).all()
+    
+    # Map Quests to Days
+    quest_map = {}
+    for q in quests:
+        day = q.due_date.day
+        if day not in quest_map:
+            quest_map[day] = []
+        quest_map[day].append(q)
+        
+    # Navigation Dates
+    prev_month = month - 1
+    prev_year = year
+    if prev_month < 1:
+        prev_month = 12
+        prev_year -= 1
+        
+    next_month = month + 1
+    next_year = year
+    if next_month > 12:
+        next_month = 1
+        next_year += 1
+
+    return render_template('calendar.html', 
+                           calendar=cal, 
+                           year=year, 
+                           month=month, 
+                           month_name=calendar.month_name[month],
+                           quest_map=quest_map,
+                           prev_year=prev_year, prev_month=prev_month,
+                           next_year=next_year, next_month=next_month)
+
+@bp.route('/log')
+@login_required
+def history_log():
+    # Fetch all completed quests, ordered by most recent
+    history = Quest.query.filter_by(player_id=current_user.id, is_completed=True).order_by(Quest.completed_at.desc()).all()
+    return render_template('log.html', history=history)
 
 @bp.route('/track_sleep', methods=['POST'])
 @login_required
@@ -292,4 +336,42 @@ def edit_quest(id):
     # Reuse dashboard? Or render a specific edit page?
     # Simple edit page.
     return render_template('edit_quest.html', quest=quest)
+
+@bp.route('/architect/breakdown/<int:quest_id>', methods=['GET', 'POST'])
+@login_required
+def architect_breakdown(quest_id):
+    quest = db.session.get(Quest, quest_id)
+    if not quest or quest.player_id != current_user.id:
+        flash("Quest not found or access denied.", "error")
+        return redirect(url_for('main.dashboard'))
+
+    # GET: Show Confirmation Page
+    if request.method == 'GET':
+        return render_template('confirm_breakdown.html', quest=quest)
+
+    # POST: Execute Breakdown
+    sub_tasks = TheArchitect.decompose_task(quest.title)
+    
+    if not sub_tasks or len(sub_tasks) == 0:
+        flash("The Architect could not decompose this task.", "warning")
+        return redirect(url_for('main.dashboard'))
+
+    created_count = 0
+    for task_title in sub_tasks:
+        # Create sub-quest with explicit properties
+        new_quest = Quest(
+            title=task_title,
+            rank='E',
+            xp_reward=10,
+            stat_reward=quest.stat_reward or 'INT',
+            player_id=current_user.id,
+            is_daily=False # Sub-tasks are usually one-off
+        )
+        db.session.add(new_quest)
+        created_count += 1
+    
+    db.session.commit()
+    flash(f"Decomposition Complete: {created_count} sub-quests created.", "success")
+    return redirect(url_for('main.dashboard'))
+
 

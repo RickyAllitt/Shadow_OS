@@ -100,10 +100,39 @@ def check_daily_reset(player):
          player.last_daily_reset = player.last_daily_reset.replace(tzinfo=timezone.utc)
     
     if player.last_daily_reset < today_midnight:
-        # It's a new day! Reset dailies.
+        # It's a new day! Check for failures before resetting.
+
+        # 1. ESCALATION: If already in penalty zone, wipe gold (Bankruptcy)
+        if player.in_penalty_zone:
+            player.gold = 0
+            # Note: Flash messages are UI-only, this logic happens in background checks.
+            # The dashboard will reflect 0 Gold.
+
         dailies = Quest.query.filter_by(player_id=player.id, is_daily=True).all()
+        missed_any = False
+        
         for quest in dailies:
+            if not quest.is_completed:
+                missed_any = True
+            # Reset for the new day
             quest.is_completed = False
+            
+        if missed_any:
+            player.in_penalty_zone = True
+            
+            # Create a Penalty Quest (5km Run)
+            penalty_due = now.replace(hour=23, minute=59, second=59)
+            penalty = Quest(
+                title="PENALTY: 5km Run",
+                rank="S", # Hard
+                player_id=player.id,
+                xp_reward=0,
+                gold_reward=0,
+                stat_reward="VIT",
+                is_penalty=True,
+                due_date=penalty_due
+            )
+            db.session.add(penalty)
             
         player.last_daily_reset = now
         db.session.commit()
@@ -121,7 +150,6 @@ def get_categorized_quests(player_id):
     dailies = []
     scheduled = []
     backlog = []
-    
     for q in all_quests:
         # Filter logic:
         # Completed non-dailies are hidden.
@@ -130,6 +158,10 @@ def get_categorized_quests(player_id):
             
         if q.is_daily:
             dailies.append(q)
+        elif q.is_penalty:
+            # Penalties go to scheduled or top of list? Let's put them in Scheduled for now with urgent marking?
+            # Or simplified: Put usage in scheduled.
+            scheduled.insert(0, q) # Urgent!
         elif q.start_date or q.due_date:
             scheduled.append(q)
         else:
@@ -139,14 +171,3 @@ def get_categorized_quests(player_id):
     scheduled.sort(key=lambda x: x.due_date if x.due_date else datetime.max.replace(tzinfo=timezone.utc))
     
     return dailies, scheduled, backlog
-
-def check_for_penalties(player):
-    """
-    Checks if any Daily Quests were missed yesterday.
-    If yes, trigger the Penalty Zone.
-    """
-    # 1. Get all daily quests
-    dailies = Quest.query.filter_by(is_daily=True).all()
-    
-    # Placeholder logic for now
-    pass

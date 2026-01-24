@@ -1,0 +1,48 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="panel"
+    style="max-width: 600px; margin: 50px auto; border-color: var(--color-primary); box-shadow: 0 0 30px var(--color-primary-dim);">
+
+    <div style="text-align: center; margin-bottom: 30px;">
+        <span class="material-icons"
+            style="font-size: 4em; color: var(--color-primary); text-shadow: 0 0 10px var(--color-primary);">psychology</span>
+        <h2 style="color: var(--color-primary); margin-top: 10px;">ARCHITECT INTERFACE</h2>
+        <p style="color: var(--color-text-muted); font-size: 0.9em;">TASK ANALYSIS MODULE</p>
+    </div>
+
+    <div
+        style="background: rgba(0,0,0,0.3); padding: 20px; border-radius: 5px; border: 1px solid #333; margin-bottom: 30px;">
+        <h3 style="color: #fff; font-size: 1.2em; margin-bottom: 10px;">TARGET QUEST</h3>
+        <p style="font-size: 1.5em; color: var(--color-text-main); font-family: var(--font-heading);">
+            "{{ quest.title }}"
+        </p>
+        <hr style="border-color: #333; margin: 15px 0;">
+        <p style="color: #aaa;">
+            <b>Operation:</b> DECOMPOSE<br>
+            <b>Model:</b> GEMINI-2.5-FLASH / HEURISTIC FALLBACK<br>
+            <b>Output:</b> 3-5 Sub-Routines
+        </p>
+    </div>
+
+    <div style="text-align: center; margin-bottom: 20px;">
+        <p style="color: var(--color-text-muted); margin-bottom: 20px;">
+            Initiate sub-task generation sequence? This will create multiple child quests based on the target objective.
+        </p>
+
+        <form action="{{ url_for('main.architect_breakdown', quest_id=quest.id) }}" method="POST">
+            <div style="display: flex; gap: 20px; justify-content: center;">
+                <a href="{{ url_for('main.dashboard') }}" class="btn-small"
+                    style="padding: 10px 20px; border-color: #666; color: #aaa; text-decoration: none; display: inline-block;">
+                    ABORT
+                </a>
+                <button type="submit" class="btn-complete"
+                    style="padding: 10px 20px; font-size: 1.1em; cursor: pointer;">
+                    EXECUTE
+                </button>
+            </div>
+        </form>
+    </div>
+
+</div>
+{% endblock %}
