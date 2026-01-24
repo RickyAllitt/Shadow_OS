@@ -64,13 +64,21 @@ def add_quest():
     flash(f"Quest '{title}' Accepted.", "success")
     return redirect(url_for('main.dashboard'))
 
-@bp.route('/complete/<int:id>')
+@bp.route('/complete/<int:id>', methods=['GET', 'POST'])
 @login_required
 def complete_quest(id):
     quest = db.session.get(Quest, id)
     player = current_user
     
-    if quest and not quest.is_completed:
+    if not quest:
+        return redirect(url_for('main.dashboard'))
+        
+    # GET: Show Verification Page
+    if request.method == 'GET':
+        return render_template('verify_completion.html', quest=quest)
+    
+    # POST: Execute Completion
+    if not quest.is_completed:
         quest.is_completed = True
         player.xp += quest.xp_reward
         

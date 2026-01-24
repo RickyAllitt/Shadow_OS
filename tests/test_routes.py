@@ -49,7 +49,7 @@ def test_complete_quest(auth_client, app):
         quest_id = quest.id
     
     # Action
-    response = auth_client.get(f'/complete/{quest_id}', follow_redirects=True)
+    response = auth_client.post(f'/complete/{quest_id}', follow_redirects=True)
     assert response.status_code == 200
     
     # Assert
