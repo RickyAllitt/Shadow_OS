@@ -1,0 +1,100 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div style="display: flex; justify-content: center; align-items: center; height: 80vh;">
+    <div class="panel" style="width: 100%; max-width: 500px; padding: 40px;">
+        <h2 style="margin-bottom: 20px;">EDIT QUEST</h2>
+
+        <form action="/edit_quest/{{ quest.id }}" method="POST">
+            <label style="color: var(--color-text-muted); display: block; margin-bottom: 5px;">Objective</label>
+            <input type="text" name="title" value="{{ quest.title }}" required
+                style="width: 100%; padding: 12px; background: black; border: 1px solid var(--color-primary); color: white; margin-bottom: 20px;">
+
+            <div style="display: flex; gap: 20px; margin-bottom: 30px;">
+                <div style="flex: 1;">
+                    <label
+                        style="color: var(--color-text-muted); display: block; margin-bottom: 5px;">Difficulty</label>
+                    <select name="rank"
+                        style="width: 100%; padding: 10px; background: black; color: white; border: 1px solid #333;">
+                        <option value="E" {% if quest.rank=='E' %}selected{% endif %}>Rank E</option>
+                        <option value="D" {% if quest.rank=='D' %}selected{% endif %}>Rank D</option>
+                        <option value="C" {% if quest.rank=='C' %}selected{% endif %}>Rank C</option>
+                        <option value="B" {% if quest.rank=='B' %}selected{% endif %}>Rank B</option>
+                        <option value="A" {% if quest.rank=='A' %}selected{% endif %}>Rank A</option>
+                        <option value="S" {% if quest.rank=='S' %}selected{% endif %}>Rank S</option>
+                    </select>
+                </div>
+
+                <div style="flex: 1;">
+                    <label style="color: var(--color-text-muted); display: block; margin-bottom: 5px;">Stat
+                        Reward</label>
+                    <select name="stat"
+                        style="width: 100%; padding: 10px; background: black; color: white; border: 1px solid #333;">
+                        <option value="STR" {% if quest.stat_reward=='STR' %}selected{% endif %}>Strength</option>
+                        <option value="INT" {% if quest.stat_reward=='INT' %}selected{% endif %}>Intelligence</option>
+                        <option value="VIT" {% if quest.stat_reward=='VIT' %}selected{% endif %}>Vitality</option>
+                        <option value="AGI" {% if quest.stat_reward=='AGI' %}selected{% endif %}>Agility</option>
+                        <option value="SEN" {% if quest.stat_reward=='SEN' %}selected{% endif %}>Sense</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 20px; margin-bottom: 20px;">
+                <div style="flex: 1;">
+                    <label style="color: var(--color-text-muted); display: block; margin-bottom: 5px;">Start
+                        Date</label>
+                    <input type="date" name="start_date"
+                        value="{{ quest.start_date.strftime('%Y-%m-%d') if quest.start_date else '' }}"
+                        style="width: 100%; padding: 10px; background: #000; color: white; border: 1px solid #333;">
+                </div>
+                <div style="flex: 1;">
+                    <label style="color: var(--color-text-muted); display: block; margin-bottom: 5px;">Due Date</label>
+                    <input type="date" name="due_date"
+                        value="{{ quest.due_date.strftime('%Y-%m-%d') if quest.due_date else '' }}"
+                        style="width: 100%; padding: 10px; background: #000; color: white; border: 1px solid #333;">
+                </div>
+            </div>
+
+            <div style="margin-bottom: 30px;">
+                <input type="checkbox" name="is_daily" id="is_daily_edit" {% if quest.is_daily %}checked{% endif %}>
+                <label for="is_daily_edit" style="color: white; margin-left: 10px;">Daily Repeat</label>
+                <p style="color: #666; font-size: 0.8em; margin-top: 5px;">Daily quests un-complete every night at
+                    00:00.</p>
+            </div>
+
+            <div style="margin-bottom: 30px; border-top: 1px solid #333; padding-top: 20px;">
+                <label style="color: var(--color-text-muted); display: block; margin-bottom: 5px;">Progress: <span
+                        id="progressVal">{{ quest.progress }}</span>%</label>
+                <input type="range" name="progress" min="0" max="100" value="{{ quest.progress }}" style="width: 100%;"
+                    oninput="document.getElementById('progressVal').innerText = this.value">
+            </div>
+
+            <div style="margin-bottom: 30px; border-top: 1px solid #333; padding-top: 20px;">
+                <h3 style="color: var(--color-primary); font-size: 1em; margin-bottom: 10px;">NOTES & COMMENTS</h3>
+                <div
+                    style="background: #111; padding: 10px; border: 1px solid #333; margin-bottom: 10px; max-height: 200px; overflow-y: auto;">
+                    {% if quest.comments %}
+                    {% for comment in quest.comments %}
+                    <div style="margin-bottom: 10px; border-bottom: 1px solid #222; padding-bottom: 5px;">
+                        <p style="color: #ccc; margin: 0; font-size: 0.9em;">{{ comment.content }}</p>
+                        <span style="color: #666; font-size: 0.7em;">{{ comment.created_at.strftime('%Y-%m-%d %H:%M')
+                            }}</span>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <p style="color: #555; font-style: italic;">No notes yet.</p>
+                    {% endif %}
+                </div>
+                <textarea name="new_comment" placeholder="Add a note or progress update..."
+                    style="width: 100%; height: 60px; background: #000; color: white; border: 1px solid #333; padding: 5px;"></textarea>
+            </div>
+
+            <div style="display: flex; justify-content: space-between;">
+                <a href="/" class="btn-small"
+                    style="text-decoration: none; padding: 10px 20px; color: #888; border-color: #555;">CANCEL</a>
+                <button type="submit" class="btn-complete" style="padding: 10px 30px;">SAVE CHANGES</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

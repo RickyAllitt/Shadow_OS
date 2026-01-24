@@ -1,0 +1,25 @@
+# Virtual Environment
+env/
+venv/
+ENV/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.db
+*.sqlite3
+
+# Flask
+instance/
+.webassets-cache
+
+# Testing
+.pytest_cache/
+.coverage
+
+# OS
+.DS_Store
+Thumbs.db

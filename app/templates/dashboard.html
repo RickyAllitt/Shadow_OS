@@ -1,0 +1,322 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<header class="system-header">
+    <div class="profile-info">
+        <h1 class="player-name">{{ player.name }}</h1>
+        <span class="player-title">{{ player.title }}</span>
+    </div>
+
+    <div class="level-info">
+        <div class="level-circle">LVL {{ player.level }}</div>
+        <div class="xp-bar-container">
+            <div class="xp-bar-fill" style="width: {{ (player.xp / player.xp_required) * 100 }}%;"></div>
+        </div>
+        <span class="player-title" style="font-size: 0.8em; margin-top: 5px; display: block;">
+            XP: {{ player.xp }} / {{ player.xp_required }}
+        </span>
+    </div>
+</header>
+
+<div class="dashboard-grid">
+
+    <!-- LEFT PANEL: STATUS -->
+    <section class="panel status-panel">
+        <h2>STATUS</h2>
+
+        <div class="economy-box" style="margin-bottom: 20px;">
+            <div class="gold-display" style="display: flex; align-items: center; gap: 10px; color: var(--color-gold);">
+                <span class="material-icons">monetization_on</span>
+                <span style="font-size: 1.2em; font-weight: bold;">{{ player.gold }} G</span>
+            </div>
+        </div>
+
+        <div class="stats-list">
+            <div class="stat-row"><span>STR</span> <b>{{ player.strength }}</b></div>
+            <div class="stat-row"><span>AGI</span> <b>{{ player.agility }}</b></div>
+            <div class="stat-row"><span>SEN</span> <b>{{ player.sense }}</b></div>
+            <div class="stat-row"><span>VIT</span> <b>{{ player.vitality }}</b></div>
+            <div class="stat-row"><span>INT</span> <b>{{ player.intelligence }}</b></div>
+        </div>
+
+        <div class="recovery-box" style="margin-top: 20px; border-top: 1px solid #333; padding-top: 15px;">
+            <h3 style="font-size: 0.9em; color: var(--color-text-muted); margin-bottom: 10px;">RECOVERY</h3>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                <span style="font-size: 0.9em;">Condition:</span>
+                <span
+                    style="font-weight: bold; color: {% if player.condition == 'WELL RESTED' %}var(--color-primary){% elif player.condition == 'TIRED' %}orange{% else %}white{% endif %};">
+                    {{ player.condition }}
+                </span>
+            </div>
+
+            <form action="/track_sleep" method="POST" style="display: flex; gap: 5px;">
+                <input type="number" name="hours" step="0.1" placeholder="Hours"
+                    style="width: 70px; padding: 5px; background: #000; border: 1px solid #333; color: white;" required>
+                <button type="submit" class="btn-small">LOG SPI</button>
+            </form>
+        </div>
+    </section>
+
+    <!-- CENTER PANEL: QUESTS -->
+    <section class="panel quest-panel">
+        <div
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid var(--color-primary-dim); padding-bottom: 10px;">
+            <h2 style="margin: 0; border: none;">QUESTS</h2>
+            <button class="btn-small" onclick="document.getElementById('addQuestForm').toggleAttribute('hidden')">+
+                NEW</button>
+        </div>
+
+        <form id="addQuestForm" action="/add_quest" method="POST" hidden
+            style="background: rgba(0,0,0,0.5); padding: 15px; margin-bottom: 15px; border: 1px solid #333;">
+
+            <div style="margin-bottom: 10px;">
+                <input type="text" name="title" placeholder="Objective..."
+                    style="width: 100%; padding: 8px; background: #000; border: 1px solid #333; color: white;" required>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <div style="flex: 1;">
+                    <label style="color: #888; font-size: 0.8em;">Start (Opt)</label>
+                    <input type="date" name="start_date"
+                        style="width: 100%; padding: 5px; background: #000; color: white; border: 1px solid #333;">
+                </div>
+                <div style="flex: 1;">
+                    <label style="color: #888; font-size: 0.8em;">Due (Opt)</label>
+                    <input type="date" name="due_date"
+                        style="width: 100%; padding: 5px; background: #000; color: white; border: 1px solid #333;">
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
+                <select name="rank" style="background: #000; color: white; border: 1px solid #333; padding: 5px;">
+                    <option value="E">Rank E</option>
+                    <option value="C">Rank C</option>
+                    <option value="A">Rank A</option>
+                </select>
+                <select name="stat" style="background: #000; color: white; border: 1px solid #333; padding: 5px;">
+                    <option value="INT">INT</option>
+                    <option value="STR">STR</option>
+                    <option value="VIT">VIT</option>
+                    <option value="AGI">AGI</option>
+                    <option value="SEN">SEN</option>
+                </select>
+                <div style="display: flex; align-items: center; gap: 5px; margin-left: auto;">
+                    <input type="checkbox" name="is_daily" id="is_daily_check">
+                    <label for="is_daily_check" style="color: #ccc; cursor: pointer;">Daily?</label>
+                </div>
+            </div>
+            <button type="submit" class="btn-small" style="width: 100%;">INITIATE</button>
+        </form>
+
+        <div class="quest-list">
+
+            <!-- SECTION 1: DAILIES -->
+            <h3
+                style="font-size: 0.8em; color: var(--color-primary); margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 5px;">
+                DAILY ROUTINE</h3>
+            {% if not dailies %}
+            <p style="color: #555; font-style: italic; font-size: 0.9em; margin-bottom: 15px;">No daily tasks
+                established.</p>
+            {% else %}
+            {% for quest in dailies %}
+            <div class="quest-card" {% if quest.is_completed %}style="opacity: 0.6; filter: grayscale(1);" {% endif %}>
+                <div style="flex-grow: 1;">
+                    <span class="rank-badge rank-{{ quest.rank.lower() }}">{{ quest.rank }}</span>
+                    <span class="quest-title" {% if quest.is_completed %}style="text-decoration: line-through;" {% endif
+                        %}>{{ quest.title }}</span>
+
+                    <!-- Progress Bar (Always Visible) -->
+                    <div style="display: flex; align-items: center; gap: 5px; margin-top: 5px;">
+                        <div style="flex-grow: 1; height: 4px; background: #333; border-radius: 2px;">
+                            <div style="height: 100%; background: var(--color-primary); width: {{ quest.progress }}%;">
+                            </div>
+                        </div>
+                        <span style="font-size: 0.7em; color: #888;">{{ quest.progress }}%</span>
+                    </div>
+
+                    <!-- Latest Comment -->
+                    {% if quest.comments %}
+                    <div style="margin-top: 5px; font-size: 0.8em; color: #aaa; font-style: italic;">
+                        <span style="color: #666;">Note:</span> "{{ quest.comments[-1].content }}"
+                    </div>
+                    {% endif %}
+
+                    <div class="quest-rewards"
+                        style="font-size: 0.8em; color: #888; margin-left: 0px; margin-top: 5px;">
+                        +{{ quest.xp_reward }} XP | +{{ quest.gold_reward }} G
+                    </div>
+                </div>
+                <div style="display: flex; gap: 5px; align-items: center;">
+                    <a href="/edit_quest/{{ quest.id }}" title="Edit"
+                        style="color: #666; font-size: 1.2em; text-decoration: none; padding: 0 5px;">✎</a>
+                    <a href="/delete_quest/{{ quest.id }}" title="Delete"
+                        style="color: var(--color-danger); font-size: 1.2em; text-decoration: none; padding: 0 5px;">✖</a>
+                    {% if not quest.is_completed %}
+                    <a href="/complete/{{ quest.id }}" class="btn-complete">✓</a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+            {% endif %}
+
+            <!-- SECTION 2: SCHEDULED -->
+            <h3
+                style="font-size: 0.8em; color: #aaa; margin-top: 25px; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 5px;">
+                SCHEDULED</h3>
+            {% if not scheduled %}
+            <p style="color: #555; font-style: italic; font-size: 0.9em; margin-bottom: 15px;">No upcoming tasks.</p>
+            {% else %}
+            {% for quest in scheduled %}
+            <div class="quest-card">
+                <div style="flex-grow: 1;">
+                    <span class="rank-badge rank-{{ quest.rank.lower() }}">{{ quest.rank }}</span>
+                    <span class="quest-title">{{ quest.title }}</span>
+
+                    <!-- Progress Bar (Always Visible) -->
+                    <div style="display: flex; align-items: center; gap: 5px; margin-top: 5px;">
+                        <div style="flex-grow: 1; height: 4px; background: #333; border-radius: 2px;">
+                            <div style="height: 100%; background: var(--color-primary); width: {{ quest.progress }}%;">
+                            </div>
+                        </div>
+                        <span style="font-size: 0.7em; color: #888;">{{ quest.progress }}%</span>
+                    </div>
+
+                    <!-- Latest Comment -->
+                    {% if quest.comments %}
+                    <div style="margin-top: 5px; font-size: 0.8em; color: #aaa; font-style: italic;">
+                        <span style="color: #666;">Note:</span> "{{ quest.comments[-1].content }}"
+                    </div>
+                    {% endif %}
+
+                    <!-- Progress Bar (Always Visible) -->
+                    <div style="display: flex; align-items: center; gap: 5px; margin-top: 5px;">
+                        <div style="flex-grow: 1; height: 4px; background: #333; border-radius: 2px;">
+                            <div style="height: 100%; background: var(--color-primary); width: {{ quest.progress }}%;">
+                            </div>
+                        </div>
+                        <span style="font-size: 0.7em; color: #888;">{{ quest.progress }}%</span>
+                    </div>
+
+                    <!-- Latest Comment -->
+                    {% if quest.comments %}
+                    <div style="margin-top: 5px; font-size: 0.8em; color: #aaa; font-style: italic;">
+                        <span style="color: #666;">Note:</span> "{{ quest.comments[-1].content }}"
+                    </div>
+                    {% endif %}
+
+                    <div class="quest-dates" style="font-size: 0.8em; color: var(--color-accent); margin-top: 5px;">
+                        {% if quest.due_date %} Due: {{ quest.due_date.strftime('%Y-%m-%d') }} {% endif %}
+                    </div>
+                </div>
+                <div style="display: flex; gap: 5px; align-items: center;">
+                    <a href="/edit_quest/{{ quest.id }}" title="Edit"
+                        style="color: #666; font-size: 1.2em; text-decoration: none; padding: 0 5px;">✎</a>
+                    <a href="/delete_quest/{{ quest.id }}" title="Delete"
+                        style="color: var(--color-danger); font-size: 1.2em; text-decoration: none; padding: 0 5px;">✖</a>
+                    <a href="/complete/{{ quest.id }}" class="btn-complete">✓</a>
+                </div>
+            </div>
+            {% endfor %}
+            {% endif %}
+
+            <!-- SECTION 3: BACKLOG -->
+            <h3
+                style="font-size: 0.8em; color: #555; margin-top: 25px; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 5px;">
+                BACKLOG</h3>
+            {% if not backlog %}
+            <p style="color: #555; font-style: italic; font-size: 0.9em;">Empty.</p>
+            {% else %}
+            {% for quest in backlog %}
+            <div class="quest-card">
+                <div style="flex-grow: 1;">
+                    <span class="rank-badge rank-{{ quest.rank.lower() }}">{{ quest.rank }}</span>
+                    <span class="quest-title">{{ quest.title }}</span>
+
+                    <!-- Progress Bar (Always Visible) -->
+                    <div style="display: flex; align-items: center; gap: 5px; margin-top: 5px;">
+                        <div style="flex-grow: 1; height: 4px; background: #333; border-radius: 2px;">
+                            <div style="height: 100%; background: var(--color-primary); width: {{ quest.progress }}%;">
+                            </div>
+                        </div>
+                        <span style="font-size: 0.7em; color: #888;">{{ quest.progress }}%</span>
+                    </div>
+
+                    <!-- Latest Comment -->
+                    {% if quest.comments %}
+                    <div style="margin-top: 5px; font-size: 0.8em; color: #aaa; font-style: italic;">
+                        <span style="color: #666;">Note:</span> "{{ quest.comments[-1].content }}"
+                    </div>
+                    {% endif %}
+                </div>
+                <div style="display: flex; gap: 5px; align-items: center;">
+                    <a href="/edit_quest/{{ quest.id }}" title="Edit"
+                        style="color: #666; font-size: 1.2em; text-decoration: none; padding: 0 5px;">✎</a>
+                    <a href="/delete_quest/{{ quest.id }}" title="Delete"
+                        style="color: var(--color-danger); font-size: 1.2em; text-decoration: none; padding: 0 5px;">✖</a>
+                    <a href="/complete/{{ quest.id }}" class="btn-complete">✓</a>
+                </div>
+            </div>
+            {% endfor %}
+            {% endif %}
+
+        </div>
+    </section>
+
+    <!-- RIGHT PANEL: SHOP -->
+    <section class="panel shop-panel">
+        <h2>SHOP</h2>
+
+        {% if player.in_penalty_zone %}
+        <div style="text-align: center; padding: 20px; color: var(--color-danger);">
+            <span class="material-icons" style="font-size: 3em;">lock</span>
+            <p>LOCKED</p>
+        </div>
+        {% else %}
+        {% for item in shop_items %}
+        <div class="shop-item">
+            <div>
+                <div class="item-name">{{ item.name }}</div>
+                <div class="item-cost">{{ item.cost }} G</div>
+            </div>
+            {% if player.gold >= item.cost %}
+            <a href="/buy/{{ item.id }}" class="btn-small">BUY</a>
+            {% else %}
+            <button class="btn-small" style="opacity: 0.3; cursor: not-allowed;">LOCKED</button>
+            {% endif %}
+        </div>
+        {% endfor %}
+        {% endif %}
+    </section>
+
+    </section>
+
+</div>
+
+<!-- WARNING MODAL -->
+<div id="warningModal"
+    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center;">
+    <div class="panel"
+        style="width: 90%; max-width: 400px; padding: 30px; border-color: var(--color-danger); text-align: center;">
+        <h2 style="color: var(--color-danger); margin-bottom: 20px;">WARNING</h2>
+        <p id="warningText" style="margin-bottom: 30px; font-size: 1.1em;"></p>
+        <button onclick="document.getElementById('warningModal').style.display='none'" class="btn-complete"
+            style="width: 100%;">CLOSE</button>
+    </div>
+</div>
+
+<script>
+    // Check for specific flash messages to trigger modal
+    document.addEventListener("DOMContentLoaded", function () {
+        const flashes = document.querySelectorAll('.flash-msg.error_modal');
+        if (flashes.length > 0) {
+            const msg = flashes[0].innerText;
+            document.getElementById('warningText').innerText = msg;
+            document.getElementById('warningModal').style.display = 'flex';
+
+            // Optionally hide the valid html flash to avoid duplication visually if desired, 
+            // but for now keeping it simple.
+        }
+    });
+</script>
+
+{% endblock %}

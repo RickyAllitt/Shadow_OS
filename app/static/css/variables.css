@@ -1,0 +1,31 @@
+:root {
+    /* Colors */
+    --color-primary: #00EAFF;
+    --color-primary-dim: rgba(0, 234, 255, 0.1);
+    --color-primary-glow: rgba(0, 234, 255, 0.6);
+    
+    --color-danger: #FF2A2A;
+    --color-danger-dim: rgba(255, 42, 42, 0.1);
+    --color-danger-glow: rgba(255, 42, 42, 0.6);
+    
+    --color-gold: #FFD700;
+    --color-gold-dim: rgba(255, 215, 0, 0.1);
+    
+    --color-bg-dark: #050505;
+    --color-bg-panel: rgba(10, 15, 20, 0.85);
+    --color-text-main: #FFFFFF;
+    --color-text-muted: #888888;
+    
+    /* Typography */
+    --font-heading: 'Orbitron', sans-serif;
+    --font-body: 'Roboto', sans-serif;
+    
+    /* Spacing */
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
+    --spacing-lg: 24px;
+    
+    /* Borders */
+    --border-radius: 8px;
+    --border-width: 1px;
+}
