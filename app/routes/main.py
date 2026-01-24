@@ -29,38 +29,50 @@ def dashboard():
                            dailies=dailies, scheduled=scheduled, backlog=backlog, 
                            shop_items=shop_items)
 
+from app.ai_guardian import TheArchitect
+
 @bp.route('/add_quest', methods=['POST'])
 @login_required
 def add_quest():
     title = request.form.get('title')
     rank = request.form.get('rank')
-    stat = request.form.get('stat')
     
-    # Dates
-    start_str = request.form.get('start_date')
-    due_str = request.form.get('due_date')
+    # Optional inputs
+    stat = request.form.get('stat', 'INT') # Default if missing
+    is_daily = 'is_daily' in request.form
     
-    start_date = datetime.strptime(start_str, '%Y-%m-%d') if start_str else None
-    due_date = datetime.strptime(due_str, '%Y-%m-%d') if due_str else None
+    start_date = None
+    due_date = None
+    if request.form.get('start_date'):
+        start_date = datetime.strptime(request.form.get('start_date'), '%Y-%m-%d')
+    if request.form.get('due_date'):
+        due_date = datetime.strptime(request.form.get('due_date'), '%Y-%m-%d')
+
+    # Auto-Evaluation Logic
+    if rank == 'Auto':
+        analysis = TheArchitect.analyze_quest(title)
+        rank = analysis['rank']
+        xp = analysis['xp']
+        stat = analysis['stat']
+        flash(f"System Analysis: Rank {rank} | Stat {stat} | XP {xp}", "info")
+    else:
+        xp_map = {'E': 10, 'D': 20, 'C': 50, 'B': 100, 'A': 200, 'S': 500}
+        xp = xp_map.get(rank, 10)
     
-    # Daily Checkbox
-    is_daily = True if request.form.get('is_daily') else False
-    
-    # Simple logic: Higher rank = More XP
-    xp_map = {'E': 10, 'D': 20, 'C': 50, 'B': 100, 'A': 200, 'S': 500}
-    
-    new_quest = Quest(
+    quest = Quest(
         title=title, 
         rank=rank, 
-        stat_reward=stat, 
-        xp_reward=xp_map.get(rank, 10), 
-        player=current_user,
+        xp_reward=xp, 
+        stat_reward=stat,
+        player_id=current_user.id,
+        is_daily=is_daily,
         start_date=start_date,
-        due_date=due_date,
-        is_daily=is_daily
+        due_date=due_date
     )
-    db.session.add(new_quest)
+    
+    db.session.add(quest)
     db.session.commit()
+    
     flash(f"Quest '{title}' Accepted.", "success")
     return redirect(url_for('main.dashboard'))
 

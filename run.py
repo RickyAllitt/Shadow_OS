@@ -1,6 +1,10 @@
 from app import create_app
 from app.extensions import db
 from app.services import seed_database
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = create_app()
 
@@ -10,4 +14,5 @@ with app.app_context():
     seed_database()
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    debug_mode = os.environ.get('FLASK_DEBUG', 'True').lower() in ['true', '1', 't']
+    app.run(debug=debug_mode)

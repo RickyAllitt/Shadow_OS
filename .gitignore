@@ -23,3 +23,8 @@ instance/
 # OS
 .DS_Store
 Thumbs.db
+
+# Api keys
+.env
+
+
