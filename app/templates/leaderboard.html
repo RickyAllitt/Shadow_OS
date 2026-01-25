@@ -1,0 +1,49 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="dashboard-grid">
+    <div class="panel" style="grid-column: 1 / -1;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 style="margin: 0;">HUNTER LEADERBOARD</h2>
+            <a href="{{ url_for('main.dashboard') }}" class="btn-small">BACK TO DASHBOARD</a>
+        </div>
+
+        <table style="width: 100%; border-collapse: collapse; color: #eee;">
+            <thead>
+                <tr style="border-bottom: 2px solid var(--color-primary);">
+                    <th style="text-align: left; padding: 10px;">RANK</th>
+                    <th style="text-align: left; padding: 10px;">NAME</th>
+                    <th style="text-align: left; padding: 10px;">TITLE</th>
+                    <th style="text-align: right; padding: 10px;">LEVEL</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for player in leaderboard %}
+                <tr style="border-bottom: 1px solid #333;">
+                    <td style="padding: 15px; width: 50px; font-weight: bold; color: var(--color-accent);">#{{
+                        loop.index }}</td>
+                    <td style="padding: 15px;">
+                        <a href="{{ url_for('main.public_profile', player_id=player.id) }}"
+                            style="color: white; text-decoration: none; font-weight: bold; transition: color 0.2s;">
+                            {{ player.name }}
+                        </a>
+                        <!-- Add 'YOU' marker -->
+                        {% if player.id == current_user.id %}
+                        <span
+                            style="margin-left: 10px; font-size: 0.8em; color: var(--color-primary); border: 1px solid var(--color-primary); padding: 2px 5px; border-radius: 4px;">YOU</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 15px; color: #aaa;">
+                        {{ player.title_display or 'None' }}
+                    </td>
+                    <td
+                        style="padding: 15px; text-align: right; font-family: monospace; font-size: 1.2em; color: var(--color-gold);">
+                        LVL {{ player.level }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

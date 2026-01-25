@@ -231,6 +231,8 @@
         style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid var(--color-primary-dim); padding-bottom: 10px;">
         <h2 style="margin: 0; border: none;">QUESTS</h2>
         <div style="display: flex; gap: 10px;">
+            <a href="{{ url_for('main.leaderboard') }}" class="btn-small"
+                style="color: var(--color-gold); border-color: var(--color-gold);">LEADERBOARD</a>
             <a href="{{ url_for('main.history_log') }}" class="btn-small">LOG</a>
             <a href="{{ url_for('main.calendar_view') }}" class="btn-small">CALENDAR</a>
             <button class="btn-small" onclick="document.getElementById('addQuestModal').style.display='flex'">+

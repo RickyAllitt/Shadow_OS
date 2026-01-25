@@ -244,6 +244,23 @@ def calendar_view(year=None, month=None):
                            prev_year=prev_year, prev_month=prev_month,
                            next_year=next_year, next_month=next_month)
 
+@bp.route('/leaderboard')
+@login_required
+def leaderboard():
+    # Top 20 players by Level DESC, then XP DESC
+    leaderboard_data = Player.query.order_by(Player.level.desc(), Player.xp.desc()).limit(20).all()
+    return render_template('leaderboard.html', leaderboard=leaderboard_data)
+
+@bp.route('/profile/<int:player_id>')
+@login_required
+def public_profile(player_id):
+    player = db.session.get(Player, player_id)
+    if not player:
+        flash("Player not found.", "error")
+        return redirect(url_for('main.leaderboard'))
+        
+    return render_template('public_profile.html', player=player)
+
 @bp.route('/log')
 @login_required
 def history_log():
