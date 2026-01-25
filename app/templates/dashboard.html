@@ -18,6 +18,35 @@
     </div>
 </header>
 
+{% if player.in_penalty_zone %}
+<div class="system-lockdown-overlay">
+    <div class="glitch-text">SYSTEM FAILURE</div>
+    <p style="margin-top: 20px; font-size: 1.2rem; color: #fff;">PENALTY QUEST REQUIRED</p>
+    <div style="border: 1px solid var(--color-danger); padding: 20px; margin-top: 30px; width: 80%; max-width: 500px;">
+        <h3 style="color: var(--color-danger);">OBJECTIVE: SURVIVE</h3>
+        <p style="color: #ccc; margin: 10px 0;">Complete the specific Penalty Quest to restore system functionality.</p>
+        <!-- Find the penalty quest and show it -->
+        {% set penalty_quest = scheduled | selectattr('is_penalty', 'equalto', true) | first %}
+        {% if penalty_quest %}
+        <div
+            style="background: rgba(255,0,0,0.1); padding: 15px; margin-top: 15px; border: 1px dashed var(--color-danger);">
+            <div style="font-size: 1.5rem; font-weight: bold;">{{ penalty_quest.title }}</div>
+            <div style="margin-top: 5px;">Due: {{ penalty_quest.due_date.strftime('%H:%M:%S') if penalty_quest.due_date
+                else 'IMMEDIATE' }}</div>
+            <a href="/complete/{{ penalty_quest.id }}" class="btn-complete"
+                style="display: block; margin-top: 15px; background: var(--color-danger); color: black; text-align: center; padding: 10px; text-decoration: none;">COMPLETE
+                PENALTY</a>
+        </div>
+        {% else %}
+        <p>NO ACTIVE PENALTY QUEST FOUND. CONTACT ADMINISTRATOR OR WAIT FOR GENERATION.</p>
+        {% endif %}
+    </div>
+    <div style="margin-top: 50px; opacity: 0.5;">
+        FAIL CONDITION: LEVEL DOWN (-1)
+    </div>
+</div>
+{% endif %}
+
 <div class="dashboard-grid">
 
     <!-- LEFT PANEL: STATUS -->
@@ -41,11 +70,21 @@
         </div>
 
         <div class="stats-list">
-            <div class="stat-row"><span>STR</span> <b>{{ player.strength }}</b></div>
-            <div class="stat-row"><span>AGI</span> <b>{{ player.agility }}</b></div>
-            <div class="stat-row"><span>SEN</span> <b>{{ player.sense }}</b></div>
-            <div class="stat-row"><span>VIT</span> <b>{{ player.vitality }}</b></div>
-            <div class="stat-row"><span>INT</span> <b>{{ player.intelligence }}</b></div>
+            <div class="stat-row"><span>STR</span> <b {% if player.has_debuff %}style="color: var(--color-text-muted);"
+                    {% endif %}>{{ player.strength }} {% if player.has_debuff %}<span
+                        style="color:red; font-size: 0.8em;">(-20%)</span>{% endif %}</b></div>
+            <div class="stat-row"><span>AGI</span> <b {% if player.has_debuff %}style="color: var(--color-text-muted);"
+                    {% endif %}>{{ player.agility }} {% if player.has_debuff %}<span
+                        style="color:red; font-size: 0.8em;">(-20%)</span>{% endif %}</b></div>
+            <div class="stat-row"><span>SEN</span> <b {% if player.has_debuff %}style="color: var(--color-text-muted);"
+                    {% endif %}>{{ player.sense }} {% if player.has_debuff %}<span
+                        style="color:red; font-size: 0.8em;">(-20%)</span>{% endif %}</b></div>
+            <div class="stat-row"><span>VIT</span> <b {% if player.has_debuff %}style="color: var(--color-text-muted);"
+                    {% endif %}>{{ player.vitality }} {% if player.has_debuff %}<span
+                        style="color:red; font-size: 0.8em;">(-20%)</span>{% endif %}</b></div>
+            <div class="stat-row"><span>INT</span> <b {% if player.has_debuff %}style="color: var(--color-text-muted);"
+                    {% endif %}>{{ player.intelligence }} {% if player.has_debuff %}<span
+                        style="color:red; font-size: 0.8em;">(-20%)</span>{% endif %}</b></div>
         </div>
 
         <div class="recovery-box" style="margin-top: 20px; border-top: 1px solid #333; padding-top: 15px;">

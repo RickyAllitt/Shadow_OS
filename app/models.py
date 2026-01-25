@@ -53,6 +53,12 @@ class Player(UserMixin, db.Model):
     # --- THE PENALTY SYSTEM ---
     # If True, the UI turns RED and user cannot buy from shop until penalty is cleared.
     in_penalty_zone = db.Column(db.Boolean, default=False) 
+    
+    # New Strict Penalty Fields
+    consecutive_missed_days = db.Column(db.Integer, default=0)
+    has_debuff = db.Column(db.Boolean, default=False)
+    # If set, this is the deadline for the "System" penalty quest.
+    penalty_deadline = db.Column(db.DateTime, nullable=True) 
 
 class Quest(db.Model):
     id = db.Column(db.Integer, primary_key=True)

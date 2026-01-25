@@ -3,7 +3,7 @@ from flask_login import login_required, current_user
 from sqlalchemy import or_
 from app.extensions import db
 from app.models import Player, Quest, RewardItem, QuestComment
-from app.services import check_weekly_reset, check_daily_reset, get_categorized_quests
+from app.services import check_weekly_reset, check_daily_reset, get_categorized_quests, calculate_rewards, process_quest_completion
 from datetime import datetime
 
 bp = Blueprint('main', __name__)
@@ -57,7 +57,9 @@ def add_quest():
         flash(f"System Analysis: Rank {rank} | Stat {stat} | XP {xp}", "info")
     else:
         xp_map = {'E': 10, 'D': 20, 'C': 50, 'B': 100, 'A': 200, 'S': 500}
-        xp = xp_map.get(rank, 10)
+        # Use centralized logic, or stick to this if we want to preview?
+        # Better:
+        xp, _ = calculate_rewards(rank)
     
     quest = Quest(
         title=title, 
@@ -91,30 +93,16 @@ def complete_quest(id):
     
     # POST: Execute Completion
     if not quest.is_completed:
-        quest.is_completed = True
-        quest.completed_at = datetime.now(timezone.utc)
-        player.xp += quest.xp_reward
+        xp_gain, gold_gain, level_up = process_quest_completion(player, quest)
         
-        # Stat Buff Logic
-        if quest.stat_reward == 'STR': player.strength += 1
-        elif quest.stat_reward == 'INT': player.intelligence += 1
-        elif quest.stat_reward == 'AGI': player.agility += 1
+        # Feedback
+        flash(f"COMPLETE: {quest.title} | +{xp_gain} XP | +{gold_gain} G", "success")
         
-        # Level Up Logic
-        if player.xp >= player.xp_required:
-            player.level += 1
-            player.xp -= player.xp_required
-            player.xp_required = int(player.xp_required * 1.2)
+        if level_up:
+            flash("LEVEL UP!", "levelup")
             
-            # TRIGGER THE NOTIFICATION
-            flash('LEVEL UP!', 'levelup') 
-
-        # Penalty Clearance Logic
         if quest.is_penalty:
-            player.in_penalty_zone = False
             flash("PENALTY CLEARED. WELCOME BACK.", "success")
-            
-        db.session.commit()
         
     return redirect(url_for('main.dashboard'))
 

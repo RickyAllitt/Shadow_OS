@@ -267,6 +267,103 @@ a {
     transition: background 0.2s;
 }
 
-.log-row:hover {
-    background: rgba(255, 255, 255, 0.05);
+
+/* SICKLY / GLITCH THEME */
+body.glitch-theme {
+    animation: sick-flicker 4s infinite;
+}
+
+body.glitch-theme .panel,
+body.glitch-theme .system-header {
+    border-color: #555 !important;
+    box-shadow: none !important;
+}
+
+body.glitch-theme .player-name,
+body.glitch-theme h2,
+body.glitch-theme b {
+    color: #888 !important;
+    text-shadow: none !important;
+}
+
+@keyframes sick-flicker {
+    0% {
+        filter: grayscale(0.8) brightness(0.8);
+    }
+
+    2% {
+        filter: grayscale(0.8) brightness(1.2) sepia(1);
+    }
+
+    /* Flash */
+    4% {
+        filter: grayscale(0.8) brightness(0.8);
+    }
+
+    90% {
+        filter: grayscale(0.8) brightness(0.8);
+    }
+
+    92% {
+        opacity: 0.9;
+        transform: translateX(2px);
+    }
+
+    94% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+
+    100% {
+        filter: grayscale(0.8) brightness(0.8);
+    }
+}
+
+/* SYSTEM LOCKDOWN OVERLAY */
+.system-lockdown-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #000;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: var(--color-danger);
+    font-family: var(--font-heading);
+    text-align: center;
+}
+
+.glitch-text {
+    font-size: 3rem;
+    animation: text-jitter 0.3s infinite;
+    text-transform: uppercase;
+}
+
+@keyframes text-jitter {
+    0% {
+        text-shadow: 2px 0 0 red, -2px 0 0 blue;
+    }
+
+    25% {
+        text-shadow: -2px 0 0 red, 2px 0 0 blue;
+        transform: translate(2px, 2px);
+    }
+
+    50% {
+        text-shadow: 2px 0 0 red, -2px 0 0 blue;
+        transform: translate(-2px, -2px);
+    }
+
+    75% {
+        text-shadow: -2px 0 0 red, 2px 0 0 blue;
+        transform: translate(2px, -2px);
+    }
+
+    100% {
+        text-shadow: 2px 0 0 red, -2px 0 0 blue;
+    }
 }

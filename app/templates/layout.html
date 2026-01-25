@@ -9,7 +9,7 @@
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
 
-<body>
+<body class="{% if current_user.is_authenticated and current_user.has_debuff %}glitch-theme{% endif %}">
 
     {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
