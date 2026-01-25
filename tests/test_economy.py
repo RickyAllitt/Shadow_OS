@@ -74,9 +74,9 @@ class TestEconomy(unittest.TestCase):
         _, _, leveled_up = process_quest_completion(self.player, quest)
         
         self.assertTrue(leveled_up)
-        self.assertEqual(self.player.level, 2)
-        self.assertEqual(self.player.xp, 147)
-        self.assertEqual(self.player.xp_required, 125)
+        self.assertEqual(self.player.level, 3)
+        self.assertEqual(self.player.xp, 22)
+        self.assertEqual(self.player.xp_required, 156)
 
     def test_penalty_stage_1_debuff(self):
         # Mock yesterday

@@ -1,58 +1,68 @@
-# The System: Gamified Life Manager
+# Solo Leveling: The System
 
-A gamified to-do list application that turns your life into an RPG. Built with Flask, it features an intelligent "System Administrator" (AI) that ranks your tasks, a penalty zone for failures, and a verification oath to keep you honest.
+> "You do not level up. You survive."
 
-## 🌟 Key Features
+A gamified life-management system inspired by *Solo Leveling*. Track your quests, maintain your stats, and avoid the penalties of the System.
 
-### 1. The Architect (AI Integration)
-The application includes an intelligent agent called **"The Architect"** that analyzes your tasks.
--   **Auto-Ranking**: select `✨ AUTO ✨` when creating a quest, and the AI will determine:
-    -   **Rank (E-S)**: Difficulty level.
-    -   **Attributes**: Is this a Strength (STR), Intellect (INT), or Discipline (SEN) task?
-    -   **XP Rewards**: Calculated based on difficulty.
--   **Gemini Powered**: Uses Google's **Gemini 2.5 Flash** model for high-speed, low-cost analysis.
--   **Offline Fallback**: If no API key is present, it gracefully falls back to a Keyword Engine (e.g., "Run" = STR).
+## Features
 
-### 2. The Verification Oath
-Completing a task isn't just a click.
--   **The Oath**: When you mark a task as done, you are taken to a dedicated "Verification" page.
--   **Commitment**: You must explicitly "Swear on your word" to claim the rewards, adding a psychological layer of accountability.
+### 1. The Dashboard (The HUD)
+- **Status Window**: Real-time display of STR, INT, AGI, VIT, SENSE.
+- **Dynamic UI**: Interface glitching and distortion based on penalty status and health.
+- **Title System**: Unlock and equip titles (e.g., *Wolf Slayer*, *Monarch of Shadows*) for buffs.
+- **Active Effects**: Visual indicators for conditions (Well Rested, Tired) and stat bonuses.
 
-### 3. Core Gamification
--   **RPG Stats**: Track STR, AGI, INT, VIT, and SEN (Sense/Spirit).
--   **XP & Leveling**: Gain XP to level up.
--   **Currency (Gold)**: Earn gold to buy rewards in the shop.
--   **Penalty Zone**: Fail 3 daily quests? You enter the Penalty Zone, incurring debuffs until you complete a punishment quest.
+### 2. Quests & Progression
+- **Daily Quests**: Recurring tasks that must be completed every 24 hours.
+- **Ranked Quests**: E-Rank to S-Rank tasks with exponential XP/Gold rewards.
+- **AI Architect**: Uses Gemini to analyze custom tasks and assign appropriate Ranks/Stats.
+- **Leveling**: Exponential XP curve. Leveling up refreshes your status.
 
-## 🛠️ Technical Stack
--   **Backend**: Python (Flask), SQLAlchemy (SQLite).
--   **Frontend**: HTML/Jinja2, Pure CSS (Dark Mode aesthetic).
--   **AI Service**: Custom `TheArchitect` class using standard `urllib` (Zero dependencies beyond `python-dotenv`).
+### 3. The Economy
+- **Gold (G)**: Earn gold from quests.
+- **Shop**: Spend gold on real-life rewards (Cheat Meals, Gaming, etc.).
+- **Weekly Reset**: Gold resets to 0 every Sunday night. Spend it or lose it.
 
-## 🚀 Setup & Installation
+### 4. The Penalty System
+If you fail your Daily Quests:
+1.  **Stage 1 (Debuff)**: Stats reduced by 20%. Glitch effect applied.
+2.  **Stage 2 (Lockdown)**: Shop locked. Penalty Quest issued.
+3.  **Stage 3 (Level Down)**: Level -1. Stats permanent reduction.
 
-### 1. Clone & Install
-```bash
-git clone https://github.com/yourusername/The-System.git
-cd The-System
-pip install -r requirements.txt
-```
+## Setup & Installation
 
-### 2. Configure Environment
-Create a `.env` file in the root directory:
-```bash
-# Optional: For AI Features
-GEMINI_API_KEY=your_google_api_key_here
-```
+### Prerequisites
+- Python 3.10+
+- Virtual Environment (Recommended)
 
-### 3. Run the System
+### Installation
+1.  Clone the repository.
+2.  Install dependencies:
+    ```bash
+    pip install -r requirements.txt
+    ```
+3.  Initialize the database:
+    ```bash
+    # (Optional) Seed initial data
+    python -c "from app.services import seed_database; from app.extensions import db; from app import create_app; app=create_app(); app.app_context().push(); db.create_all(); seed_database()"
+    ```
+    *Note: The app handles initialization automatically on first run.*
+
+### Running the System
 ```bash
 python run.py
 ```
-Access the app at `http://127.0.0.1:5000`.
+Access the interface at `http://127.0.0.1:5000`.
 
-## 📂 Project Structure
--   `app/ai_guardian.py`: The AI logic (Gemini + Heuristics).
--   `app/routes/`: Route controllers (Main, Auth).
--   `app/models.py`: Database schema (Player, Quest, Item).
--   `app/templates/`: UI Templates (Dashboard, Verification, etc.).
+### Running Tests
+```bash
+pytest
+```
+
+## Developer Notes
+- **Scripts**: Utility scripts are located in `scripts/`.
+- **Database**: Uses SQLite (`instance/system.db`).
+- **Architecture**: Flask Blueprint structure (`app/routes`, `app/models`, `app/templates`).
+
+---
+*"I alone level up."*

@@ -76,7 +76,7 @@ def test_buy_item_success(client, app):
         
     response = client.get(f'/buy/{item_id}', follow_redirects=True)
     assert response.status_code == 200
-    assert b"PURCHASE SUCCESSFUL" in response.data
+    assert b"Purchased: Potion" in response.data
     
     with app.app_context():
         user = Player.query.filter_by(name="RichBuyer").first()

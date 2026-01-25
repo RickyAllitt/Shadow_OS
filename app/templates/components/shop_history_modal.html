@@ -1,0 +1,58 @@
+<!-- Shop History Modal -->
+<div id="shopHistoryModal" class="modal"
+    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; justify-content: center; align-items: center;">
+    <div class="modal-content system-panel" style="width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto;">
+
+        <div
+            style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--color-primary); padding-bottom: 10px; margin-bottom: 20px;">
+            <h2 style="margin: 0; color: var(--color-primary);">WEEKLY EXPENSES</h2>
+            <span onclick="document.getElementById('shopHistoryModal').style.display='none'"
+                style="cursor: pointer; font-size: 1.5em; color: #888;">&times;</span>
+        </div>
+
+        {% if not purchase_history %}
+        <p style="text-align: center; color: #666; font-style: italic;">No purchases this week.</p>
+        {% else %}
+        {% set total_spent = namespace(value=0) %}
+
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+            {% for purchase in purchase_history %}
+            {% set total_spent.value = total_spent.value + purchase.cost %}
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 5px;">
+                <div>
+                    <span
+                        style="color: white; display: block; {% if purchase.is_claimed %}text-decoration: line-through; color: #888;{% endif %}">{{
+                        purchase.item_name }}</span>
+                    <span style="font-size: 0.8em; color: #666;">{{ purchase.purchased_at.strftime('%a %H:%M') }}</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="color: var(--color-gold); font-weight: bold;">-{{ purchase.cost }} G</span>
+                    {% if not purchase.is_claimed %}
+                    <form action="/claim_purchase/{{ purchase.id }}" method="POST" style="margin: 0;">
+                        <button type="submit" class="btn-small"
+                            style="font-size: 0.7em; padding: 2px 5px; background: var(--color-primary); color: black;">CLAIM</button>
+                    </form>
+                    {% else %}
+                    <span style="font-size: 0.7em; color: #444; border: 1px solid #444; padding: 2px 5px;">USED</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div
+            style="margin-top: 20px; border-top: 2px solid #444; padding-top: 15px; display: flex; justify-content: space-between; font-size: 1.2em;">
+            <span>TOTAL SPENT:</span>
+            <span style="color: var(--color-danger); font-weight: bold;">{{ total_spent.value }} G</span>
+        </div>
+
+        <div style="margin-top: 10px; font-size: 0.8em; color: #555; text-align: center;">
+            resets Sunday at 23:59
+        </div>
+        {% endif %}
+
+        <button onclick="document.getElementById('shopHistoryModal').style.display='none'" class="btn-complete"
+            style="width: 100%; margin-top: 20px;">CLOSE</button>
+    </div>
+</div>

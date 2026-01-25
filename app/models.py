@@ -28,15 +28,29 @@ class Player(UserMixin, db.Model):
     level = db.Column(db.Integer, default=1)
     xp = db.Column(db.Integer, default=0)
     xp_required = db.Column(db.Integer, default=100)
-    title = db.Column(db.String(50), default="E-Rank Hunter")
+
+    # Replaced simple string with relationship, but keeping string for fallback or efficiency? 
+    # Let's map it to the relationship now.
+    current_title_id = db.Column(db.Integer, db.ForeignKey('title.id'), nullable=True)
+    current_title = db.relationship('Title', foreign_keys=[current_title_id])
+    
+    # Many-to-Many for Unlocked Titles
+    unlocked_titles = db.relationship('PlayerTitle', back_populates='player', lazy='dynamic')
+    
+    # Helper to get display title
+    @property
+    def title_display(self):
+        return self.current_title.name if self.current_title else "E-Rank Hunter"
     
     # --- ECONOMY (The Reward) ---
     gold = db.Column(db.Integer, default=0) 
+    coins = db.Column(db.Integer, default=0) # Permanent
     last_weekly_reset = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     last_daily_reset = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     
     # --- RECOVERY SYSTEM ---
     last_sleep_duration = db.Column(db.Float, default=0.0) # Hours slept
+    last_sleep_log_date = db.Column(db.Date, nullable=True) # Track the last date (YYYY-MM-DD) sleep was logged
     sleep_streak = db.Column(db.Integer, default=0) # Days with 7+ hours
     
     # Condition affects XP gain. 
@@ -52,9 +66,9 @@ class Player(UserMixin, db.Model):
     
     # --- THE PENALTY SYSTEM ---
     # If True, the UI turns RED and user cannot buy from shop until penalty is cleared.
-    in_penalty_zone = db.Column(db.Boolean, default=False) 
-    
-    # New Strict Penalty Fields
+    in_penalty_zone = db.Column(db.Boolean, default=False)
+    # last_daily_reset defined above
+    last_daily_bonus = db.Column(db.DateTime, nullable=True) # Track if +100g prompt claimed today
     consecutive_missed_days = db.Column(db.Integer, default=0)
     has_debuff = db.Column(db.Boolean, default=False)
     # If set, this is the deadline for the "System" penalty quest.
@@ -63,6 +77,7 @@ class Player(UserMixin, db.Model):
 class Quest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, nullable=True) # Optional detailed description
     rank = db.Column(db.String(10), default="E") 
     player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False) 
     
@@ -99,4 +114,39 @@ class RewardItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False) # e.g. "1 Hour Video Games"
     cost = db.Column(db.Integer, nullable=False) # e.g. 50 Gold
+    currency = db.Column(db.String(20), default='gold') # 'gold' or 'coins'
     stock = db.Column(db.Integer, default=-1) # -1 = Infinite
+
+class PurchaseLog(db.Model):
+    """ History of purchased items. Resets on weekly reset (Sunday). """
+    id = db.Column(db.Integer, primary_key=True)
+    player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
+    item_name = db.Column(db.String(100), nullable=False) # Snapshot of name
+    cost = db.Column(db.Integer, nullable=False) # Snapshot of cost
+    purchased_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    
+    # Claim Logic
+    is_claimed = db.Column(db.Boolean, default=False)
+    claimed_at = db.Column(db.DateTime, nullable=True)
+
+    player = db.relationship('Player', backref='purchase_history')
+
+class Title(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False)
+    description = db.Column(db.String(200))
+    buff_description = db.Column(db.String(100), nullable=True) # e.g. "ALL STATS +1" (Visual for now)
+    
+    # Unlock Logic
+    unlock_condition = db.Column(db.String(20), nullable=False) # 'level', 'streak_sleep', 'streak_daily', 'manual'
+    unlock_value = db.Column(db.Integer, default=0) # e.g. Level 10
+    
+class PlayerTitle(db.Model):
+    """ Association table for unlocked titles """
+    id = db.Column(db.Integer, primary_key=True)
+    player_id = db.Column(db.Integer, db.ForeignKey('player.id'))
+    title_id = db.Column(db.Integer, db.ForeignKey('title.id'))
+    unlocked_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    
+    player = db.relationship('Player', back_populates='unlocked_titles')
+    title = db.relationship('Title')

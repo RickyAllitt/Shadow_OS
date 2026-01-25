@@ -1,0 +1,84 @@
+<!-- Add Quest Modal -->
+<div id="addQuestModal" class="modal"
+    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; justify-content: center; align-items: center;">
+    <div class="modal-content system-panel"
+        style="width: 90%; max-width: 500px; padding: 20px; border: 1px solid var(--color-primary); box-shadow: 0 0 20px rgba(0,255,100,0.2);">
+
+        <div
+            style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--color-primary); padding-bottom: 10px; margin-bottom: 20px;">
+            <h2 style="margin: 0; color: var(--color-primary); font-family: 'Orbitron', sans-serif;">INITIATE NEW
+                PROTOCOL</h2>
+            <span onclick="document.getElementById('addQuestModal').style.display='none'"
+                style="cursor: pointer; font-size: 1.5em; color: #888;">&times;</span>
+        </div>
+
+        <form action="/add_quest" method="POST">
+            <div style="margin-bottom: 15px;">
+                <label style="color: var(--color-text-muted); display: block; margin-bottom: 5px;">OBJECTIVE</label>
+                <input type="text" name="title" placeholder="Enter task description..."
+                    style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid #444; color: white; border-radius: 4px;"
+                    required>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label style="color: var(--color-text-muted); display: block; margin-bottom: 5px;">DETAILS
+                    (OPTIONAL)</label>
+                <textarea name="description" placeholder="Additional context..."
+                    style="width: 100%; height: 60px; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid #444; color: white; border-radius: 4px; resize: none;"></textarea>
+            </div>
+
+            <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                <div style="flex: 1;">
+                    <label style="color: var(--color-text-muted); display: block; margin-bottom: 5px;">START DATE
+                        (OPTIONAL)</label>
+                    <input type="date" name="start_date"
+                        style="width: 100%; padding: 8px; background: rgba(255,255,255,0.05); color: white; border: 1px solid #444; border-radius: 4px;">
+                </div>
+                <div style="flex: 1;">
+                    <label style="color: var(--color-text-muted); display: block; margin-bottom: 5px;">DEADLINE
+                        (OPTIONAL)</label>
+                    <input type="date" name="due_date"
+                        style="width: 100%; padding: 8px; background: rgba(255,255,255,0.05); color: white; border: 1px solid #444; border-radius: 4px;">
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+                <div style="flex: 1;">
+                    <label style="color: var(--color-text-muted); display: block; margin-bottom: 5px;">PRIORITY
+                        CLASS</label>
+                    <select name="rank"
+                        style="width: 100%; padding: 8px; background: #111; color: white; border: 1px solid #444; border-radius: 4px;">
+                        <option value="Auto">✨ AUTO DETECT</option>
+                        <option value="E">Rank E (Trivial)</option>
+                        <option value="D">Rank D (Easy)</option>
+                        <option value="C">Rank C (Normal)</option>
+                        <option value="B">Rank B (Hard)</option>
+                        <option value="A">Rank A (Critical)</option>
+                        <option value="S">Rank S (Life Changing)</option>
+                    </select>
+                </div>
+                <div style="flex: 1;">
+                    <label style="color: var(--color-text-muted); display: block; margin-bottom: 5px;">ATTRIBUTE</label>
+                    <select name="stat"
+                        style="width: 100%; padding: 8px; background: #111; color: white; border: 1px solid #444; border-radius: 4px;">
+                        <option value="INT">INT (Mental)</option>
+                        <option value="STR">STR (Physical)</option>
+                        <option value="VIT">VIT (Health)</option>
+                        <option value="AGI">AGI (Speed/Efficiency)</option>
+                        <option value="SEN">SEN (Art/Social)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div
+                style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px; padding: 10px; background: rgba(255,255,255,0.02);">
+                <input type="checkbox" name="is_daily" id="modal_is_daily_check" style="transform: scale(1.2);">
+                <label for="modal_is_daily_check" style="color: #ccc; cursor: pointer;">Mark as Daily Protocol? (Repeats
+                    every 24h)</label>
+            </div>
+
+            <button type="submit" class="btn-complete" style="width: 100%; padding: 12px; font-size: 1.1em;">CONFIRM
+                PROTOCOL</button>
+        </form>
+    </div>
+</div>

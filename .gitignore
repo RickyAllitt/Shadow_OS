@@ -17,8 +17,11 @@ instance/
 .webassets-cache
 
 # Testing
+# Testing
 .pytest_cache/
 .coverage
+tests/
+scripts/
 
 # OS
 .DS_Store

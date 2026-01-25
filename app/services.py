@@ -1,5 +1,5 @@
 from app.extensions import db
-from app.models import Player, RewardItem, Quest
+from app.models import Player, RewardItem, Quest, Title, PlayerTitle
 
 def seed_database():
     """Populates the database with initial game state."""
@@ -8,7 +8,7 @@ def seed_database():
     if not Player.query.first():
         new_player = Player(
             name="Player One",          
-            title="E-Rank Student",
+            # Title is set via relationship logic now
             level=1,
             xp=0,
             xp_required=100,
@@ -24,14 +24,21 @@ def seed_database():
         )
         db.session.add(new_player)
         print(">> Player Created.")
+        # Title handling happens in process_quest_completion or manual checks now
+        # We assume migration script handles default title assignment for new players via default in DB or signals?
+        # Better: Assign default title here if it exists
+        default_title = Title.query.filter_by(name="E-Rank Hunter").first()
+        if default_title:
+             new_player.current_title = default_title
+             
+             # Also unlock it
+             assoc = PlayerTitle(player=new_player, title=default_title)
+             db.session.add(assoc)
 
     # 2. Create Default Shop Items (Rewards)
     if not RewardItem.query.first():
         default_rewards = [
-            RewardItem(name="1 Hour Guilt-Free Laziness", cost=100, stock=-1),
-            RewardItem(name="Cheat Meal", cost=300, stock=-1),
             RewardItem(name="Night Out with Friends", cost=600, stock=-1),
-            RewardItem(name="Buy New Game/Gadget", cost=2000, stock=1), 
         ]
         db.session.add_all(default_rewards)
         print(">> Shop Stocked.")
@@ -88,16 +95,16 @@ def calculate_xp_required(level):
     return int(100 * (1.25 ** (level - 1)))
 
 def calculate_rewards(rank):
-    """ Returns (XP, Gold) based on Rank """
+    """ Returns (XP, Gold, Coins) based on Rank """
     rewards = {
-        'E': (10, 5),
-        'D': (25, 20),
-        'C': (60, 50),
-        'B': (150, 200),
-        'A': (500, 1000),
-        'S': (1000, 2500)
+        'E': (10, 0, 0),
+        'D': (25, 0, 0),
+        'C': (60, 0, 0),
+        'B': (150, 150, 10),
+        'A': (500, 300, 25),
+        'S': (1000, 600, 50)
     }
-    return rewards.get(rank, (10, 5))
+    return rewards.get(rank, (10, 0, 0))
 
 def process_quest_completion(player, quest):
     """ Handles all rewards, stats, and level up logic. """
@@ -108,9 +115,15 @@ def process_quest_completion(player, quest):
     quest.completed_at = datetime.now(timezone.utc)
     
     # 1. Calculate Rewards
-    base_xp, base_gold = calculate_rewards(quest.rank)
+    base_xp, base_gold, base_coins = calculate_rewards(quest.rank)
     if quest.xp_reward: # Override if set on quest
         base_xp = quest.xp_reward
+        
+    # User Rule: Dailies give NO Gold and NO XP (individually).
+    if quest.is_daily:
+        base_gold = 0
+        base_xp = 0
+        base_coins = 0
         
     # INT Multiplier: +5% per 10 INT
     int_multiplier = 1 + (player.intelligence / 10) * 0.05
@@ -118,6 +131,7 @@ def process_quest_completion(player, quest):
     
     player.xp += xp_gain
     player.gold += base_gold
+    player.coins += base_coins
     
     # 2. Stat Buffs
     if quest.stat_reward == 'STR': player.strength += 1
@@ -126,21 +140,49 @@ def process_quest_completion(player, quest):
     elif quest.stat_reward == 'VIT': player.vitality += 1
     elif quest.stat_reward == 'SNS': player.sense += 1
     
-    # 3. Level Up Logic
-    if player.xp >= player.xp_required:
+    # 3. Daily Completion Bonus (+100 Gold + 50 XP)
+    daily_bonus = False
+    if quest.is_daily:
+        dailies = Quest.query.filter_by(player_id=player.id, is_daily=True).all()
+        # Check if ALL dailies are now completed
+        all_completed = all(q.is_completed for q in dailies)
+        
+        if all_completed:
+            # Check if bonus already claimed today
+            now = datetime.now(timezone.utc)
+            today_midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            
+            # Use player.last_daily_bonus if exists
+            last_bonus = player.last_daily_bonus
+            if last_bonus and last_bonus.tzinfo is None:
+                last_bonus = last_bonus.replace(tzinfo=timezone.utc)
+                
+            if not last_bonus or last_bonus < today_midnight:
+                player.gold += 100
+                player.xp += 50 # Bonus XP
+                player.coins += 20 # Bonus Coins
+                player.last_daily_bonus = now
+                daily_bonus = True
+                print(f">> Daily Bonus Granted for {player.name}")
+
+    # 4. Level Up Logic (Moved after all XP gains)
+    initial_level = player.level
+    while player.xp >= player.xp_required:
         player.level += 1
         player.xp -= player.xp_required
         player.xp_required = calculate_xp_required(player.level)
-        # Note: Flash handling must be done in route
-        
-    # 4. Penalty Clearance
+
+    # Check titles on every completion (level up or streak)
+    check_title_unlocks(player)
+
+    # 5. Penalty Clearance
     if quest.is_penalty:
         player.in_penalty_zone = False
         player.consecutive_missed_days = 0 # Mercy reset
         player.has_debuff = False
         
     db.session.commit()
-    return xp_gain, base_gold, (player.xp >= player.xp_required)
+    return xp_gain, base_gold, base_coins, (player.level > initial_level), daily_bonus
 
 def check_daily_reset(player):
     """
@@ -258,4 +300,94 @@ def get_categorized_quests(player_id):
     # Sort Scheduled
     scheduled.sort(key=lambda x: x.due_date if x.due_date else datetime.max.replace(tzinfo=timezone.utc))
     
+    
     return dailies, scheduled, backlog
+
+def check_title_unlocks(player):
+    """ Checks and unlocks titles based on player stats/milestones. """
+    print(f"Checking titles for {player.name}...")
+    
+    # 1. Get all titles NOT yet unlocked by player
+    # subquery for titles player uses
+    unlocked_ids = [t.title_id for t in player.unlocked_titles]
+    potential_titles = Title.query.filter(Title.id.notin_(unlocked_ids)).all()
+    
+    new_unlocks = []
+    
+    for t in potential_titles:
+        unlocked = False
+        
+        if t.unlock_condition == 'level':
+            if player.level >= t.unlock_value:
+                unlocked = True
+                
+        elif t.unlock_condition == 'streak_daily' or t.unlock_condition == 'streak_sleep':
+            # Mapping 'streak_daily' to sleep_streak for now as it is the primary tracked streak
+            if player.sleep_streak >= t.unlock_value:
+                unlocked = True
+
+        # Stat Unlocks
+        elif t.unlock_condition.startswith('stat_'):
+            stat_name = t.unlock_condition.split('_')[1] # e.g. 'strength' from 'stat_strength'
+            # getattr(player, 'strength')
+            if hasattr(player, stat_name):
+                current_val = getattr(player, stat_name)
+                if current_val >= t.unlock_value:
+                    unlocked = True
+                
+        if unlocked:
+            assoc = PlayerTitle(player=player, title=t)
+            db.session.add(assoc)
+            new_unlocks.append(t.name)
+            
+    if new_unlocks:
+        print(f"New Titles Unlocked: {new_unlocks}")
+        db.session.commit()
+    
+    return new_unlocks
+
+def equip_title_service(player, title_id):
+    """ Equips a title if unlocked. """
+    association = PlayerTitle.query.filter_by(player_id=player.id, title_id=title_id).first()
+    if not association:
+        return False, "Title not unlocked."
+    
+    title = db.session.get(Title, title_id)
+    if not title:
+        return False, "Title not found."
+        
+    player.current_title = title
+    db.session.commit()
+    return True, f"Equipped title: {title.name}"
+
+def ensure_welcome_quest(player):
+    """
+    Checks if the player has any quests at all.
+    If not, seeds a tutorial quest.
+    """
+    quest_count = Quest.query.filter_by(player_id=player.id).count()
+    quest_count = Quest.query.filter_by(player_id=player.id).count()
+    if quest_count == 0:
+        # 1. Tutorial Quest
+        welcome_quest = Quest(
+            title="Welcome to the System: Create a Task",
+            rank="E",
+            player_id=player.id,
+            xp_reward=50,
+            gold_reward=10,
+            stat_reward="INT", # Learning the system
+            is_daily=False
+        )
+        db.session.add(welcome_quest)
+        
+        # 2. Default Dailies x3
+        default_dailies = [
+            Quest(title="Morning Routine", rank="E", player_id=player.id, xp_reward=10, gold_reward=5, stat_reward="VIT", is_daily=True),
+            Quest(title="Exercise / Workout", rank="D", player_id=player.id, xp_reward=25, gold_reward=10, stat_reward="STR", is_daily=True),
+            Quest(title="Study / Work Focus", rank="D", player_id=player.id, xp_reward=25, gold_reward=10, stat_reward="INT", is_daily=True)
+        ]
+        db.session.add_all(default_dailies)
+        
+        db.session.commit()
+        return True
+    return False

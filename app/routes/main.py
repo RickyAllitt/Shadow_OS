@@ -1,10 +1,10 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 from sqlalchemy import or_
 from app.extensions import db
-from app.models import Player, Quest, RewardItem, QuestComment
-from app.services import check_weekly_reset, check_daily_reset, get_categorized_quests, calculate_rewards, process_quest_completion
-from datetime import datetime
+from app.models import Player, Quest, RewardItem, QuestComment, PurchaseLog
+from app.services import check_weekly_reset, check_daily_reset, get_categorized_quests, calculate_rewards, process_quest_completion, ensure_welcome_quest
+from datetime import datetime, timezone
 
 bp = Blueprint('main', __name__)
 
@@ -12,22 +12,38 @@ bp = Blueprint('main', __name__)
 @login_required
 def dashboard():
     if check_weekly_reset(current_user):
-        flash("WEEKLY RESET: Gold has been reset to 0.", "warning")
+        flash("WEEKLY RESET: Gold has been reset to 0.", "system_popup")
     
     if check_daily_reset(current_user):
-        flash("DAILY RESET: Daily quests have been refreshed.", "info")
+        flash("DAILY RESET: Daily quests have been refreshed.", "system_popup")
 
     player = current_user
     
-    # FETCH ALL ACTIVE QUESTS via Service
+    check_daily_reset(player)
+    
+    # Get Items
     dailies, scheduled, backlog = get_categorized_quests(player.id)
+    
+    # Onboarding: If absolutely no quests exist, seed one and reload
+    if not dailies and not scheduled and not backlog:
+        if ensure_welcome_quest(player):
+             dailies, scheduled, backlog = get_categorized_quests(player.id)
+             flash("Welcome, Player. A tutorial protocol has been initiated.", "levelup")
     
     # Get shop items (where stock is infinite (-1) OR stock > 0)
     shop_items = RewardItem.query.filter(or_(RewardItem.stock == -1, RewardItem.stock > 0)).all()
     
+    # Get purchase history since last reset
+    purchase_history = []
+    if player.last_weekly_reset:
+         purchase_history = PurchaseLog.query.filter(
+             PurchaseLog.player_id == player.id,
+             PurchaseLog.purchased_at >= player.last_weekly_reset
+         ).order_by(PurchaseLog.purchased_at.desc()).all()
+    
     return render_template('dashboard.html', player=player, 
                            dailies=dailies, scheduled=scheduled, backlog=backlog, 
-                           shop_items=shop_items)
+                           shop_items=shop_items, purchase_history=purchase_history)
 
 from app.ai_guardian import TheArchitect
 
@@ -35,6 +51,7 @@ from app.ai_guardian import TheArchitect
 @login_required
 def add_quest():
     title = request.form.get('title')
+    description = request.form.get('description')
     rank = request.form.get('rank')
     
     # Optional inputs
@@ -59,10 +76,11 @@ def add_quest():
         xp_map = {'E': 10, 'D': 20, 'C': 50, 'B': 100, 'A': 200, 'S': 500}
         # Use centralized logic, or stick to this if we want to preview?
         # Better:
-        xp, _ = calculate_rewards(rank)
+        xp, _, _ = calculate_rewards(rank)
     
     quest = Quest(
         title=title, 
+        description=description,
         rank=rank, 
         xp_reward=xp, 
         stat_reward=stat,
@@ -75,7 +93,7 @@ def add_quest():
     db.session.add(quest)
     db.session.commit()
     
-    flash(f"Quest '{title}' Accepted.", "success")
+    flash(f"Quest '{title}' Accepted.", "system_popup")
     return redirect(url_for('main.dashboard'))
 
 @bp.route('/complete/<int:id>', methods=['GET', 'POST'])
@@ -93,16 +111,25 @@ def complete_quest(id):
     
     # POST: Execute Completion
     if not quest.is_completed:
-        xp_gain, gold_gain, level_up = process_quest_completion(player, quest)
+        xp_gain, gold_gain, coin_gain, level_up, daily_bonus = process_quest_completion(player, quest)
         
         # Feedback
-        flash(f"COMPLETE: {quest.title} | +{xp_gain} XP | +{gold_gain} G", "success")
+        msg = f"COMPLETE: {quest.title} | +{xp_gain} XP"
+        if gold_gain > 0:
+            msg += f" | +{gold_gain} G"
+        if coin_gain > 0:
+            msg += f" | +{coin_gain} C"
+            
+        flash(msg, "system_popup")
+        
+        if daily_bonus:
+             flash("DAILY BONUS: All tasks completed! +100 Gold | +20 Coins | +50 XP", "system_popup")
         
         if level_up:
             flash("LEVEL UP!", "levelup")
             
         if quest.is_penalty:
-            flash("PENALTY CLEARED. WELCOME BACK.", "success")
+            flash("PENALTY CLEARED. WELCOME BACK.", "system_popup")
         
     return redirect(url_for('main.dashboard'))
 
@@ -130,10 +157,21 @@ def buy_item(item_id):
             if item.stock > 0:
                 item.stock -= 1
             db.session.commit()
+            
+            # Log Purchase
+            log = PurchaseLog(player_id=player.id, item_name=item.name, cost=item.cost)
+            db.session.add(log)
+            db.session.commit()
+            
+            if request.args.get('json'):
+                return jsonify({'success': True, 'message': f"Purchased {item.name}", 'new_gold': player.gold})
+
             flash(f"Purchased: {item.name}", "success")
     else:
+        if request.args.get('json'):
+             return jsonify({'success': False, 'message': "Insufficient Funds."})
         flash("Insufficient Funds.", "error")
-        
+    
     return redirect(url_for('main.dashboard'))
 
 import calendar
@@ -221,22 +259,30 @@ def track_sleep():
     
     player.last_sleep_duration = hours
     
+    # Check for daily restriction
+    today = datetime.now(timezone.utc).date()
+    if player.last_sleep_log_date == today:
+        flash("You have already logged sleep for today.", "system_popup")
+        return redirect(url_for('main.dashboard'))
+        
+    player.last_sleep_log_date = today
+    
     # --- THE SYSTEM LOGIC ---
     if hours >= 7.5:
         player.condition = "WELL RESTED"
         player.sleep_streak += 1
         # Buff: Restores HP/MP (Visual)
-        flash(f"SLEEP: {hours}h. CONDITION: BEST. (XP GAIN +10%)", "success")
+        flash(f"SLEEP: {hours}h. CONDITION: BEST. (XP GAIN +10%)", "system_popup")
         
     elif hours >= 6:
         player.condition = "NORMAL"
-        flash(f"SLEEP: {hours}h. CONDITION: NORMAL.", "success")
+        flash(f"SLEEP: {hours}h. CONDITION: NORMAL.", "system_popup")
         
     else:
         player.condition = "TIRED"
         player.sleep_streak = 0
         # Debuff: Warning
-        flash(f"SLEEP: {hours}h. WARNING: RECOVERY INCOMPLETE. (XP GAIN REDUCED)", "error")
+        flash(f"SLEEP: {hours}h. WARNING: RECOVERY INCOMPLETE. (XP GAIN REDUCED)", "system_popup")
         
     db.session.commit()
     return redirect(url_for('main.dashboard'))
@@ -263,7 +309,9 @@ def delete_quest(id):
             current_user.gold -= penalty
             db.session.delete(quest)
             db.session.commit()
-            flash(f"Quest Abandoned. You lost {penalty} G.", "warning")
+            db.session.delete(quest)
+            db.session.commit()
+            flash(f"Quest Abandoned. You lost {penalty} G.", "system_popup")
         else:
              # Should be caught by GET check generally, but for safety:
             flash("You cannot afford to run away. Earn more gold or finish the quest.", "error_modal")
@@ -289,7 +337,29 @@ def edit_quest(id):
         return redirect(url_for('main.dashboard'))
         
     if request.method == 'POST':
+        # Restriction Check for Dailies
+        if quest.is_daily:
+            # Only allow progress and comments
+            try:
+                 quest.progress = int(request.form.get('progress', 0))
+            except ValueError:
+                 pass
+                 
+            # New Comment
+            new_comment_text = request.form.get('new_comment')
+            if new_comment_text and new_comment_text.strip():
+                comment = QuestComment(content=new_comment_text.strip(), quest_id=quest.id)
+                db.session.add(comment)
+                
+            db.session.commit()
+            db.session.commit()
+            flash("Daily Quest updated (Progress/Notes only).", "system_popup")
+            return redirect(url_for('main.dashboard'))
+            return redirect(url_for('main.dashboard'))
+
+        # Normal Quest Logic
         quest.title = request.form.get('title')
+        quest.description = request.form.get('description')
         quest.rank = request.form.get('rank')
         quest.stat_reward = request.form.get('stat')
         
@@ -318,7 +388,9 @@ def edit_quest(id):
         quest.xp_reward = xp_map.get(quest.rank, 10)
         
         db.session.commit()
-        flash("Quest updated.", "success")
+        db.session.commit()
+        flash("Quest updated.", "system_popup")
+        return redirect(url_for('main.dashboard'))
         return redirect(url_for('main.dashboard'))
         
     # Reuse dashboard? Or render a specific edit page?
@@ -360,6 +432,37 @@ def architect_breakdown(quest_id):
     
     db.session.commit()
     flash(f"Decomposition Complete: {created_count} sub-quests created.", "success")
+    return redirect(url_for('main.dashboard'))
+
+@bp.route('/claim_purchase/<int:log_id>', methods=['POST'])
+@login_required
+def claim_purchase(log_id):
+    buy_log = db.session.get(PurchaseLog, log_id)
+    
+    if not buy_log or buy_log.player_id != current_user.id:
+        flash("Invalid item.", "error")
+        return redirect(url_for('main.dashboard'))
+        
+    if buy_log.is_claimed:
+        flash("Already claimed.", "warning")
+    else:
+        buy_log.is_claimed = True
+        buy_log.claimed_at = datetime.now(timezone.utc)
+        db.session.commit()
+        flash(f"Consumed: {buy_log.item_name}", "success")
+        
+    return redirect(url_for('main.dashboard'))
+
+from app.services import equip_title_service
+
+@bp.route('/equip_title/<int:title_id>', methods=['POST'])
+@login_required
+def equip_title_route(title_id):
+    success, msg = equip_title_service(current_user, title_id)
+    if success:
+        flash(msg, "success")
+    else:
+        flash(msg, "error")
     return redirect(url_for('main.dashboard'))
 
 
