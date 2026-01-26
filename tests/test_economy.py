@@ -34,13 +34,13 @@ class TestEconomy(unittest.TestCase):
         self.assertGreater(calculate_xp_required(6), 300)
 
     def test_rewards(self):
-        xp, gold = calculate_rewards('C')
+        xp, gold, coins = calculate_rewards('C')
         self.assertEqual(xp, 60)
-        self.assertEqual(gold, 50)
+        self.assertEqual(gold, 0)
         
-        xp, gold = calculate_rewards('A')
+        xp, gold, coins = calculate_rewards('A')
         self.assertEqual(xp, 500)
-        self.assertEqual(gold, 1000)
+        self.assertEqual(gold, 300)
 
     def test_quest_completion(self):
         quest = Quest(title="Test Quest", rank="C", xp_reward=60, gold_reward=50, player_id=self.player.id)
@@ -50,13 +50,13 @@ class TestEconomy(unittest.TestCase):
         # Player has 10 INT -> +5% XP
         # Rank C = 60 XP. +5% = 63 XP.
         
-        xp_gain, gold_gain, leveled_up = process_quest_completion(self.player, quest)
+        xp_gain, gold_gain, coin_gain, leveled_up, daily_bonus, can_arise = process_quest_completion(self.player, quest)
         
         self.assertEqual(xp_gain, 63)
-        self.assertEqual(gold_gain, 50)
+        self.assertEqual(gold_gain, 0) # Rank C gives 0 Gold now (only B+ gives gold)
         self.assertEqual(self.player.xp, 63)
         self.assertFalse(leveled_up)
-        self.assertEqual(self.player.gold, 50)
+        self.assertEqual(self.player.gold, 0)
         self.assertTrue(quest.is_completed)
 
     def test_level_up(self):
@@ -71,7 +71,7 @@ class TestEconomy(unittest.TestCase):
         # Level 1 requires 100.
         # Surplus 147. Level becomes 2. New Req = 125.
         
-        _, _, leveled_up = process_quest_completion(self.player, quest)
+        _, _, _, leveled_up, _, _ = process_quest_completion(self.player, quest)
         
         self.assertTrue(leveled_up)
         self.assertEqual(self.player.level, 3)

@@ -27,6 +27,8 @@ class Player(UserMixin, db.Model):
     # --- PROGRESSION ---
     level = db.Column(db.Integer, default=1)
     xp = db.Column(db.Integer, default=0)
+    job_class = db.Column(db.String(50), default='None')
+    rank = db.Column(db.String(1), default='E') # New Rank System
     xp_required = db.Column(db.Integer, default=100)
 
     # Replaced simple string with relationship, but keeping string for fallback or efficiency? 
@@ -40,7 +42,7 @@ class Player(UserMixin, db.Model):
     # Helper to get display title
     @property
     def title_display(self):
-        return self.current_title.name if self.current_title else "E-Rank Hunter"
+        return self.current_title.name if self.current_title else "Noob"
     
     # --- ECONOMY (The Reward) ---
     gold = db.Column(db.Integer, default=0) 
@@ -116,6 +118,22 @@ class RewardItem(db.Model):
     cost = db.Column(db.Integer, nullable=False) # e.g. 50 Gold
     currency = db.Column(db.String(20), default='gold') # 'gold' or 'coins'
     stock = db.Column(db.Integer, default=-1) # -1 = Infinite
+    
+    # New Inventory Props
+    item_type = db.Column(db.String(20), default='consumable') # 'consumable', 'equipment'
+    stat_bonus = db.Column(db.String(20), nullable=True) # e.g. 'STR'
+    stat_value = db.Column(db.Integer, default=0) # e.g. 2
+    slot = db.Column(db.String(20), nullable=True) # 'weapon', 'armor', 'accessory'
+
+class Inventory(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
+    item_id = db.Column(db.Integer, db.ForeignKey('reward_item.id'), nullable=False)
+    is_equipped = db.Column(db.Boolean, default=False)
+    acquired_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    player = db.relationship('Player', backref=db.backref('inventory', lazy=True))
+    item = db.relationship('RewardItem')
 
 class PurchaseLog(db.Model):
     """ History of purchased items. Resets on weekly reset (Sunday). """
@@ -150,3 +168,21 @@ class PlayerTitle(db.Model):
     
     player = db.relationship('Player', back_populates='unlocked_titles')
     title = db.relationship('Title')
+
+class Shadow(db.Model):
+    """ 
+    The Shadow Army. 
+    S-Rank Quests that have been completed and 'Arised'.
+    Provide permanent passive buffs.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
+    original_quest_name = db.Column(db.String(100), nullable=False)
+    rank = db.Column(db.String(10), default='S')
+    extracted_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    
+    # Buff Logic
+    buff_type = db.Column(db.String(50), default='ALL_STATS') # 'ALL_STATS', 'STR', etc.
+    buff_value = db.Column(db.Integer, default=1) # +1% or +1 Flat
+    
+    player = db.relationship('Player', backref=db.backref('shadows', lazy=True))

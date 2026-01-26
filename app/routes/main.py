@@ -2,8 +2,8 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from sqlalchemy import or_
 from app.extensions import db
-from app.models import Player, Quest, RewardItem, QuestComment, PurchaseLog
-from app.services import check_weekly_reset, check_daily_reset, get_categorized_quests, calculate_rewards, process_quest_completion, ensure_welcome_quest
+from app.models import Player, Quest, RewardItem, QuestComment, PurchaseLog, Inventory
+from app.services import check_weekly_reset, check_daily_reset, get_categorized_quests, calculate_rewards, process_quest_completion, ensure_welcome_quest, calculate_total_stats, extract_shadow
 from datetime import datetime, timezone
 
 bp = Blueprint('main', __name__)
@@ -41,7 +41,10 @@ def dashboard():
              PurchaseLog.purchased_at >= player.last_weekly_reset
          ).order_by(PurchaseLog.purchased_at.desc()).all()
     
-    return render_template('dashboard.html', player=player, 
+    # Calculate Total Stats (Base + Equipment + Debuffs)
+    total_stats = calculate_total_stats(player)
+    
+    return render_template('dashboard.html', player=player, stats=total_stats,
                            dailies=dailies, scheduled=scheduled, backlog=backlog, 
                            shop_items=shop_items, purchase_history=purchase_history)
 
@@ -98,6 +101,7 @@ def add_quest():
 
 @bp.route('/complete/<int:id>', methods=['GET', 'POST'])
 @login_required
+@login_required
 def complete_quest(id):
     quest = db.session.get(Quest, id)
     player = current_user
@@ -110,27 +114,38 @@ def complete_quest(id):
         return render_template('verify_completion.html', quest=quest)
     
     # POST: Execute Completion
-    if not quest.is_completed:
-        xp_gain, gold_gain, coin_gain, level_up, daily_bonus = process_quest_completion(player, quest)
+    xp_gain, gold_gain, coin_gain, level_up, daily_bonus, can_arise = process_quest_completion(player, quest)
+    
+    # Feedback
+    msg = f"COMPLETE: {quest.title} | +{xp_gain} XP"
+    if gold_gain > 0:
+        msg += f" | +{gold_gain} G"
+    if coin_gain > 0:
+        msg += f" | +{coin_gain} C"
         
-        # Feedback
-        msg = f"COMPLETE: {quest.title} | +{xp_gain} XP"
-        if gold_gain > 0:
-            msg += f" | +{gold_gain} G"
-        if coin_gain > 0:
-            msg += f" | +{coin_gain} C"
-            
-        flash(msg, "system_popup")
+    flash(msg, "system_popup")
+    
+    if daily_bonus:
+            flash("DAILY BONUS: All tasks completed! +100 Gold | +20 Coins | +50 XP", "system_popup")
+    
+    if level_up:
+        flash("LEVEL UP!", "levelup")
         
-        if daily_bonus:
-             flash("DAILY BONUS: All tasks completed! +100 Gold | +20 Coins | +50 XP", "system_popup")
+    # Check for Evolution (Service attaches this attribute temporarily)
+    if hasattr(player, 'just_evolved') and player.just_evolved:
+        flash(f"CLASS EVOLVED: You are now a {player.just_evolved}!", "system_popup")
         
-        if level_up:
-            flash("LEVEL UP!", "levelup")
-            
-        if quest.is_penalty:
-            flash("PENALTY CLEARED. WELCOME BACK.", "system_popup")
+    # Check for Rank Up
+    if hasattr(player, 'just_ranked_up') and player.just_ranked_up:
+        flash(f"RANK UP: You have reached {player.just_ranked_up}-Rank!", "system_popup")
         
+    if quest.is_penalty:
+        flash("PENALTY CLEARED. WELCOME BACK.", "system_popup")
+
+    if can_arise:
+        # Trigger 'Arise' Interaction via URL Param for reliability
+        return redirect(url_for('main.dashboard', arise=quest.id))
+    
     return redirect(url_for('main.dashboard'))
 
 
@@ -150,23 +165,59 @@ def buy_item(item_id):
         return redirect(url_for('main.dashboard'))
         
     if player.gold >= item.cost:
-        if item.stock != -1 and item.stock <= 0:
-            flash("Out of Stock.", "error")
+        # Check stock
+        if item.stock != -1:
+            if item.stock <= 0:
+                flash("Out of Stock.", "error")
+                return redirect(url_for('main.dashboard'))
+            else:
+                item.stock -= 1
+
+        # Deduct Cost
+        if item.currency == 'coins':
+            if player.coins < item.cost:
+               flash("Not enough coins.", "error")
+               return redirect(url_for('main.dashboard'))
+            player.coins -= item.cost
         else:
             player.gold -= item.cost
-            if item.stock > 0:
-                item.stock -= 1
-            db.session.commit()
             
-            # Log Purchase
+        # Inventory Logic: If Equipment -> Add to Inventory
+        if item.item_type == 'equipment':
+            new_inv = Inventory(player_id=player.id, item_id=item.id)
+            db.session.add(new_inv)
+            # Log purchase as claimed immediately since it's an item
+            log = PurchaseLog(player_id=player.id, item_name=item.name, cost=item.cost, is_claimed=True, claimed_at=datetime.now(timezone.utc))
+            msg_text = f"Purchased {item.name}. Added to Inventory."
+        else:
+            # Consumable
             log = PurchaseLog(player_id=player.id, item_name=item.name, cost=item.cost)
-            db.session.add(log)
-            db.session.commit()
+            msg_text = f"Purchased: {item.name}"
             
-            if request.args.get('json'):
-                return jsonify({'success': True, 'message': f"Purchased {item.name}", 'new_gold': player.gold})
+        db.session.add(log)
+        db.session.commit()
+        
+        if request.args.get('json'):
+            response_data = {
+                'success': True, 
+                'message': msg_text,
+                'new_gold': player.gold,
+                'new_coins': player.coins
+            }
+            
+            # If equipment, include details for UI update
+            if item.item_type == 'equipment' and 'new_inv' in locals():
+                response_data['item_details'] = {
+                    'name': item.name,
+                    'type': item.item_type,
+                    'stat_bonus': item.stat_bonus,
+                    'stat_value': item.stat_value,
+                    'inv_id': new_inv.id
+                }
+                
+            return jsonify(response_data)
 
-            flash(f"Purchased: {item.name}", "success")
+        flash(msg_text, "success")
     else:
         if request.args.get('json'):
              return jsonify({'success': False, 'message': "Insufficient Funds."})
@@ -326,8 +377,6 @@ def delete_quest(id):
             current_user.gold -= penalty
             db.session.delete(quest)
             db.session.commit()
-            db.session.delete(quest)
-            db.session.commit()
             flash(f"Quest Abandoned. You lost {penalty} G.", "system_popup")
         else:
              # Should be caught by GET check generally, but for safety:
@@ -369,9 +418,7 @@ def edit_quest(id):
                 db.session.add(comment)
                 
             db.session.commit()
-            db.session.commit()
             flash("Daily Quest updated (Progress/Notes only).", "system_popup")
-            return redirect(url_for('main.dashboard'))
             return redirect(url_for('main.dashboard'))
 
         # Normal Quest Logic
@@ -405,9 +452,7 @@ def edit_quest(id):
         quest.xp_reward = xp_map.get(quest.rank, 10)
         
         db.session.commit()
-        db.session.commit()
         flash("Quest updated.", "system_popup")
-        return redirect(url_for('main.dashboard'))
         return redirect(url_for('main.dashboard'))
         
     # Reuse dashboard? Or render a specific edit page?
@@ -478,6 +523,92 @@ def equip_title_route(title_id):
     success, msg = equip_title_service(current_user, title_id)
     if success:
         flash(msg, "success")
+    else:
+        flash(msg, "error")
+    return redirect(url_for('main.dashboard'))
+
+@bp.route('/job_qualification')
+@login_required
+def job_qualification():
+    if current_user.job_class != 'None':
+        flash("You have already chosen a path.", "warning")
+        return redirect(url_for('main.dashboard'))
+    
+    if current_user.level < 10:
+        flash("You are not yet ready. (Level 10 Required)", "error")
+        return redirect(url_for('main.dashboard'))
+        
+    return redirect(url_for('main.job_test'))
+
+@bp.route('/job_test', methods=['GET', 'POST'])
+@login_required
+def job_test():
+    if current_user.job_class != 'None':
+        return redirect(url_for('main.dashboard'))
+    
+    if request.method == 'POST':
+        q1 = request.form.get('q1')
+        q2 = request.form.get('q2')
+        q3 = request.form.get('q3')
+        
+        # Simple Logic: Majority wins. Tie-break: Q3 (Weapon)
+        answers = [q1, q2, q3]
+        counts = {'A': answers.count('A'), 'B': answers.count('B'), 'C': answers.count('C')}
+        
+        # Determine winner
+        winner = max(counts, key=counts.get)
+        
+        # Handle Tie (if max count appears more than once, use Q3)
+        if list(counts.values()).count(counts[winner]) > 1:
+            winner = q3
+            
+        job_map = {
+            'A': 'Assassin',
+            'B': 'Mage',
+            'C': 'Tank'
+        }
+        
+        selected_class = job_map.get(winner, 'Fighter')
+        
+        current_user.job_class = selected_class
+        db.session.commit()
+        
+        flash(f"SYSTEM: Class Change Complete. You are now a {selected_class.upper()}.", "system_popup")
+        return redirect(url_for('main.dashboard'))
+        
+    return render_template('job_test.html')
+
+from app.services import equip_item_service, unequip_item_service
+
+@bp.route('/equip_item/<int:inv_id>', methods=['POST'])
+@login_required
+def equip_item_route(inv_id):
+    success, msg = equip_item_service(current_user, inv_id)
+    if success:
+        flash(msg, "success")
+    else:
+        flash(msg, "error")
+    return redirect(url_for('main.dashboard'))
+
+@bp.route('/unequip_item/<int:inv_id>', methods=['POST'])
+@login_required
+def unequip_item_route(inv_id):
+    success, msg = unequip_item_service(current_user, inv_id)
+    if success:
+        flash(msg, "success")
+    else:
+        flash(msg, "error")
+    return redirect(url_for('main.dashboard'))
+
+@bp.route('/arise/<int:quest_id>', methods=['POST'])
+@login_required
+def arise_route(quest_id):
+    success, msg = extract_shadow(current_user, quest_id)
+    if success:
+        flash(msg, "success") 
+        flash(msg, "system_popup") 
+        # Add visual flare trigger
+        flash("shadow_born", "shadow_born")
     else:
         flash(msg, "error")
     return redirect(url_for('main.dashboard'))

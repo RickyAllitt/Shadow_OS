@@ -136,6 +136,7 @@ def test_abandon_success(auth_client, app):
     assert b"Quest Abandoned" in response.data
     
     with app.app_context():
+        db.session.expire_all()
         assert db.session.get(Quest, quest_id) is None
         user = Player.query.filter_by(name="AuthUser").first()
         assert user.gold == 90 # 100 - 10

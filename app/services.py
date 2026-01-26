@@ -1,5 +1,5 @@
 from app.extensions import db
-from app.models import Player, RewardItem, Quest, Title, PlayerTitle
+from app.models import Player, RewardItem, Quest, Title, PlayerTitle, Inventory, Shadow
 
 def seed_database():
     """Populates the database with initial game state."""
@@ -38,7 +38,10 @@ def seed_database():
     # 2. Create Default Shop Items (Rewards)
     if not RewardItem.query.first():
         default_rewards = [
-            RewardItem(name="Night Out with Friends", cost=600, stock=-1),
+            RewardItem(name="Night Out with Friends", cost=600, stock=-1, item_type='consumable'),
+            RewardItem(name="Novice Dagger", cost=100, stock=1, currency='coins', item_type='equipment', stat_bonus='STR', stat_value=2),
+            RewardItem(name="Apprentice Grimoire", cost=100, stock=1, currency='coins', item_type='equipment', stat_bonus='INT', stat_value=2),
+            RewardItem(name="Iron Shield", cost=100, stock=1, currency='coins', item_type='equipment', stat_bonus='VIT', stat_value=2),
         ]
         db.session.add_all(default_rewards)
         print(">> Shop Stocked.")
@@ -129,41 +132,26 @@ def process_quest_completion(player, quest):
     int_multiplier = 1 + (player.intelligence / 10) * 0.05
     xp_gain = int(base_xp * int_multiplier)
     
+    # --- CLASS BONUSES ---
+    # Assassin: +10% Gold
+    if player.job_class == 'Assassin':
+        base_gold = int(base_gold * 1.10)
+        
+    # Mage: +10% XP
+    if player.job_class == 'Mage':
+        xp_gain = int(xp_gain * 1.10)
+
     player.xp += xp_gain
     player.gold += base_gold
     player.coins += base_coins
     
-    # 2. Stat Buffs
-    if quest.stat_reward == 'STR': player.strength += 1
-    elif quest.stat_reward == 'INT': player.intelligence += 1
-    elif quest.stat_reward == 'AGI': player.agility += 1
-    elif quest.stat_reward == 'VIT': player.vitality += 1
-    elif quest.stat_reward == 'SNS': player.sense += 1
+    # 2. Apply Stat Buffs
+    _apply_quest_stat_reward(player, quest)
     
     # 3. Daily Completion Bonus (+100 Gold + 50 XP)
     daily_bonus = False
     if quest.is_daily:
-        dailies = Quest.query.filter_by(player_id=player.id, is_daily=True).all()
-        # Check if ALL dailies are now completed
-        all_completed = all(q.is_completed for q in dailies)
-        
-        if all_completed:
-            # Check if bonus already claimed today
-            now = datetime.now(timezone.utc)
-            today_midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
-            
-            # Use player.last_daily_bonus if exists
-            last_bonus = player.last_daily_bonus
-            if last_bonus and last_bonus.tzinfo is None:
-                last_bonus = last_bonus.replace(tzinfo=timezone.utc)
-                
-            if not last_bonus or last_bonus < today_midnight:
-                player.gold += 100
-                player.xp += 50 # Bonus XP
-                player.coins += 20 # Bonus Coins
-                player.last_daily_bonus = now
-                daily_bonus = True
-                print(f">> Daily Bonus Granted for {player.name}")
+        daily_bonus = _check_and_apply_daily_bonus(player)
 
     # 4. Level Up Logic (Moved after all XP gains)
     initial_level = player.level
@@ -171,7 +159,19 @@ def process_quest_completion(player, quest):
         player.level += 1
         player.xp -= player.xp_required
         player.xp_required = calculate_xp_required(player.level)
-
+        
+        # Check Evolution immediately on level up
+        evolved, new_class = check_class_evolution(player)
+        if evolved:
+             print(f">> CLASS EVOLUTION: {player.name} became {new_class}!")
+             player.just_evolved = new_class
+             
+        # Check Rank Up
+        ranked_up, new_rank = check_player_rank_up(player)
+        if ranked_up:
+             print(f">> RANK UP: {player.name} is now Rank {new_rank}!")
+             player.just_ranked_up = new_rank
+             
     # Check titles on every completion (level up or streak)
     check_title_unlocks(player)
 
@@ -182,7 +182,42 @@ def process_quest_completion(player, quest):
         player.has_debuff = False
         
     db.session.commit()
-    return xp_gain, base_gold, base_coins, (player.level > initial_level), daily_bonus
+    
+    can_arise = (quest.rank == 'S')
+    return xp_gain, base_gold, base_coins, (player.level > initial_level), daily_bonus, can_arise
+
+def _apply_quest_stat_reward(player, quest):
+    """Helper to apply stat rewards from a quest."""
+    if quest.stat_reward == 'STR': player.strength += 1
+    elif quest.stat_reward == 'INT': player.intelligence += 1
+    elif quest.stat_reward == 'AGI': player.agility += 1
+    elif quest.stat_reward == 'VIT': player.vitality += 1
+    elif quest.stat_reward == 'SNS': player.sense += 1
+
+def _check_and_apply_daily_bonus(player):
+    """Checks if all dailies are done and applies bonus if not claimed yet."""
+    dailies = Quest.query.filter_by(player_id=player.id, is_daily=True).all()
+    # Check if ALL dailies are now completed
+    all_completed = all(q.is_completed for q in dailies)
+    
+    if all_completed:
+        # Check if bonus already claimed today
+        now = datetime.now(timezone.utc)
+        today_midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        # Use player.last_daily_bonus if exists
+        last_bonus = player.last_daily_bonus
+        if last_bonus and last_bonus.tzinfo is None:
+            last_bonus = last_bonus.replace(tzinfo=timezone.utc)
+            
+        if not last_bonus or last_bonus < today_midnight:
+            player.gold += 100
+            player.xp += 50 # Bonus XP
+            player.coins += 20 # Bonus Coins
+            player.last_daily_bonus = now
+            print(f">> Daily Bonus Granted for {player.name}")
+            return True
+    return False
 
 def check_daily_reset(player):
     """
@@ -216,11 +251,18 @@ def check_daily_reset(player):
             # FAILURE LOGIC
             player.consecutive_missed_days += 1
             
-            # Stage 1: Debuff (Immediate)
-            player.has_debuff = True
+            # --- CLASS BONUS: TANK ---
+            # Tanks ignore the first day of failure (Grace Period)
+            effective_missed_days = player.consecutive_missed_days
+            if player.job_class == 'Tank':
+                effective_missed_days = max(0, effective_missed_days - 1)
             
-            # Stage 2: Penalty Zone (2 Days Missed)
-            if player.consecutive_missed_days >= 2:
+            # Stage 1: Debuff (Immediate)
+            if effective_missed_days >= 1:
+                player.has_debuff = True
+            
+            # Stage 2: Penalty Zone (2 Days Missed -> Tanks: 3 Days)
+            if effective_missed_days >= 2:
                 player.in_penalty_zone = True
                 
                 # Check if penalty quest exists, if not create one
@@ -238,8 +280,8 @@ def check_daily_reset(player):
                     )
                     db.session.add(penalty)
 
-            # Stage 3: Level Down (3 Days Missed)
-            if player.consecutive_missed_days >= 3:
+            # Stage 3: Level Down (3 Days Missed -> Tanks: 4 Days)
+            if effective_missed_days >= 3:
                 if player.level > 1:
                     player.level -= 1
                     player.xp = 0 # Reset XP bar
@@ -334,6 +376,14 @@ def check_title_unlocks(player):
                 current_val = getattr(player, stat_name)
                 if current_val >= t.unlock_value:
                     unlocked = True
+                    
+        # Wealth Unlocks
+        elif t.unlock_condition == 'gold':
+            if player.gold >= t.unlock_value:
+                unlocked = True
+        elif t.unlock_condition == 'coins':
+            if player.coins >= t.unlock_value:
+                unlocked = True
                 
         if unlocked:
             assoc = PlayerTitle(player=player, title=t)
@@ -359,6 +409,137 @@ def equip_title_service(player, title_id):
     player.current_title = title
     db.session.commit()
     return True, f"Equipped title: {title.name}"
+
+def check_class_evolution(player):
+    """ Checks for Class Upgrades at Level 20, 40, 60, 80, 100. """
+    evolution_map = {
+        # Tier 1 -> Tier 2 (Level 20)
+        "Assassin": ("Shadow Assassin", 20),
+        "Mage": ("Archmage", 20),
+        "Tank": ("Juggernaut", 20),
+        
+        # Tier 2 -> Tier 3 (Level 40)
+        "Shadow Assassin": ("Shadow Lord", 40),
+        "Archmage": ("Spellweaver", 40),
+        "Juggernaut": ("Iron Fortress", 40),
+        
+        # Tier 3 -> Tier 4 (Level 60)
+        "Shadow Lord": ("Nightwalker", 60),
+        "Spellweaver": ("Arcane Sage", 60),
+        "Iron Fortress": ("Titan", 60),
+        
+        # Tier 4 -> Tier 5 (Level 80)
+        "Nightwalker": ("Eclipse Bringer", 80),
+        "Arcane Sage": ("Void Walker", 80),
+        "Titan": ("World Guardian", 80),
+        
+        # Tier 5 -> Tier 6 (Level 100)
+        "Eclipse Bringer": ("Monarch of Shadows", 100),
+        "Void Walker": ("Monarch of Scrolls", 100),
+        "World Guardian": ("Monarch of Iron", 100)
+    }
+    
+    current_class = player.job_class
+    if current_class in evolution_map:
+        next_class, required_level = evolution_map[current_class]
+        if player.level >= required_level:
+            player.job_class = next_class
+            # db.session.commit() # Caller handles commit
+            return True, next_class
+            
+    return False, None
+
+def check_player_rank_up(player):
+    """ Checks if player qualifies for a higher Hunter Rank. """
+    # Rank Requirements: (Level, Total Stats)
+    rank_reqs = {
+        'E': ('D', 10, 50),
+        'D': ('C', 20, 100),
+        'C': ('B', 40, 200),
+        'B': ('A', 60, 350),
+        'A': ('S', 80, 500)
+    }
+    
+    if player.rank == 'S':
+        return False, None
+
+    next_rank, req_lvl, req_stats = rank_reqs.get(player.rank, (None, 999, 9999))
+    
+    if next_rank:
+        total_stats = player.strength + player.agility + player.intelligence + player.vitality + player.sense
+        if player.level >= req_lvl and total_stats >= req_stats:
+            player.rank = next_rank
+            return True, next_rank
+            
+    return False, None
+
+def equip_item_service(player, inventory_id):
+    """ Equips an item from inventory. """
+    item_record = db.session.get(Inventory, inventory_id)
+    if not item_record or item_record.player_id != player.id:
+        return False, "Item not found."
+    
+    if item_record.item.item_type != 'equipment':
+        return False, "Cannot equip this item."
+        
+    # Logic: Enforce "One Item per Slot"
+    target_slot = item_record.item.slot
+    if target_slot:
+        # Check if slot is occupied
+        occupied = db.session.query(Inventory).join(RewardItem).filter(
+            Inventory.player_id == player.id,
+            Inventory.is_equipped == True,
+            RewardItem.slot == target_slot,
+            Inventory.id != item_record.id 
+        ).first()
+        
+        if occupied:
+            return False, f"Slot {target_slot} already occupied by {occupied.item.name}"
+    
+    item_record.is_equipped = True
+    db.session.commit()
+    return True, f"Equipped: {item_record.item.name}"
+
+def unequip_item_service(player, inventory_id):
+    """ Unequips an item. """
+    item_record = db.session.get(Inventory, inventory_id)
+    if not item_record or item_record.player_id != player.id:
+        return False, "Item not found."
+        
+    item_record.is_equipped = False
+    db.session.commit()
+    return True, f"Unequipped: {item_record.item.name}"
+
+def extract_shadow(player, quest_id):
+    """ 
+    Arise.
+    Converts a completed S-Rank Quest into a Shadow Soldier. 
+    """
+    quest = db.session.get(Quest, quest_id)
+    if not quest or quest.player_id != player.id:
+        return False, "Quest not found."
+    
+    if quest.rank != 'S' and not quest.is_penalty: # Allow Penalty extraction? No, only glory.
+         return False, "Only S-Rank feats can be extracted."
+         
+    if not quest.is_completed:
+        return False, "Quest must be completed first."
+        
+    # Check if already extracted? (Unique constraint? Or just allow multiple?)
+    # Let's check duplicate original name to prevent spamming same quest?
+    # For now, allow it.
+    
+    shadow = Shadow(
+        player_id=player.id,
+        original_quest_name=quest.title,
+        rank=quest.rank,
+        buff_type='ALL_STATS', # Default for now
+        buff_value=1 # +1%
+    )
+    db.session.add(shadow)
+    db.session.commit()
+    
+    return True, f"ARISE. {quest.title} has joined your Shadow Army."
 
 def ensure_welcome_quest(player):
     """
@@ -391,3 +572,47 @@ def ensure_welcome_quest(player):
         db.session.commit()
         return True
     return False
+
+def calculate_total_stats(player):
+    """
+    Returns a dictionary of total stats (Base + Equipment + Buffs).
+    """
+    stats = {
+        'strength': player.strength,
+        'intelligence': player.intelligence,
+        'agility': player.agility,
+        'vitality': player.vitality,
+        'sense': player.sense
+    }
+    
+    # Add Equipment Bonuses
+    for inv_item in player.inventory:
+        if inv_item.is_equipped and inv_item.item.stat_bonus:
+            # Standardizing: RewardItem.stat_bonus should match Player field names or simple map
+            # Let's map STR -> strength
+            mapper = {
+                'STR': 'strength',
+                'INT': 'intelligence',
+                'AGI': 'agility',
+                'VIT': 'vitality',
+                'SNS': 'sense'
+            }
+            target_stat = mapper.get(inv_item.item.stat_bonus, inv_item.item.stat_bonus.lower())
+            
+            if target_stat in stats:
+                stats[target_stat] += inv_item.item.stat_value
+                
+    # Shadow Army Buffs (Percentage Scaling)
+    # Each Shadow gives +1% All Stats (default)
+    shadow_count = len(player.shadows)
+    if shadow_count > 0:
+        multiplier = 1 + (shadow_count * 0.01) # e.g. 5 shadows = 1.05x
+        for key in stats:
+            stats[key] = int(stats[key] * multiplier)
+                
+    # Penalty Debuff (-20%)
+    if player.has_debuff:
+        for key in stats:
+            stats[key] = int(stats[key] * 0.8)
+            
+    return stats

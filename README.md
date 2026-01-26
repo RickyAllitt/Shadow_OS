@@ -15,13 +15,17 @@ A gamified life-management system inspired by *Solo Leveling*. Track your quests
 ### 2. Quests & Progression
 - **Daily Quests**: Recurring tasks that must be completed every 24 hours.
 - **Ranked Quests**: E-Rank to S-Rank tasks with exponential XP/Gold rewards.
-- **AI Architect**: Uses Gemini to analyze custom tasks and assign appropriate Ranks/Stats.
-- **Leveling**: Exponential XP curve. Leveling up refreshes your status.
+- **Hunter Rank**: Climb from **Rank E** to **Rank S** by meeting Stat and Level requirements.
+- **Class System**: Evolve your class at Levels 20, 40, 60, 80, and 100.
+    - **Paths**: *Assassin* (Gold), *Mage* (XP), *Tank* (Survival).
+- **Shadow Army**: Extract the shadows of S-Rank bosses to build your own army (Stat Buffs).
 
-### 3. The Economy
-- **Gold (G)**: Earn gold from quests.
-- **Shop**: Spend gold on real-life rewards (Cheat Meals, Gaming, etc.).
-- **Weekly Reset**: Gold resets to 0 every Sunday night. Spend it or lose it.
+### 3. The Economy & Equipment
+- **Gold (G)**: Currency for standard rewards.
+- **Coins (C)**: Premium currency for endgame items.
+- **Shop**: Buy equipment (Weapons, Armor) and real-life rewards.
+- **Inventory**: Equip items to "Weapon", "Head", "Body", and "Accessory" slots.
+- **Weekly Reset**: Gold resets to 0 every Sunday night.
 
 ### 4. The Penalty System
 If you fail your Daily Quests:
