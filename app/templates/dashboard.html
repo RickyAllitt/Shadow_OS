@@ -221,11 +221,11 @@
 
         </section>
 
-        <!-- INVENTORY SECTION -->
+        <!-- EQUIPMENT SECTION (Quick View) -->
         <div class="inventory-section" style="margin-top: 20px;">
             <h3 style="font-size: 0.9em; color: var(--color-text-muted); margin-bottom: 10px;">EQUIPMENT</h3>
 
-            <!-- PAPER DOLL SLOTS -->
+            <!-- PAPER DOLL SLOTS (Limited to 4 original) -->
             <div class="equipment-slots"
                 style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
                 {% for slot in ['head', 'body', 'weapon', 'accessory'] %}
@@ -250,6 +250,7 @@
                             }}</span>
                         <span style="color: cyan; font-size: 0.8em;">{{ equipped_item.item.stat_bonus }} +{{
                             equipped_item.item.stat_value }}</span>
+                        <!-- Quick Unequip -->
                         <form action="{{ url_for('main.unequip_item_route', inv_id=equipped_item.id) }}" method="POST"
                             style="margin-top: 5px;">
                             <button type="submit" class="btn-small"
@@ -266,51 +267,13 @@
                 {% endfor %}
             </div>
 
-            <h3 style="font-size: 0.9em; color: var(--color-text-muted); margin-bottom: 10px;">BAG</h3>
-            {% if player.inventory %}
-            <div class="inventory-list" style="display: flex; flex-direction: column; gap: 10px;">
-                {% for inv in player.inventory %}
-                <div class="inv-item"
-                    style="background: rgba(255, 255, 255, 0.05); padding: 10px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; {% if inv.is_equipped %}border: 1px solid var(--color-primary);{% endif %}">
-                    <div>
-                        <span style="color: #bbb; display: block;">{{ inv.item.name }} {% if inv.is_equipped %}<span
-                                style="font-size: 0.8em; color: var(--color-primary); font-weight: bold;">[EQUIPPED]</span>{%
-                            endif %}</span>
-                        {% if inv.item.item_type == 'equipment' %}
-                        <span style="font-size: 0.8em; color: cyan;">
-                            {{ inv.item.stat_bonus }} +{{ inv.item.stat_value }}
-                        </span>
-                        {% endif %}
-                    </div>
-
-                    {% if inv.item.item_type == 'equipment' %}
-                    {% if inv.is_equipped %}
-                    <form action="{{ url_for('main.unequip_item_route', inv_id=inv.id) }}" method="POST"
-                        style="margin:0;">
-                        <button type="submit" class="btn btn-sm"
-                            style="border: 1px solid #777; color: #777; background: transparent;">EQP</button>
-                    </form>
-                    {% else %}
-                    <form action="{{ url_for('main.equip_item_route', inv_id=inv.id) }}" method="POST"
-                        style="margin:0;">
-                        <button type="submit" class="btn btn-sm"
-                            style="background: var(--color-primary); border: none; color: black;">USE</button>
-                    </form>
-                    {% endif %}
-                    {% else %}
-                    <!-- Consumable -->
-                    <form action="{{ url_for('main.use_item_route', inv_id=inv.id) }}" method="POST" style="margin:0;">
-                        <button type="submit" class="btn btn-sm"
-                            style="background: var(--color-success); border: none; color: black;">USE</button>
-                    </form>
-                    {% endif %}
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <div style="font-size: 0.8em; color: #555; text-align: center;">Empty</div>
-            {% endif %}
+            <a href="{{ url_for('main.inventory') }}" class="btn-small"
+                style="width: 100%; display: block; text-align: center; border-color: #777; color: #ccc; text-decoration: none; padding: 10px;">
+                OPEN INVENTORY / BAG
+            </a>
         </div>
+
+
 
         <!-- RECOVERY SECTION (COMPACT) -->
         <div class="recovery-compact" style="margin-top: 15px; border-top: 1px solid #333; padding-top: 10px;">

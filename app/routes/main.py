@@ -569,6 +569,11 @@ def job_test():
 
 from app.services import equip_item_service, unequip_item_service
 
+@bp.route('/inventory')
+@login_required
+def inventory():
+    return render_template('inventory.html', player=current_user)
+
 @bp.route('/equip_item/<int:inv_id>', methods=['POST'])
 @login_required
 def equip_item_route(inv_id):
@@ -577,6 +582,9 @@ def equip_item_route(inv_id):
         flash(msg, "success")
     else:
         flash(msg, "error")
+        
+    if request.form.get('redirect_to') == 'inventory':
+        return redirect(url_for('main.inventory'))
     return redirect(url_for('main.dashboard'))
 
 @bp.route('/unequip_item/<int:inv_id>', methods=['POST'])
@@ -587,6 +595,9 @@ def unequip_item_route(inv_id):
         flash(msg, "success")
     else:
         flash(msg, "error")
+        
+    if request.form.get('redirect_to') == 'inventory':
+        return redirect(url_for('main.inventory'))
     return redirect(url_for('main.dashboard'))
 
 @bp.route('/use_item/<int:inv_id>', methods=['POST'])
@@ -621,6 +632,9 @@ def use_item_route(inv_id):
     db.session.commit()
     
     flash(f"Used: {item_name}", "success")
+    
+    if request.form.get('redirect_to') == 'inventory':
+        return redirect(url_for('main.inventory'))
     return redirect(url_for('main.dashboard'))
 
 @bp.route('/shop')
