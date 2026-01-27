@@ -54,6 +54,12 @@ class Player(UserMixin, db.Model):
     last_sleep_duration = db.Column(db.Float, default=0.0) # Hours slept
     last_sleep_log_date = db.Column(db.Date, nullable=True) # Track the last date (YYYY-MM-DD) sleep was logged
     sleep_streak = db.Column(db.Integer, default=0) # Days with 7+ hours
+    daily_focus_duration = db.Column(db.Integer, default=0) # Minutes dedicated to "The Void" today
+    
+    # --- ONBOARDING & CORE ---
+    setup_complete = db.Column(db.Boolean, default=False)
+    penalty_description = db.Column(db.String(255), default="Survival") # Custom punishment
+    penalties_count = db.Column(db.Integer, default=0) # Track number of times in Penalty Zone
     
     # Condition affects XP gain. 
     # "Healthy" (100% XP), "Well Rested" (110% XP), "Exhausted" (50% XP)
@@ -149,6 +155,23 @@ class PurchaseLog(db.Model):
 
     player = db.relationship('Player', backref='purchase_history')
 
+class DailySnapshot(db.Model):
+    """ Tracks player progress over time for Analytics. """
+    id = db.Column(db.Integer, primary_key=True)
+    player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
+    date = db.Column(db.Date, nullable=False, default=lambda: datetime.now(timezone.utc).date())
+    
+    level = db.Column(db.Integer)
+    xp = db.Column(db.Integer)
+    total_stats = db.Column(db.Integer) # Sum of stats
+    
+    # Snapshot of core stats
+    strength = db.Column(db.Integer)
+    intelligence = db.Column(db.Integer)
+    agility = db.Column(db.Integer)
+    vitality = db.Column(db.Integer)
+    sense = db.Column(db.Integer)
+    
 class Title(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), nullable=False)

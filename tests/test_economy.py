@@ -134,10 +134,77 @@ class TestEconomy(unittest.TestCase):
         check_daily_reset(self.player)
         
         self.assertEqual(self.player.consecutive_missed_days, 0) # Reset
-        self.assertEqual(self.player.level, 4) # Level Down
+        self.assertEqual(self.player.level, 2) # Level Down (5 - 3 = 2)
         self.assertEqual(self.player.xp, 0) # XP Reset
-        self.assertEqual(self.player.strength, 9) # Stat Loss
+        self.assertEqual(self.player.strength, 7) # Stat Loss (10 - 3 = 7)
         self.assertFalse(self.player.in_penalty_zone) # Unlocked
+
+    def test_penalty_clearance(self):
+        # Setup: Player in Penalty Zone
+        self.player.in_penalty_zone = True
+        self.player.has_debuff = True
+        self.player.consecutive_missed_days = 2
+        
+        # Create Penalty Quest
+        penalty_quest = Quest(
+            title="PENALTY: Survival", 
+            rank="S", 
+            player_id=self.player.id, 
+            is_penalty=True, 
+            xp_reward=0, 
+            gold_reward=0
+        )
+        db.session.add(penalty_quest)
+        db.session.commit()
+        
+        # Complete it
+        process_quest_completion(self.player, penalty_quest)
+        
+        self.assertFalse(self.player.in_penalty_zone)
+        self.assertFalse(self.player.has_debuff)
+        self.assertEqual(self.player.consecutive_missed_days, 0)
+        self.assertTrue(penalty_quest.is_completed)
+
+    def test_penalty_redemption_via_dailies(self):
+        """ Test that completing all dailies clears an active penalty (Day 1/2). """
+        # Setup: Player has missed 1 day (Debuff Active)
+        self.player.consecutive_missed_days = 1
+        self.player.has_debuff = True
+        
+        # Create 2 Dailies
+        d1 = Quest(title="D1", is_daily=True, player_id=self.player.id, rank="E")
+        d2 = Quest(title="D2", is_daily=True, player_id=self.player.id, rank="E")
+        db.session.add_all([d1, d2])
+        db.session.commit()
+        
+        # Complete D1 (Partial)
+        process_quest_completion(self.player, d1)
+        self.assertTrue(self.player.has_debuff) # Still active
+        
+        # Complete D2 (Full)
+        process_quest_completion(self.player, d2)
+        
+        # Should be cleared
+        self.assertFalse(self.player.has_debuff)
+        self.assertEqual(self.player.consecutive_missed_days, 0)
+
+    def test_penalty_redemption_with_claimed_bonus(self):
+        """ Test that redemption works even if the Daily Bonus was already 'claimed' (or check failed). """
+        self.player.consecutive_missed_days = 1
+        self.player.has_debuff = True
+        
+        # Simulate that bonus was already claimed today
+        self.player.last_daily_bonus = datetime.now(timezone.utc)
+        
+        d1 = Quest(title="D1", is_daily=True, player_id=self.player.id, rank="E")
+        db.session.add(d1)
+        db.session.commit()
+        
+        process_quest_completion(self.player, d1)
+        
+        # Redemption should STILL happen
+        self.assertFalse(self.player.has_debuff)
+        self.assertEqual(self.player.consecutive_missed_days, 0)
 
 if __name__ == '__main__':
     unittest.main()

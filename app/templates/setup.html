@@ -1,0 +1,128 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<style>
+    .setup-container {
+        max-width: 600px;
+        margin: 50px auto;
+        padding: 30px;
+        background: rgba(0, 0, 0, 0.8);
+        border: 1px solid var(--color-primary);
+        box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+        color: #fff;
+    }
+
+    .setup-title {
+        text-align: center;
+        color: var(--color-primary);
+        font-size: 2em;
+        margin-bottom: 10px;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        text-shadow: 0 0 10px var(--color-primary);
+    }
+
+    .setup-subtitle {
+        text-align: center;
+        color: #aaa;
+        margin-bottom: 30px;
+        font-family: 'Courier New', monospace;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        color: var(--color-gold);
+        font-weight: bold;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 10px;
+        background: #111;
+        border: 1px solid #444;
+        color: #fff;
+        font-family: inherit;
+    }
+
+    .form-control:focus {
+        border-color: var(--color-primary);
+        outline: none;
+        box-shadow: 0 0 5px var(--color-primary);
+    }
+
+    .penalty-group {
+        margin-top: 40px;
+        border-top: 1px solid #333;
+        padding-top: 20px;
+    }
+
+    .penalty-group label {
+        color: red;
+        text-shadow: 0 0 5px red;
+    }
+
+    .btn-submit {
+        width: 100%;
+        padding: 15px;
+        background: transparent;
+        border: 1px solid var(--color-primary);
+        color: var(--color-primary);
+        font-size: 1.2em;
+        cursor: pointer;
+        transition: all 0.3s;
+        margin-top: 20px;
+        text-transform: uppercase;
+        font-weight: bold;
+    }
+
+    .btn-submit:hover {
+        background: var(--color-primary);
+        color: #000;
+        box-shadow: 0 0 20px var(--color-primary);
+    }
+</style>
+
+<div class="setup-container">
+    <div class="setup-title">System Initialization</div>
+    <div class="setup-subtitle">CONFIGURE DAILY PROTOCOL</div>
+
+    <form method="POST">
+        <p style="color: #ccc; margin-bottom: 20px; text-align: center;">
+            To proceed, you must establish 4 Daily Quests. These are non-negotiable tasks required for your survival.
+        </p>
+
+        <div class="form-group">
+            <label>DAILY QUEST 1</label>
+            <input type="text" name="quest1" class="form-control" placeholder="e.g. 100 Pushups" required>
+        </div>
+        <div class="form-group">
+            <label>DAILY QUEST 2</label>
+            <input type="text" name="quest2" class="form-control" placeholder="e.g. 10km Run" required>
+        </div>
+        <div class="form-group">
+            <label>DAILY QUEST 3</label>
+            <input type="text" name="quest3" class="form-control" placeholder="e.g. Read 10 Pages" required>
+        </div>
+        <div class="form-group">
+            <label>DAILY QUEST 4</label>
+            <input type="text" name="quest4" class="form-control" placeholder="e.g. Code for 1 Hour" required>
+        </div>
+
+        <div class="form-group penalty-group">
+            <label>PENALTY PUNISHMENT</label>
+            <p style="color: #666; font-size: 0.9em; margin-bottom: 10px;">
+                If you fail to complete your dailies, this Penalty Quest will be issued.
+                Completion is mandatory to remove System Restrictions.
+            </p>
+            <input type="text" name="penalty" class="form-control" placeholder="e.g. Survival Run (10km)" required>
+        </div>
+
+        <button type="submit" class="btn-submit">INITIALIZE SYSTEM</button>
+    </form>
+</div>
+{% endblock %}

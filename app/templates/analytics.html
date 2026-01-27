@@ -1,0 +1,89 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container" style="max-width: 800px; margin: 0 auto; color: #fff;">
+    <h2 class="section-title">SYSTEM LOGS // ANALYTICS</h2>
+
+    <!-- STAT RADAR -->
+    <div
+        style="background: rgba(0,0,0,0.5); border: 1px solid #333; padding: 20px; margin-bottom: 20px; border-radius: 10px;">
+        <h3 style="color: cyan; margin-bottom: 15px;">ABILITY PARAMETERS</h3>
+        <canvas id="statChart"></canvas>
+    </div>
+
+    <!-- GROWTH CHART -->
+    <div
+        style="background: rgba(0,0,0,0.5); border: 1px solid #333; padding: 20px; margin-bottom: 20px; border-radius: 10px;">
+        <h3 style="color: var(--color-gold); margin-bottom: 15px;">GROWTH PROTOCOL (Last 30 Days)</h3>
+        <canvas id="growthChart"></canvas>
+    </div>
+
+    <a href="{{ url_for('main.dashboard') }}" class="btn-action">Return to Dashboard</a>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Stats
+    const ctxStats = document.getElementById('statChart').getContext('2d');
+    new Chart(ctxStats, {
+        type: 'radar',
+        data: {
+            labels: ['STR', 'INT', 'AGI', 'VIT', 'SNS'],
+            datasets: [{
+                label: 'Current Stats',
+                data: [{{ stats.STR }}, {{ stats.INT }}, {{ stats.AGI }}, {{ stats.VIT }}, {{ stats.SNS }}],
+        backgroundColor: 'rgba(0, 255, 255, 0.2)',
+        borderColor: 'cyan',
+        pointBackgroundColor: '#fff',
+        pointBorderColor: '#fff'
+            }]
+        },
+        options: {
+        scales: {
+            r: {
+                angleLines: { color: '#333' },
+                grid: { color: '#333' },
+                pointLabels: { color: '#fff', font: { size: 14 } },
+                suggestedMin: 0,
+                suggestedMax: 20 // Adjust dynamic?
+            }
+        },
+        plugins: {
+            legend: { display: false }
+        }
+    }
+    });
+
+    // Growth
+    const ctxGrowth = document.getElementById('growthChart').getContext('2d');
+    new Chart(ctxGrowth, {
+        type: 'line',
+        data: {
+            labels: {{ dates | tojson }},
+        datasets: [{
+            label: 'Player Level',
+            data: {{ levels | tojson }},
+        borderColor: '#ffeb3b',
+        backgroundColor: 'rgba(255, 235, 59, 0.1)',
+        fill: true,
+        tension: 0.4
+            }]
+        },
+        options: {
+        scales: {
+            y: {
+                grid: { color: '#333' },
+                ticks: { color: '#aaa', stepSize: 1 }
+            },
+            x: {
+                grid: { color: '#333' },
+                ticks: { color: '#aaa' }
+            }
+        },
+        plugins: {
+            legend: { labels: { color: '#fff' } }
+        }
+    }
+    });
+</script>
+{% endblock %}

@@ -1,5 +1,5 @@
 from app.extensions import db
-from app.models import Player, RewardItem, Quest, Title, PlayerTitle, Inventory, Shadow
+from app.models import Player, RewardItem, Quest, Title, PlayerTitle, Inventory, Shadow, DailySnapshot
 
 def seed_database():
     """Populates the database with initial game state."""
@@ -36,15 +36,61 @@ def seed_database():
              db.session.add(assoc)
 
     # 2. Create Default Shop Items (Rewards)
-    if not RewardItem.query.first():
-        default_rewards = [
-            RewardItem(name="Night Out with Friends", cost=600, stock=-1, item_type='consumable'),
-            RewardItem(name="Novice Dagger", cost=100, stock=1, currency='coins', item_type='equipment', stat_bonus='STR', stat_value=2),
-            RewardItem(name="Apprentice Grimoire", cost=100, stock=1, currency='coins', item_type='equipment', stat_bonus='INT', stat_value=2),
-            RewardItem(name="Iron Shield", cost=100, stock=1, currency='coins', item_type='equipment', stat_bonus='VIT', stat_value=2),
-        ]
-        db.session.add_all(default_rewards)
-        print(">> Shop Stocked.")
+    # 2. Create Default Shop Items (Rewards)
+    # Define all desired items
+    desired_items = [
+        # Gold Rewards (Real Life)
+        {'name': "Night Out with Friends", 'cost': 600, 'stock': -1, 'currency': 'gold', 'item_type': 'consumable', 'stat_bonus': None, 'stat_value': 0, 'slot': None},
+        {'name': "Video Game Session (1h)", 'cost': 50, 'stock': -1, 'currency': 'gold', 'item_type': 'consumable', 'stat_bonus': None, 'stat_value': 0, 'slot': None},
+        
+        # Coin Rewards (System Gear)
+        # Weapons
+        {'name': "Novice Dagger", 'cost': 100, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'STR', 'stat_value': 2, 'slot': 'weapon'},
+        {'name': "Demon's Dagger", 'cost': 1200, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'STR', 'stat_value': 10, 'slot': 'weapon'},
+        
+        # Armor
+        {'name': "Iron Shield", 'cost': 100, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'VIT', 'stat_value': 2, 'slot': 'offhand'},
+        {'name': "Shadow Hood", 'cost': 300, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'AGI', 'stat_value': 3, 'slot': 'head'},
+        {'name': "Hunter's Vest", 'cost': 500, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'VIT', 'stat_value': 5, 'slot': 'body'},
+        {'name': "Assassin's Gloves", 'cost': 250, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'SNS', 'stat_value': 3, 'slot': 'hands'},
+        
+        # Accessories
+        {'name': "Apprentice Grimoire", 'cost': 100, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'INT', 'stat_value': 2, 'slot': 'accessory'},
+        {'name': "Ring of Clarity", 'cost': 400, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'INT', 'stat_value': 5, 'slot': 'accessory'},
+        
+        # Coin Consumables
+        {'name': "Elixir of Vitality", 'cost': 100, 'stock': 5, 'currency': 'coins', 'item_type': 'consumable', 'stat_bonus': 'VIT', 'stat_value': 1, 'slot': None},
+        
+        # Mid-Tier Gear (800-1200 Range)
+        {'name': "High Orc's Helm", 'cost': 900, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'VIT', 'stat_value': 6, 'slot': 'head'},
+        {'name': "Warden's Necklace", 'cost': 1000, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'SNS', 'stat_value': 6, 'slot': 'accessory'},
+        {'name': "Blue Venom Fang", 'cost': 1100, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'STR', 'stat_value': 8, 'slot': 'weapon'},
+        
+        # New High-Tier Gear (Expansion Phase 2)
+        {'name': "Shadow Boots", 'cost': 600, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'AGI', 'stat_value': 5, 'slot': 'feet'},
+        {'name': "Knight Killer", 'cost': 2500, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'STR', 'stat_value': 15, 'slot': 'weapon'},
+        {'name': "Baruka's Dagger", 'cost': 2000, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'AGI', 'stat_value': 10, 'slot': 'weapon'},
+        {'name': "Cloak of Shadows", 'cost': 1500, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'SNS', 'stat_value': 10, 'slot': 'back'},
+        {'name': "Orb of Avarice", 'cost': 3000, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'INT', 'stat_value': 20, 'slot': 'accessory'},
+        {'name': "Red Knight's Helmet", 'cost': 1800, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'VIT', 'stat_value': 10, 'slot': 'head'},
+    ]
+
+    for item_data in desired_items:
+        if not RewardItem.query.filter_by(name=item_data['name']).first():
+            new_item = RewardItem(
+                name=item_data['name'],
+                cost=item_data['cost'],
+                stock=item_data['stock'],
+                currency=item_data['currency'],
+                item_type=item_data['item_type'],
+                stat_bonus=item_data['stat_bonus'],
+                stat_value=item_data['stat_value'],
+                slot=item_data['slot']
+            )
+            db.session.add(new_item)
+            print(f">> Created Shop Item: {item_data['name']}")
+
+    print(">> Shop Stock Verified.")
 
     db.session.commit()
 
@@ -97,17 +143,44 @@ def calculate_xp_required(level):
     # Base is 100 for Level 1 -> 2
     return int(100 * (1.25 ** (level - 1)))
 
-def calculate_rewards(rank):
-    """ Returns (XP, Gold, Coins) based on Rank """
-    rewards = {
-        'E': (10, 0, 0),
-        'D': (25, 0, 0),
-        'C': (60, 0, 0),
-        'B': (150, 150, 10),
-        'A': (500, 300, 25),
-        'S': (1000, 600, 50)
+def calculate_rewards(rank, player_level=1):
+    """ Returns (XP, Gold, Coins) based on Rank and Scaled Level Cap """
+    
+    # 1. Calculate XP Requirement for current level
+    xp_cap = calculate_xp_required(player_level)
+    
+    # 2. Define Percentages (Target: 4 Years to Lvl 100)
+    percentages = {
+        'E': 0.005, # 0.5%
+        'D': 0.01,  # 1%
+        'C': 0.02,  # 2%
+        'B': 0.04,  # 4%
+        'A': 0.10,  # 10%
+        'S': 0.20   # 20%
     }
-    return rewards.get(rank, (10, 0, 0))
+    
+    # 3. Calculate Scaled XP
+    pct = percentages.get(rank, 0.005)
+    scaled_xp = int(xp_cap * pct)
+    
+    # 4. Enforce Minimums (Base Values) so low levels don't get 0 XP
+    min_xp = {
+        'E': 10, 'D': 25, 'C': 60, 'B': 150, 'A': 500, 'S': 1000
+    }
+    final_xp = max(min_xp.get(rank, 10), scaled_xp)
+    
+    # 5. Gold/Coins remain flat (Economy balance separate from Leveling)
+    rewards_flat = {
+        'E': (0, 0),
+        'D': (0, 0),
+        'C': (0, 0),
+        'B': (150, 10),
+        'A': (300, 25),
+        'S': (600, 50)
+    }
+    gold, coins = rewards_flat.get(rank, (0, 0))
+    
+    return final_xp, gold, coins
 
 def process_quest_completion(player, quest):
     """ Handles all rewards, stats, and level up logic. """
@@ -118,7 +191,8 @@ def process_quest_completion(player, quest):
     quest.completed_at = datetime.now(timezone.utc)
     
     # 1. Calculate Rewards
-    base_xp, base_gold, base_coins = calculate_rewards(quest.rank)
+    # 1. Calculate Rewards (Pass Level for Scaling)
+    base_xp, base_gold, base_coins = calculate_rewards(quest.rank, player.level)
     if quest.xp_reward: # Override if set on quest
         base_xp = quest.xp_reward
         
@@ -195,29 +269,72 @@ def _apply_quest_stat_reward(player, quest):
     elif quest.stat_reward == 'SNS': player.sense += 1
 
 def _check_and_apply_daily_bonus(player):
-    """Checks if all dailies are done and applies bonus if not claimed yet."""
-    dailies = Quest.query.filter_by(player_id=player.id, is_daily=True).all()
+    """Checks if all dailies are done. Applies bonus if eligible. Clears penalty if active."""
     # Check if ALL dailies are now completed
+    dailies = Quest.query.filter_by(player_id=player.id, is_daily=True).all()
     all_completed = all(q.is_completed for q in dailies)
     
+    bonus_granted = False
+    
     if all_completed:
-        # Check if bonus already claimed today
+        # 1. Daily Bonus Logic
         now = datetime.now(timezone.utc)
         today_midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
         
-        # Use player.last_daily_bonus if exists
         last_bonus = player.last_daily_bonus
         if last_bonus and last_bonus.tzinfo is None:
             last_bonus = last_bonus.replace(tzinfo=timezone.utc)
             
         if not last_bonus or last_bonus < today_midnight:
+            # Scaled Daily Bonus: 3% of Level Cap
+            xp_cap = calculate_xp_required(player.level)
+            bonus_xp = int(xp_cap * 0.03)
+            player.xp += bonus_xp
+            
             player.gold += 100
-            player.xp += 50 # Bonus XP
-            player.coins += 20 # Bonus Coins
+            player.coins += 20
             player.last_daily_bonus = now
             print(f">> Daily Bonus Granted for {player.name}")
-            return True
-    return False
+            bonus_granted = True
+
+        # 2. Penalty Redemption Logic
+        # Independent of whether bonus was just granted or claimed previously.
+        if player.consecutive_missed_days > 0:
+            print(f">> REDEMPTION: {player.name} cleared penalty debt via hard work.")
+            player.consecutive_missed_days = 0
+            player.has_debuff = False
+            player.in_penalty_zone = False
+
+    return bonus_granted
+
+def _create_daily_snapshot(player):
+    """ Creates a historical record of the player's status for today (yesterday effectively). """
+    # We record the state as it was "yesterday" (the day being closed out). 
+    # Or simplified: Record CURRENT state as the snapshot for YESTERDAY'S DATE?
+    # Actually, we are running this at the START of a new day, so we are snapshotting the result of the previous day.
+    # Let's verify if a snapshot already defaults to 'now', which is 'today'. 
+    # We want the date to be the day that just finished.
+    
+    today = datetime.now(timezone.utc).date()
+    yesterday = today - timedelta(days=1)
+    
+    # Check if snapshot exists for yesterday (to avoid duplicates if script runs multiple times)
+    existing = DailySnapshot.query.filter_by(player_id=player.id, date=yesterday).first()
+    if not existing:
+        snap = DailySnapshot(
+            player_id=player.id,
+            date=yesterday,
+            level=player.level,
+            xp=player.xp,
+            total_stats=sum(calculate_total_stats(player).values()),
+            strength=player.strength,
+            intelligence=player.intelligence,
+            agility=player.agility,
+            vitality=player.vitality,
+            sense=player.sense
+        )
+        db.session.add(snap)
+        print(f">> Created Daily Snapshot for {yesterday}")
 
 def check_daily_reset(player):
     """
@@ -237,6 +354,12 @@ def check_daily_reset(player):
     
     if player.last_daily_reset < today_midnight:
         # A new day has dawned. Judgment Time.
+        
+        # 1. Capture Analytics Snapshot (Before reset changes stats or levels down)
+        _create_daily_snapshot(player)
+        
+        # 2. Reset Daily Variables
+        player.daily_focus_duration = 0 # Reset Focus Timer
         
         dailies = Quest.query.filter_by(player_id=player.id, is_daily=True).all()
         
@@ -268,8 +391,11 @@ def check_daily_reset(player):
                 # Check if penalty quest exists, if not create one
                 existing_penalty = Quest.query.filter_by(player_id=player.id, is_penalty=True, is_completed=False).first()
                 if not existing_penalty:
+                    # NEW PENALTY INCIDENT
+                    player.penalties_count += 1
+                    
                     penalty = Quest(
-                        title="PENALTY: Survival", 
+                        title=f"PENALTY: {player.penalty_description}", 
                         rank="S", 
                         player_id=player.id,
                         xp_reward=0, 
@@ -283,15 +409,15 @@ def check_daily_reset(player):
             # Stage 3: Level Down (3 Days Missed -> Tanks: 4 Days)
             if effective_missed_days >= 3:
                 if player.level > 1:
-                    player.level -= 1
+                    player.level = max(1, player.level - 3) # Lose 3 Levels
                     player.xp = 0 # Reset XP bar
                     player.xp_required = calculate_xp_required(player.level)
-                    # Stat Loss (Random or Fixed? Let's do -1 all for massive pain)
-                    player.strength = max(1, player.strength - 1)
-                    player.intelligence = max(1, player.intelligence - 1)
-                    player.agility = max(1, player.agility - 1)
-                    player.sense = max(1, player.sense - 1)
-                    player.vitality = max(1, player.vitality - 1)
+                    # Stat Loss (Massive Pain)
+                    player.strength = max(1, player.strength - 3)
+                    player.intelligence = max(1, player.intelligence - 3)
+                    player.agility = max(1, player.agility - 3)
+                    player.sense = max(1, player.sense - 3)
+                    player.vitality = max(1, player.vitality - 3)
                     
                 player.consecutive_missed_days = 0 # The debt is paid in blood
                 player.in_penalty_zone = False # Unlocked, but broken

@@ -1,0 +1,163 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="dashboard-grid">
+    <div class="panel" style="grid-column: 1 / -1; max-width: 800px; margin: 0 auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div>
+                <h2 style="margin: 0;">SYSTEM SHOP</h2>
+                <div style="font-size: 0.9em; margin-top: 5px; color: var(--color-gold);">
+                    <span id="playerGold">{{ player.gold }}</span> G
+                    <span style="color: #666;">|</span>
+                    <span id="playerCoins" style="color: var(--color-purple-light);">{{ player.coins }}</span> C
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="document.getElementById('shopHistoryModal').style.display='flex'" class="btn-small"
+                    style="background: transparent; border: 1px solid #444;">HISTORY</button>
+                <a href="{{ url_for('main.dashboard') }}" class="btn-small">BACK TO DASHBOARD</a>
+            </div>
+        </div>
+
+        <div id="shopContent">
+            {% if player.in_penalty_zone %}
+            <div style="text-align: center; padding: 20px; color: var(--color-danger);">
+                <span class="material-icons" style="font-size: 3em;">lock</span>
+                <p>LOCKED: PENALTY ACTIVE</p>
+                <p style="font-size: 0.8em;">Complete your Penalty Quest to restore access.</p>
+            </div>
+            {% else %}
+
+            {% for currency, currency_group in shop_items|groupby('currency') %}
+
+            <div style="margin-top: 30px; margin-bottom: 10px; border-bottom: 1px solid #444; padding-bottom: 5px;">
+                <h3
+                    style="color: {% if currency == 'coins' %}var(--color-purple-light){% else %}var(--color-gold){% endif %}; margin: 0;">
+                    {% if currency == 'coins' %}HUNTER'S SHOP (COINS){% else %}REAL WORLD REWARDS (GOLD){% endif %}
+                </h3>
+            </div>
+
+            {% for type, type_group in currency_group|groupby('item_type') %}
+
+            <h4
+                style="color: #888; margin-top: 15px; margin-bottom: 10px; text-transform: uppercase; font-size: 0.9em;">
+                {{ type }}
+            </h4>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px;">
+                {% for item in type_group %}
+                <div class="shop-item"
+                    style="border: 1px solid #333; padding: 15px; background: rgba(255,255,255,0.05); display: flex; flex-direction: column; justify-content: space-between;">
+                    <div style="margin-bottom: 10px;">
+                        <div class="item-name" style="font-weight: bold; color: #fff;">{{ item.name }}</div>
+                        {% if item.description %}
+                        <div style="font-size: 0.8em; color: #888;">{{ item.description }}</div>
+                        {% endif %}
+
+                        <!-- Show Stats if Equipment -->
+                        {% if item.item_type == 'equipment' and item.stat_bonus %}
+                        <div style="font-size: 0.8em; color: var(--color-info); margin-top: 2px;">
+                            {{ item.slot|upper }}: {{ item.stat_bonus }} +{{ item.stat_value }}
+                        </div>
+                        {% endif %}
+
+                        <div class="item-cost" style="margin-top: 5px;">
+                            {% if item.currency == 'coins' %}
+                            <span style="color: var(--color-purple-light); font-weight: bold;">{{ item.cost }} C</span>
+                            {% else %}
+                            <span style="color: var(--color-gold); font-weight: bold;">{{ item.cost }} G</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% if item.currency == 'coins' %}
+                    {% if player.coins >= item.cost %}
+                    <button id="btn-buy-{{ item.id }}" onclick="buyItem({{ item.id }})" class="btn-small"
+                        style="width: 100%; border-color: var(--color-purple-light); color: var(--color-purple-light);">BUY</button>
+                    {% else %}
+                    <button class="btn-small" style="width: 100%; opacity: 0.3; cursor: not-allowed;">LOCKED</button>
+                    {% endif %}
+                    {% else %}
+                    {% if player.gold >= item.cost %}
+                    <button id="btn-buy-{{ item.id }}" onclick="buyItem({{ item.id }})" class="btn-small"
+                        style="width: 100%;">BUY</button>
+                    {% else %}
+                    <button class="btn-small" style="width: 100%; opacity: 0.3; cursor: not-allowed;">LOCKED</button>
+                    {% endif %}
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+            {% endfor %}
+
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% include 'components/shop_history_modal.html' %}
+
+<script>
+    const SoundManager = {
+        sounds: {
+            'buy': new Audio("{{ url_for('static', filename='sounds/buy_item.mp3') }}"),
+            'popup': new Audio("{{ url_for('static', filename='sounds/popup.mp3') }}")
+        },
+        play: function (name) {
+            if (this.sounds[name]) {
+                this.sounds[name].volume = 0.5;
+                this.sounds[name].currentTime = 0;
+                this.sounds[name].play().catch(e => console.log("Audio play blocked/missing: " + name));
+            }
+        }
+    };
+
+    function buyItem(itemId) {
+        const btn = document.getElementById(`btn-buy-${itemId}`);
+        const originalText = btn.innerText;
+        btn.innerText = "...";
+        btn.disabled = true;
+
+        fetch('/buy/' + itemId + '?json=true', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.innerText = originalText;
+
+                if (data.success) {
+                    SoundManager.play('buy');
+                    // Update Balance
+                    if (document.getElementById('playerGold'))
+                        document.getElementById('playerGold').innerText = data.new_gold;
+                    if (document.getElementById('playerCoins'))
+                        document.getElementById('playerCoins').innerText = data.new_coins;
+
+                    // Visual Feedback
+                    btn.innerText = "PURCHASED";
+                    btn.style.borderColor = "var(--color-success)";
+                    btn.style.color = "var(--color-success)";
+
+                    setTimeout(() => {
+                        btn.innerText = originalText;
+                        btn.style.borderColor = "";
+                        btn.style.color = "";
+                    }, 1500);
+
+                } else {
+                    alert("Error: " + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                btn.disabled = false;
+                btn.innerText = originalText;
+            });
+    }
+</script>
+{% endblock %}

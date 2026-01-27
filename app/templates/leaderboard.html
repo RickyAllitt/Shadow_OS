@@ -15,6 +15,8 @@
                     <th style="text-align: left; padding: 10px;">NAME</th>
                     <th style="text-align: left; padding: 10px;">TITLE</th>
                     <th style="text-align: right; padding: 10px;">LEVEL</th>
+                    <th style="text-align: left; padding: 10px;">CLASS</th>
+                    <th style="text-align: left; padding: 10px;">FAILURES</th>
                 </tr>
             </thead>
             <tbody>
@@ -37,8 +39,14 @@
                         {{ player.title_display or 'None' }}
                     </td>
                     <td
-                        style="padding: 15px; text-align: right; font-family: monospace; font-size: 1.2em; color: var(--color-gold);">
+                        style="padding: 15px; text-align: right; font-family: 'Courier New', monospace; font-size: 1.2em; color: var(--color-gold);">
                         LVL {{ player.level }}
+                    </td>
+                    <td style="padding: 15px; color: #b19cd9;">
+                        {{ player.job_class if player.job_class != 'None' else '-' }}
+                    </td>
+                    <td style="padding: 15px; color: red; font-weight: bold; text-align: center;">
+                        {{ player.penalties_count }}
                     </td>
                 </tr>
                 {% endfor %}

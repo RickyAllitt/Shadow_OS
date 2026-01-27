@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from sqlalchemy import or_
 from app.extensions import db
-from app.models import Player, Quest, RewardItem, QuestComment, PurchaseLog, Inventory
+from app.models import Player, Quest, RewardItem, QuestComment, PurchaseLog, Inventory, DailySnapshot
 from app.services import check_weekly_reset, check_daily_reset, get_categorized_quests, calculate_rewards, process_quest_completion, ensure_welcome_quest, calculate_total_stats, extract_shadow
 from datetime import datetime, timezone
 
@@ -24,29 +24,18 @@ def dashboard():
     # Get Items
     dailies, scheduled, backlog = get_categorized_quests(player.id)
     
-    # Onboarding: If absolutely no quests exist, seed one and reload
-    if not dailies and not scheduled and not backlog:
-        if ensure_welcome_quest(player):
-             dailies, scheduled, backlog = get_categorized_quests(player.id)
-             flash("Welcome, Player. A tutorial protocol has been initiated.", "levelup")
+    # Onboarding Check
+    if not player.setup_complete:
+        return redirect(url_for('main.setup_page'))
     
-    # Get shop items (where stock is infinite (-1) OR stock > 0)
-    shop_items = RewardItem.query.filter(or_(RewardItem.stock == -1, RewardItem.stock > 0)).all()
-    
-    # Get purchase history since last reset
-    purchase_history = []
-    if player.last_weekly_reset:
-         purchase_history = PurchaseLog.query.filter(
-             PurchaseLog.player_id == player.id,
-             PurchaseLog.purchased_at >= player.last_weekly_reset
-         ).order_by(PurchaseLog.purchased_at.desc()).all()
+    # Get Items
+    dailies, scheduled, backlog = get_categorized_quests(player.id)
     
     # Calculate Total Stats (Base + Equipment + Debuffs)
     total_stats = calculate_total_stats(player)
     
     return render_template('dashboard.html', player=player, stats=total_stats,
-                           dailies=dailies, scheduled=scheduled, backlog=backlog, 
-                           shop_items=shop_items, purchase_history=purchase_history)
+                           dailies=dailies, scheduled=scheduled, backlog=backlog)
 
 from app.ai_guardian import TheArchitect
 
@@ -123,7 +112,7 @@ def complete_quest(id):
     if coin_gain > 0:
         msg += f" | +{coin_gain} C"
         
-    flash(msg, "system_popup")
+    flash(msg, "quest_complete")
     
     if daily_bonus:
             flash("DAILY BONUS: All tasks completed! +100 Gold | +20 Coins | +50 XP", "system_popup")
@@ -182,17 +171,17 @@ def buy_item(item_id):
         else:
             player.gold -= item.cost
             
-        # Inventory Logic: If Equipment -> Add to Inventory
         if item.item_type == 'equipment':
-            new_inv = Inventory(player_id=player.id, item_id=item.id)
-            db.session.add(new_inv)
-            # Log purchase as claimed immediately since it's an item
-            log = PurchaseLog(player_id=player.id, item_name=item.name, cost=item.cost, is_claimed=True, claimed_at=datetime.now(timezone.utc))
             msg_text = f"Purchased {item.name}. Added to Inventory."
         else:
-            # Consumable
-            log = PurchaseLog(player_id=player.id, item_name=item.name, cost=item.cost)
-            msg_text = f"Purchased: {item.name}"
+             msg_text = f"Purchased {item.name}. Added to Bag."
+             
+        # Always add to inventory
+        new_inv = Inventory(player_id=player.id, item_id=item.id)
+        db.session.add(new_inv)
+        
+        # Log purchase
+        log = PurchaseLog(player_id=player.id, item_name=item.name, cost=item.cost, is_claimed=True, claimed_at=datetime.now(timezone.utc))
             
         db.session.add(log)
         db.session.commit()
@@ -205,8 +194,8 @@ def buy_item(item_id):
                 'new_coins': player.coins
             }
             
-            # If equipment, include details for UI update
-            if item.item_type == 'equipment' and 'new_inv' in locals():
+            # Include details for UI update (All items now create inventory records)
+            if 'new_inv' in locals():
                 response_data['item_details'] = {
                     'name': item.name,
                     'type': item.item_type,
@@ -600,6 +589,58 @@ def unequip_item_route(inv_id):
         flash(msg, "error")
     return redirect(url_for('main.dashboard'))
 
+@bp.route('/use_item/<int:inv_id>', methods=['POST'])
+@login_required
+def use_item_route(inv_id):
+    """ Consumes a consumable item. """
+    item_record = db.session.get(Inventory, inv_id)
+    if not item_record or item_record.player_id != current_user.id:
+        flash("Item not found.", "error")
+        return redirect(url_for('main.dashboard'))
+        
+    if item_record.item.item_type == 'equipment':
+        flash("Cannot consume equipment.", "error")
+        return redirect(url_for('main.dashboard'))
+        
+    # Effect Logic
+    item_def = item_record.item
+    
+    # Stat Boosts (Permanent)
+    if item_def.stat_bonus and item_def.stat_value > 0:
+        stat_map = {
+            'STR': 'strength', 'INT': 'intelligence', 'AGI': 'agility', 'VIT': 'vitality', 'SNS': 'sense'
+        }
+        attr_name = stat_map.get(item_def.stat_bonus)
+        if attr_name:
+            current_val = getattr(current_user, attr_name)
+            setattr(current_user, attr_name, current_val + item_def.stat_value)
+            flash(f"Effect: {item_def.stat_bonus} increased by {item_def.stat_value}!", "levelup")
+            
+    item_name = item_def.name
+    db.session.delete(item_record)
+    db.session.commit()
+    
+    flash(f"Used: {item_name}", "success")
+    return redirect(url_for('main.dashboard'))
+
+@bp.route('/shop')
+@login_required
+def shop():
+    player = current_user
+    
+    # Get shop items
+    shop_items = RewardItem.query.filter(or_(RewardItem.stock == -1, RewardItem.stock > 0)).order_by(RewardItem.currency, RewardItem.item_type, RewardItem.cost).all()
+    
+    # Get purchase history since last reset
+    purchase_history = []
+    if player.last_weekly_reset:
+         purchase_history = PurchaseLog.query.filter(
+             PurchaseLog.player_id == player.id,
+             PurchaseLog.purchased_at >= player.last_weekly_reset
+         ).order_by(PurchaseLog.purchased_at.desc()).all()
+         
+    return render_template('shop.html', player=player, shop_items=shop_items, purchase_history=purchase_history)
+
 @bp.route('/arise/<int:quest_id>', methods=['POST'])
 @login_required
 def arise_route(quest_id):
@@ -613,4 +654,96 @@ def arise_route(quest_id):
         flash(msg, "error")
     return redirect(url_for('main.dashboard'))
 
+@bp.route('/analytics')
+@login_required
+def analytics():
+    # Fetch snapshots
+    snapshots = DailySnapshot.query.filter_by(player_id=current_user.id).order_by(DailySnapshot.date.asc()).limit(30).all()
+    
+    # Prepare data for Chart.js
+    dates = [s.date.strftime('%Y-%m-%d') for s in snapshots]
+    # Simple growth metric: Level
+    levels = [s.level for s in snapshots]
+    
+    # Stats for Radar
+    stats = {
+        'STR': current_user.strength,
+        'INT': current_user.intelligence,
+        'AGI': current_user.agility,
+        'VIT': current_user.vitality,
+        'SNS': current_user.sense
+    }
+    
+    return render_template('analytics.html', dates=dates, levels=levels, stats=stats)
 
+@bp.route('/focus')
+@login_required
+def focus_mode():
+    return render_template('focus.html')
+
+@bp.route('/focus_complete', methods=['POST'])
+@login_required
+def focus_complete():
+    try:
+        minutes = int(request.json.get('minutes', 0))
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'msg': "Invalid duration."})
+        
+    if minutes < 1:
+        return jsonify({'success': False, 'msg': "Too short."})
+        
+    # Rewards: 1 Coin/min, 2 XP/min (Conservative)
+    coins = minutes * 1
+    xp = minutes * 2
+    
+    current_user.coins += coins
+    current_user.xp += xp
+    current_user.daily_focus_duration += minutes
+    
+    db.session.commit()
+    
+    msg = f"FOCUS COMPLETE: {minutes}m. +{coins} Coins, +{xp} XP."
+    return jsonify({'success': True, 'msg': msg})
+@bp.route('/setup', methods=['GET', 'POST'])
+@login_required
+def setup_page():
+    if current_user.setup_complete:
+        flash("System already initialized.", "warning")
+        return redirect(url_for('main.dashboard'))
+        
+    if request.method == 'POST':
+        # 1. Create 4 Daily Quests
+        q1 = request.form.get('quest1')
+        q2 = request.form.get('quest2')
+        q3 = request.form.get('quest3')
+        q4 = request.form.get('quest4')
+        
+        # 2. Set Penalty Description
+        penalty = request.form.get('penalty')
+        
+        if not all([q1, q2, q3, q4, penalty]):
+            flash("ALL PARAMETERS REQUIRED FOR SYSTEM INITIALIZATION.", "error")
+            return render_template('setup.html')
+            
+        # Create Quests
+        for title in [q1, q2, q3, q4]:
+            quest = Quest(
+                title=title,
+                rank='E',
+                xp_reward=10,
+                stat_reward='STR', # Default, user can edit later
+                player_id=current_user.id,
+                is_daily=True
+            )
+            db.session.add(quest)
+            
+        # Update Player
+        current_user.penalty_description = penalty
+        current_user.setup_complete = True
+        
+        db.session.commit()
+        
+        flash("SYSTEM INITIALIZATION COMPLETE. WELCOME, PLAYER.", "levelup")
+        return redirect(url_for('main.dashboard'))
+        
+    return render_template('setup.html')

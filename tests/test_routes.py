@@ -7,7 +7,7 @@ def auth_client(client, app):
     """Register and login a user."""
     with app.app_context():
         # Create a user in the DB
-        u = Player(name="AuthUser")
+        u = Player(name="AuthUser", setup_complete=True)
         u.set_password("password")
         u.gold = 100 
         db.session.add(u)
@@ -63,7 +63,7 @@ def test_complete_quest(auth_client, app):
 def test_buy_item_success(client, app):
     """Test buying an item with enough gold."""
     with app.app_context():
-        user = Player(name="RichBuyer", gold=200)
+        user = Player(name="RichBuyer", gold=200, setup_complete=True)
         user.set_password("pass")
         db.session.add(user)
         # Stock = 1 (Finite)
@@ -76,7 +76,7 @@ def test_buy_item_success(client, app):
         
     response = client.get(f'/buy/{item_id}', follow_redirects=True)
     assert response.status_code == 200
-    assert b"Purchased: Potion" in response.data
+    assert b"Purchased Potion" in response.data
     
     with app.app_context():
         user = Player.query.filter_by(name="RichBuyer").first()
@@ -87,7 +87,7 @@ def test_buy_item_success(client, app):
 def test_buy_item_insufficient_funds(client, app):
     """Test buying an item without enough gold."""
     with app.app_context():
-        p = Player(name="PoorUser")
+        p = Player(name="PoorUser", setup_complete=True)
         p.set_password("pass")
         p.gold = 0
         db.session.add(p)
@@ -158,7 +158,7 @@ def test_abandon_prescreen_rich(auth_client, app):
 def test_abandon_prescreen_poor(client, app):
     """Test accessing abandon page WITHOUT enough gold (Should redirect)."""
     with app.app_context():
-        user = Player(name="PoorUserPrescreen")
+        user = Player(name="PoorUserPrescreen", setup_complete=True)
         user.set_password("pass")
         user.gold = 10 
         db.session.add(user)
@@ -180,7 +180,7 @@ def test_abandon_prescreen_poor(client, app):
 def test_abandon_insufficient_funds(client, app):
     """Test POSTing to delete without enough gold (Hacking attempt)."""
     with app.app_context():
-        user = Player(name="PoorHacker", gold=0)
+        user = Player(name="PoorHacker", gold=0, setup_complete=True)
         user.set_password("pass")
         db.session.add(user)
         

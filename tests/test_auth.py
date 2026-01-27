@@ -32,10 +32,10 @@ def test_login_flow(client, app):
     assert response.status_code == 200
     assert b"System Access Granted" in response.data
     
-    # Access Dashboard
-    response = client.get('/')
+    # Access Dashboard (Redirects to Setup)
+    response = client.get('/', follow_redirects=True)
     assert response.status_code == 200
-    assert b"SYSTEM INTERFACE" in response.data
+    assert b"INITIALIZE SYSTEM" in response.data
     
     # Logout
     response = client.get('/logout', follow_redirects=True)

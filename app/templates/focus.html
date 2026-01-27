@@ -1,0 +1,299 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<style>
+    body {
+        background-color: #000 !important;
+        color: #fff;
+    }
+
+    .system-header,
+    .level-info,
+    nav {
+        display: none !important;
+    }
+
+    .void-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        text-align: center;
+        font-family: 'Courier New', monospace;
+    }
+
+    .timer-display {
+        font-size: 6rem;
+        font-weight: bold;
+        color: #fff;
+        text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+        margin: 20px 0;
+    }
+
+    .status-msg {
+        color: #666;
+        margin-top: 10px;
+        font-size: 1.2rem;
+        text-transform: uppercase;
+        letter-spacing: 3px;
+        animation: pulse 3s infinite;
+    }
+
+    .input-group {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 30px;
+        justify-content: center;
+    }
+
+    .input-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .input-wrapper label {
+        font-size: 0.8em;
+        color: #888;
+        margin-bottom: 5px;
+    }
+
+    .input-void {
+        background: transparent;
+        border: 1px solid #333;
+        color: cyan;
+        padding: 10px;
+        width: 80px;
+        text-align: center;
+        font-size: 1.2em;
+        font-family: inherit;
+    }
+
+    .btn-void {
+        background: transparent;
+        border: 1px solid cyan;
+        color: cyan;
+        padding: 15px 50px;
+        font-size: 1.2em;
+        cursor: pointer;
+        transition: all 0.3s;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+    }
+
+    .btn-void:hover {
+        background: rgba(0, 255, 255, 0.1);
+        box-shadow: 0 0 15px cyan;
+    }
+
+    .fail-msg {
+        color: red;
+        display: none;
+        font-size: 2rem;
+        font-weight: bold;
+        text-shadow: 0 0 10px red;
+    }
+
+    @keyframes pulse {
+        0% {
+            opacity: 0.5;
+        }
+
+        50% {
+            opacity: 1;
+        }
+
+        100% {
+            opacity: 0.5;
+        }
+    }
+</style>
+
+<div class="void-container" id="menu">
+    <h1 style="color: #fff; text-shadow: 0 0 10px #fff; margin-bottom: 10px;">CONFIGURE PROTOCOL</h1>
+    <p style="color: #666; margin-bottom: 40px;">Customize your session. Do not leave this tab during active focus.</p>
+
+    <div class="input-group">
+        <div class="input-wrapper">
+            <label>FOCUS (MIN)</label>
+            <input type="number" id="focusTime" class="input-void" value="25" min="1">
+        </div>
+        <div class="input-wrapper">
+            <label>REST (MIN)</label>
+            <input type="number" id="restTime" class="input-void" value="5" min="1">
+        </div>
+        <div class="input-wrapper">
+            <label>ROUNDS</label>
+            <input type="number" id="rounds" class="input-void" value="4" min="1">
+        </div>
+    </div>
+
+    <button class="btn-void" onclick="initProtocol()">INITIATE</button>
+
+    <div style="margin-top: 50px;">
+        <p style="color: #444;">Total Focus Today: <span style="color: cyan;">{{ current_user.daily_focus_duration
+                }}m</span></p>
+        <a href="{{ url_for('main.dashboard') }}" style="color: #333; text-decoration: none;">ABORT</a>
+    </div>
+</div>
+
+<div class="void-container" id="session" style="display: none;">
+    <div style="color: #444; letter-spacing: 2px;" id="roundDisplay">ROUND 1 / 4</div>
+    <div class="timer-display" id="timer">00:00</div>
+    <div class="status-msg" id="status">SYSTEM ACTIVE</div>
+    <div class="fail-msg" id="failMsg">CONNECTION LOST.<br>PROTOCOL FAILED.</div>
+</div>
+
+<script>
+    let focusMinutes = 25;
+    let restMinutes = 5;
+    let totalRounds = 4;
+    let currentRound = 1;
+
+    let isFocus = true; // true = Focus, false = Rest
+    let timeLeft = 0;
+    let timerId = null;
+    let blurTime = null;
+    let hasFailed = false;
+
+    // AUDIO
+    const audioAlarm = new Audio("{{ url_for('static', filename='sounds/timer_alarm.mp3') }}");
+    const audioFail = new Audio("{{ url_for('static', filename='sounds/glitch_error.mp3') }}");
+
+    function initProtocol() {
+        focusMinutes = parseInt(document.getElementById('focusTime').value);
+        restMinutes = parseInt(document.getElementById('restTime').value);
+        totalRounds = parseInt(document.getElementById('rounds').value);
+
+        document.getElementById('menu').style.display = 'none';
+        document.getElementById('session').style.display = 'flex';
+
+        startRound();
+    }
+
+    function startRound() {
+        isFocus = true;
+        timeLeft = focusMinutes * 60;
+
+        updateUI("FOCUS PHASE", "cyan");
+        timerId = setInterval(tick, 1000);
+    }
+
+    function startRest() {
+        isFocus = false;
+        timeLeft = restMinutes * 60;
+
+        updateUI("RECOVERY PHASE", "#4caf50"); // Green for rest
+        timerId = setInterval(tick, 1000);
+    }
+
+    function tick() {
+        if (hasFailed) return;
+
+        timeLeft--;
+        updateTimerDisplay();
+
+        if (timeLeft <= 0) {
+            clearInterval(timerId);
+            audioAlarm.play().catch(e => console.log("Audio Error"));
+            if (isFocus) {
+                // Focus Done -> Trigger Reward & Switch to Rest or Finish
+                completeFocusSegment();
+            } else {
+                // Rest Done -> Next Round
+                currentRound++;
+                if (currentRound > totalRounds) {
+                    finishProtocol();
+                } else {
+                    startRound();
+                }
+            }
+        }
+    }
+
+    function updateUI(statusText, color) {
+        document.getElementById('roundDisplay').innerText = `ROUND ${currentRound} / ${totalRounds}`;
+        document.getElementById('status').innerText = statusText;
+        document.getElementById('status').style.color = color;
+        document.getElementById('timer').style.textShadow = `0 0 20px ${color}`;
+        updateTimerDisplay();
+    }
+
+    function updateTimerDisplay() {
+        const m = Math.floor(timeLeft / 60);
+        const s = timeLeft % 60;
+        document.getElementById('timer').innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+
+    function completeFocusSegment() {
+        // Send reward for this specific round
+        fetch('/focus_complete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ minutes: focusMinutes })
+        }).then(res => res.json()).then(data => {
+            if (data.success) {
+                console.log("Reward granting success.");
+            }
+        });
+
+        // Check if last round
+        if (currentRound >= totalRounds) {
+            finishProtocol();
+        } else {
+            startRest();
+        }
+    }
+
+    function finishProtocol() {
+        document.getElementById('status').innerText = "PROTOCOL COMPLETE";
+        document.getElementById('status').style.color = "gold";
+        document.getElementById('timer').innerText = "DONE";
+        setTimeout(() => {
+            alert("Session Complete. Rewards Granted.");
+            window.location.reload();
+        }, 1000);
+    }
+
+    function failSession() {
+        hasFailed = true;
+        clearInterval(timerId);
+        audioFail.play().catch(e => console.log("Audio Error"));
+        document.getElementById('timer').style.display = 'none';
+        document.getElementById('status').style.display = 'none';
+        document.getElementById('failMsg').style.display = 'block';
+
+        setTimeout(() => {
+            window.location.reload();
+        }, 3000);
+    }
+
+    // VISIBILITY CHECK
+    document.addEventListener("visibilitychange", () => {
+        if (hasFailed || !timerId) return;
+
+        // Strict Mode only applies during FOCUS
+        if (!isFocus) return;
+
+        if (document.hidden) {
+            blurTime = Date.now();
+            document.getElementById('status').innerText = "WARNING: RETURN IMMEDIATELY";
+            document.getElementById('status').style.color = "red";
+        } else {
+            // Returned
+            if (blurTime) {
+                const timeAway = (Date.now() - blurTime) / 1000;
+
+                if (timeAway > 20) {
+                    failSession();
+                } else {
+                    document.getElementById('status').innerText = "SYSTEM ACTIVE";
+                    document.getElementById('status').style.color = "cyan";
+                    blurTime = null;
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

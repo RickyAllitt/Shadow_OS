@@ -123,7 +123,7 @@
         {% endif %}
     </div>
     <div style="margin-top: 50px; opacity: 0.5;">
-        FAIL CONDITION: LEVEL DOWN (-1)
+        FAIL CONDITION: LEVEL DOWN (-3)
     </div>
 </div>
 {% endif %}
@@ -163,9 +163,25 @@
 
             <div style="text-align: center; margin-bottom: 20px;">
                 <button onclick="document.getElementById('shadowArmyModal').style.display='flex'" class="btn-small"
-                    style="width: 100%; border-color: #b19cd9; color: #b19cd9;">
+                    style="width: 100%; border-color: #b19cd9; color: #b19cd9; margin-bottom: 10px;">
                     VIEW SHADOW ARMY ({{ player.shadows|length }})
                 </button>
+                <div style="display: flex; gap: 5px;">
+                    <a href="{{ url_for('main.analytics') }}" class="btn-small"
+                        style="flex: 1; text-align: center; border-color: cyan; color: cyan; text-decoration: none; font-size: 0.8em; display: flex; align-items: center; justify-content: center;">
+                        SYSTEM LOGS
+                    </a>
+                    <a href="{{ url_for('main.focus_mode') }}" class="btn-small"
+                        style="flex: 1; text-align: center; border-color: #555; color: #aaa; text-decoration: none; font-size: 0.8em; display: flex; align-items: center; justify-content: center;">
+                        ENTER VOID
+                    </a>
+                </div>
+                <div style="margin-top: 5px;">
+                    <a href="{{ url_for('main.shop') }}" class="btn-small"
+                        style="width: 100%; border-color: var(--color-gold); color: var(--color-gold); display: block; text-align: center; text-decoration: none;">
+                        ACCESS STORE
+                    </a>
+                </div>
             </div>
 
             <div class="economy-box" style="margin-bottom: 20px;">
@@ -282,7 +298,11 @@
                     </form>
                     {% endif %}
                     {% else %}
-                    <span style="font-size: 0.8em; color: #666;">Consumable</span>
+                    <!-- Consumable -->
+                    <form action="{{ url_for('main.use_item_route', inv_id=inv.id) }}" method="POST" style="margin:0;">
+                        <button type="submit" class="btn btn-sm"
+                            style="background: var(--color-success); border: none; color: black;">USE</button>
+                    </form>
                     {% endif %}
                 </div>
                 {% endfor %}
@@ -341,71 +361,7 @@
         </div>
 
         <!-- SHOP PANEL MOVED TO LEFT COLUMN -->
-        <section class="panel shop-panel">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; cursor: pointer;"
-                onclick="toggleShop()">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <h2 style="margin: 0;">SHOP</h2>
-                    <span id="shopToggleIcon" style="font-size: 0.8em; color: #888;">▼</span>
-                </div>
-                <button
-                    onclick="event.stopPropagation(); document.getElementById('shopHistoryModal').style.display='flex'"
-                    class="btn-small" style="background: transparent; border: 1px solid #444;">HISTORY</button>
-            </div>
-
-            <div id="shopContent" style="display: none;">
-                {% if player.in_penalty_zone %}
-                <div style="text-align: center; padding: 20px; color: var(--color-danger);">
-                    <span class="material-icons" style="font-size: 3em;">lock</span>
-                    <p>LOCKED</p>
-                </div>
-                {% else %}
-                {% for item in shop_items %}
-                <div class="shop-item">
-                    <div>
-                        <div class="item-name">{{ item.name }}</div>
-                        <div class="item-cost">
-                            {% if item.currency == 'coins' %}
-                            <span style="color: var(--color-purple-light);">{{ item.cost }} C</span>
-                            {% else %}
-                            {{ item.cost }} G
-                            {% endif %}
-                        </div>
-                    </div>
-
-                    {% if item.currency == 'coins' %}
-                    {% if player.coins >= item.cost %}
-                    <button id="btn-buy-{{ item.id }}" onclick="buyItem({{ item.id }})" class="btn-small"
-                        style="border-color: var(--color-purple-light); color: var(--color-purple-light);">BUY</button>
-                    {% else %}
-                    <button class="btn-small" style="opacity: 0.3; cursor: not-allowed;">LOCKED</button>
-                    {% endif %}
-                    {% else %}
-                    {% if player.gold >= item.cost %}
-                    <button id="btn-buy-{{ item.id }}" onclick="buyItem({{ item.id }})" class="btn-small">BUY</button>
-                    {% else %}
-                    <button class="btn-small" style="opacity: 0.3; cursor: not-allowed;">LOCKED</button>
-                    {% endif %}
-                    {% endif %}
-                </div>
-                {% endfor %}
-                {% endif %}
-            </div>
-
-            <script>
-                function toggleShop() {
-                    const content = document.getElementById('shopContent');
-                    const icon = document.getElementById('shopToggleIcon');
-                    if (content.style.display === 'none') {
-                        content.style.display = 'block';
-                        icon.innerText = '▲';
-                    } else {
-                        content.style.display = 'none';
-                        icon.innerText = '▼';
-                    }
-                }
-            </script>
-        </section>
+        <!-- SHOP PANEL MOVED TO /shop -->
 
     </div> <!-- END LEFT COLUMN -->
 
@@ -632,6 +588,23 @@
 </div>
 
 <script>
+    const SoundManager = {
+        sounds: {
+            'levelup': new Audio("{{ url_for('static', filename='sounds/levelup.mp3') }}"),
+            'popup': new Audio("{{ url_for('static', filename='sounds/popup.mp3') }}"),
+            'buy': new Audio("{{ url_for('static', filename='sounds/buy_item.mp3') }}"),
+            'complete': new Audio("{{ url_for('static', filename='sounds/quest_complete.mp3') }}"),
+            'arise': new Audio("{{ url_for('static', filename='sounds/arise.mp3') }}")
+        },
+        play: function (name) {
+            if (this.sounds[name]) {
+                this.sounds[name].volume = 0.5;
+                this.sounds[name].currentTime = 0;
+                this.sounds[name].play().catch(e => console.log("Audio play blocked/missing: " + name));
+            }
+        }
+    };
+
     // Check for specific flash messages to trigger modal
     document.addEventListener("DOMContentLoaded", function () {
         const flashes = document.querySelectorAll('.flash-msg.error_modal');
@@ -639,6 +612,19 @@
             const msg = flashes[0].innerText;
             document.getElementById('warningText').innerText = msg;
             document.getElementById('warningModal').style.display = 'flex';
+        }
+
+        // QUEST COMPLETION
+        const completionFlashes = document.querySelectorAll('.flash-msg.quest_complete');
+        if (completionFlashes.length > 0) {
+            SoundManager.play('complete');
+            // Show as system popup too
+            let combinedMsg = "";
+            completionFlashes.forEach(flash => {
+                combinedMsg += "<p style='margin-bottom: 15px;'>" + flash.innerText + "</p>";
+            });
+            document.getElementById('systemModalText').innerHTML = combinedMsg;
+            document.getElementById('systemModal').style.display = 'flex';
         }
 
         // SYSTEM POPUPS (Sleep, Daily Bonus, Quest Completion etc)
@@ -651,10 +637,7 @@
             document.getElementById('systemModalText').innerHTML = combinedMsg;
             document.getElementById('systemModal').style.display = 'flex';
 
-            // Play Popup Sound
-            const audio = new Audio("{{ url_for('static', filename='sounds/popup.mp3') }}");
-            audio.volume = 0.5;
-            audio.play().catch(e => console.log("Audio autoplay blocked or file missing"));
+            SoundManager.play('popup');
         }
 
         // LEVEL UP CHECK
@@ -662,11 +645,7 @@
         if (levelUpFlashes.length > 0) {
             const overlay = document.getElementById('levelUpOverlay');
             overlay.style.display = 'flex';
-
-            // Play Level Up Sound
-            const audio = new Audio("{{ url_for('static', filename='sounds/levelup.mp3') }}");
-            audio.volume = 0.6;
-            audio.play().catch(e => console.log("Audio autoplay blocked"));
+            SoundManager.play('levelup');
 
             setTimeout(() => {
                 overlay.style.display = 'none';
@@ -725,14 +704,19 @@
                     itemDiv.innerHTML = `
                         <div>
                             <span style="color: #bbb; display: block;">${data.item_details.name}</span>
-                            <span style="font-size: 0.8em; color: cyan;">
-                                ${data.item_details.stat_bonus} +${data.item_details.stat_value}
-                            </span>
+                            ${data.item_details.type === 'equipment' ?
+                            `<span style="font-size: 0.8em; color: cyan;">${data.item_details.stat_bonus} +${data.item_details.stat_value}</span>` :
+                            `<span style="font-size: 0.8em; color: #666;">Consumable</span>`}
                         </div>
-                        <form action="/equip/${data.item_details.inv_id}" method="POST" style="margin:0;">
+                        ${data.item_details.type === 'equipment' ?
+                            `<form action="/equip_item/${data.item_details.inv_id}" method="POST" style="margin:0;">
                             <button type="submit" class="btn btn-sm"
                                 style="background: var(--color-primary); border: none; color: black;">USE</button>
-                        </form>
+                        </form>` :
+                            `<form action="/use_item/${data.item_details.inv_id}" method="POST" style="margin:0;">
+                            <button type="submit" class="btn btn-sm"
+                                style="background: var(--color-success); border: none; color: black;">USE</button>
+                        </form>`}
                     `;
                     list.appendChild(itemDiv);
                 }
@@ -741,10 +725,7 @@
                 document.getElementById('systemModalText').innerHTML = `<p style='margin-bottom: 15px;'>${data.message}</p>`;
                 document.getElementById('systemModal').style.display = 'flex';
 
-                // Play Popup Sound
-                const audio = new Audio("{{ url_for('static', filename='sounds/popup.mp3') }}");
-                audio.volume = 0.5;
-                audio.play().catch(e => console.log("Audio autoplay blocked"));
+                SoundManager.play('buy');
 
                 // Reset Button State
                 btn.innerText = originalText;
@@ -772,7 +753,6 @@
 
 
 {% include 'components/title_modal.html' %}
-{% include 'components/shop_history_modal.html' %}
 {% include 'components/add_quest_modal.html' %}
 
 <!-- ARISE TRIGGER MODAL -->
