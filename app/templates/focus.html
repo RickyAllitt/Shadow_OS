@@ -55,7 +55,7 @@
 
     .input-wrapper label {
         font-size: 0.8em;
-        color: #888;
+        color: #ccc;
         margin-bottom: 5px;
     }
 
@@ -112,7 +112,7 @@
 
 <div class="void-container" id="menu">
     <h1 style="color: #fff; text-shadow: 0 0 10px #fff; margin-bottom: 10px;">CONFIGURE PROTOCOL</h1>
-    <p style="color: #666; margin-bottom: 40px;">Customize your session. Do not leave this tab during active focus.</p>
+    <p style="color: #ccc; margin-bottom: 40px;">Customize your session. Do not leave this tab during active focus.</p>
 
     <div class="input-group">
         <div class="input-wrapper">
@@ -132,9 +132,17 @@
     <button class="btn-void" onclick="initProtocol()">INITIATE</button>
 
     <div style="margin-top: 50px;">
-        <p style="color: #444;">Total Focus Today: <span style="color: cyan;">{{ current_user.daily_focus_duration
+        <p style="color: #bbb;">Total Focus Today: <span style="color: cyan;">{{ current_user.daily_focus_duration
                 }}m</span></p>
-        <a href="{{ url_for('main.dashboard') }}" style="color: #333; text-decoration: none;">ABORT</a>
+        <a href="{{ url_for('main.dashboard') }}" class="btn-void-back"
+            style="color: var(--color-danger); text-decoration: none; border: 1px solid var(--color-danger); padding: 10px 30px; margin-top: 20px; display: inline-block; transition: all 0.3s;">ABORT
+            SESSION</a>
+        <style>
+            .btn-void-back:hover {
+                background: rgba(255, 0, 0, 0.1);
+                box-shadow: 0 0 15px var(--color-danger);
+            }
+        </style>
     </div>
 </div>
 

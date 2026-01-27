@@ -474,15 +474,27 @@ def architect_breakdown(quest_id):
         return redirect(url_for('main.dashboard'))
 
     created_count = 0
-    for task_title in sub_tasks:
+    created_count = 0
+    for task_data in sub_tasks:
+        # Extract data (handle both string list and dict list for backward compatibility)
+        if isinstance(task_data, str):
+            title = task_data
+            rank = 'E'
+            priority = 4
+        else:
+            title = task_data.get('step', 'Unknown Task')
+            rank = task_data.get('rank', 'E')
+            priority = task_data.get('priority', 4)
+
         # Create sub-quest with explicit properties
         new_quest = Quest(
-            title=task_title,
-            rank='E',
-            xp_reward=10,
+            title=title,
+            rank=rank,
+            xp_reward=10, # Could also ask AI for XP, but standard sub-task reward is fine
             stat_reward=quest.stat_reward or 'INT',
             player_id=current_user.id,
-            is_daily=False # Sub-tasks are usually one-off
+            is_daily=False, # Sub-tasks are usually one-off
+            priority=priority
         )
         db.session.add(new_quest)
         created_count += 1

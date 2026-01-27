@@ -807,11 +807,11 @@
                         ${data.item_details.type === 'equipment' ?
                             `<form action="/equip_item/${data.item_details.inv_id}" method="POST" style="margin:0;">
                             <button type="submit" class="btn btn-sm"
-                                style="background: var(--color-primary); border: none; color: black;">USE</button>
+                                style="background: cyan; border: none; color: black; font-weight: 900; box-shadow: 0 0 5px cyan;">EQUIP</button>
                         </form>` :
                             `<form action="/use_item/${data.item_details.inv_id}" method="POST" style="margin:0;">
                             <button type="submit" class="btn btn-sm"
-                                style="background: var(--color-success); border: none; color: black;">USE</button>
+                                style="background: #00ff00; border: none; color: black; font-weight: 900; box-shadow: 0 0 5px #00ff00;">USE</button>
                         </form>`}
                     `;
                     list.appendChild(itemDiv);
@@ -864,10 +864,15 @@
                         style="flex-grow: 1; background: #222; border: 1px solid #444; color: white; padding: 10px; border-radius: 5px;">
                 </div>
             </div>
-            <div style="display: flex; gap: 10px;">
-                <button type="button" class="btn-cancel"
-                    onclick="document.getElementById('vacationModal').style.display='none'">CANCEL</button>
-                <button type="submit" class="btn-confirm" style="background: #00bcd4; color: black;">ACTIVATE</button>
+            <div style="display: flex; gap: 15px; margin-top: 30px;">
+                <button type="button" onclick="document.getElementById('vacationModal').style.display='none'"
+                    style="flex: 1; background: transparent; border: 1px solid #555; color: #aaa; padding: 15px; font-weight: bold; cursor: pointer; transition: all 0.2s;">
+                    CANCEL
+                </button>
+                <button type="submit"
+                    style="flex: 1; background: #00bcd4; color: black; border: none; padding: 15px; font-weight: 900; letter-spacing: 1px; box-shadow: 0 0 15px rgba(0, 188, 212, 0.4); cursor: pointer; transition: all 0.2s;">
+                    ACTIVATE
+                </button>
             </div>
         </form>
     </div>
@@ -973,6 +978,8 @@
                         shadow.original_quest_name }}</div>
                     <div style="color: #b19cd9; font-size: 0.8em;">Rank: {{ shadow.rank }}</div>
                     <div style="color: #aaa; font-size: 0.7em; margin-top: 5px;">+1% All Stats</div>
+                    <div style="color: #666; font-size: 0.7em; margin-top: 2px;">Acquired: {{
+                        shadow.extracted_at.strftime('%Y-%m-%d') }}</div>
                 </div>
                 {% endfor %}
             </div>
