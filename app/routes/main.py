@@ -158,6 +158,14 @@ def buy_item(item_id):
     if not item:
         return redirect(url_for('main.dashboard'))
         
+    # CHECK UNIQUE OWNERSHIP FOR COIN ITEMS
+    # Users can only hold ONE copy of any item costing Coins (Equipment or Special)
+    if item.currency == 'coins':
+        exists = Inventory.query.filter_by(player_id=player.id, item_id=item.id).first()
+        if exists:
+             flash(f"You already own {item.name}. (Limit: 1)", "error")
+             return redirect(url_for('main.dashboard'))
+        
     if player.gold >= item.cost:
         # Check stock
         if item.stock != -1:
