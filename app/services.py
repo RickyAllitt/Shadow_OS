@@ -107,6 +107,9 @@ def check_weekly_reset(player):
         db.session.commit()
         return False
 
+    if player.is_on_vacation:
+        return False
+
     now = datetime.now(timezone.utc)
     
     # Find the most recent Sunday at 23:59:59 (or Monday 00:00)
@@ -346,6 +349,14 @@ def check_daily_reset(player):
         db.session.commit()
         return False
         
+    if player.is_on_vacation:
+        # Check if vacation has naturally ended
+        now = datetime.now(timezone.utc)
+        if player.vacation_end_date and now >= player.vacation_end_date.replace(tzinfo=timezone.utc):
+            end_vacation(player)
+            return True # Reset might occur after vacation ends
+        return False
+
     now = datetime.now(timezone.utc)
     today_midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
     
@@ -742,3 +753,57 @@ def calculate_total_stats(player):
             stats[key] = int(stats[key] * 0.8)
             
     return stats
+
+def start_vacation(player, days):
+    """
+    Activates vacation mode for the player.
+    Can only be used once a month.
+    """
+    now = datetime.now(timezone.utc)
+    
+    # Check monthly limit
+    if player.last_vacation_date:
+        if player.last_vacation_date.month == now.month and player.last_vacation_date.year == now.year:
+            return False, "MONTHLY LIMIT EXCEEDED: You have already used your vacation for this month."
+            
+    player.is_on_vacation = True
+    player.vacation_start_date = now
+    player.vacation_end_date = now + timedelta(days=days)
+    player.last_vacation_date = now
+    player.vacation_count += 1
+    
+    db.session.commit()
+    return True, f"VACATION ACTIVATED: System frozen for {days} days."
+
+def end_vacation(player):
+    """
+    Deactivates vacation mode and applies stat penalties if applicable.
+    """
+    if not player.is_on_vacation:
+        return False, "You are not on vacation."
+        
+    now = datetime.now(timezone.utc)
+    # Ensure start date is offset-aware
+    start_date = player.vacation_start_date
+    if start_date.tzinfo is None:
+        start_date = start_date.replace(tzinfo=timezone.utc)
+        
+    duration = now - start_date
+    weeks = int(duration.days / 7)
+    
+    # Stat Penalty: -1 to every stat for every week ACTUALLY spent
+    if weeks > 0:
+        player.strength = max(1, player.strength - weeks)
+        player.intelligence = max(1, player.intelligence - weeks)
+        player.agility = max(1, player.agility - weeks)
+        player.sense = max(1, player.sense - weeks)
+        player.vitality = max(1, player.vitality - weeks)
+        msg = f"VACATION OVER: You returned after {duration.days} days. Stats reduced by {weeks}."
+    else:
+        msg = "VACATION OVER: Welcome back, Hunter. No stat reduction applied."
+        
+    player.is_on_vacation = False
+    player.vacation_start_date = None
+    player.vacation_end_date = None
+    db.session.commit()
+    return True, msg

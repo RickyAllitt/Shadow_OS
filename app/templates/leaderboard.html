@@ -17,6 +17,7 @@
                     <th style="text-align: right; padding: 10px;">LEVEL</th>
                     <th style="text-align: left; padding: 10px;">CLASS</th>
                     <th style="text-align: left; padding: 10px;">FAILURES</th>
+                    <th style="text-align: left; padding: 10px;">VACATIONS</th>
                 </tr>
             </thead>
             <tbody>
@@ -47,6 +48,9 @@
                     </td>
                     <td style="padding: 15px; color: red; font-weight: bold; text-align: center;">
                         {{ player.penalties_count }}
+                    </td>
+                    <td style="padding: 15px; color: cyan; font-weight: bold; text-align: center;">
+                        {{ player.vacation_count }}
                     </td>
                 </tr>
                 {% endfor %}

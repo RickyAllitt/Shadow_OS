@@ -82,6 +82,13 @@ class Player(UserMixin, db.Model):
     # If set, this is the deadline for the "System" penalty quest.
     penalty_deadline = db.Column(db.DateTime, nullable=True) 
 
+    # --- VACATION SYSTEM ---
+    is_on_vacation = db.Column(db.Boolean, default=False)
+    vacation_start_date = db.Column(db.DateTime, nullable=True)
+    vacation_end_date = db.Column(db.DateTime, nullable=True)
+    last_vacation_date = db.Column(db.DateTime, nullable=True)
+    vacation_count = db.Column(db.Integer, default=0)
+
 class Quest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(100), nullable=False)

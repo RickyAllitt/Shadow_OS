@@ -3,7 +3,9 @@ from flask_login import login_required, current_user
 from sqlalchemy import or_
 from app.extensions import db
 from app.models import Player, Quest, RewardItem, QuestComment, PurchaseLog, Inventory, DailySnapshot
-from app.services import check_weekly_reset, check_daily_reset, get_categorized_quests, calculate_rewards, process_quest_completion, ensure_welcome_quest, calculate_total_stats, extract_shadow
+from app.services import (check_weekly_reset, check_daily_reset, get_categorized_quests, 
+                          calculate_rewards, process_quest_completion, ensure_welcome_quest, 
+                          calculate_total_stats, extract_shadow, start_vacation, end_vacation)
 from datetime import datetime, timezone
 
 bp = Blueprint('main', __name__)
@@ -761,3 +763,24 @@ def setup_page():
         return redirect(url_for('main.dashboard'))
         
     return render_template('setup.html')
+
+@bp.route('/vacation/start', methods=['POST'])
+@login_required
+def start_vacation_route():
+    days = int(request.form.get('days', 7))
+    success, msg = start_vacation(current_user, days)
+    if success:
+        flash(msg, "system_popup")
+    else:
+        flash(msg, "system_popup")
+    return redirect(url_for('main.dashboard'))
+
+@bp.route('/vacation/end', methods=['POST'])
+@login_required
+def end_vacation_route():
+    success, msg = end_vacation(current_user)
+    if success:
+        flash(msg, "system_popup")
+    else:
+        flash(msg, "error")
+    return redirect(url_for('main.dashboard'))
