@@ -37,7 +37,7 @@ class Player(UserMixin, db.Model):
     current_title = db.relationship('Title', foreign_keys=[current_title_id])
     
     # Many-to-Many for Unlocked Titles
-    unlocked_titles = db.relationship('PlayerTitle', back_populates='player', lazy='dynamic')
+    unlocked_titles = db.relationship('PlayerTitle', back_populates='player', lazy='dynamic', cascade="all, delete-orphan")
     
     # Helper to get display title
     @property
@@ -115,6 +115,8 @@ class Quest(db.Model):
     
     # Progress (0-100)
     progress = db.Column(db.Integer, default=0)
+    
+    priority = db.Column(db.Integer, default=4) # 1=Critical, 2=High, 3=Medium, 4=Low
 
     comments = db.relationship('QuestComment', backref='quest', lazy=True, cascade="all, delete-orphan")
 
@@ -145,7 +147,7 @@ class Inventory(db.Model):
     is_equipped = db.Column(db.Boolean, default=False)
     acquired_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
-    player = db.relationship('Player', backref=db.backref('inventory', lazy=True))
+    player = db.relationship('Player', backref=db.backref('inventory', lazy=True, cascade="all, delete-orphan"))
     item = db.relationship('RewardItem')
 
 class PurchaseLog(db.Model):
@@ -160,12 +162,13 @@ class PurchaseLog(db.Model):
     is_claimed = db.Column(db.Boolean, default=False)
     claimed_at = db.Column(db.DateTime, nullable=True)
 
-    player = db.relationship('Player', backref='purchase_history')
+    player = db.relationship('Player', backref=db.backref('purchase_history', cascade="all, delete-orphan"))
 
 class DailySnapshot(db.Model):
     """ Tracks player progress over time for Analytics. """
     id = db.Column(db.Integer, primary_key=True)
     player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
+    player = db.relationship('Player', backref=db.backref('snapshots', cascade="all, delete-orphan"))
     date = db.Column(db.Date, nullable=False, default=lambda: datetime.now(timezone.utc).date())
     
     level = db.Column(db.Integer)
@@ -215,4 +218,4 @@ class Shadow(db.Model):
     buff_type = db.Column(db.String(50), default='ALL_STATS') # 'ALL_STATS', 'STR', etc.
     buff_value = db.Column(db.Integer, default=1) # +1% or +1 Flat
     
-    player = db.relationship('Player', backref=db.backref('shadows', lazy=True))
+    player = db.relationship('Player', backref=db.backref('shadows', lazy=True, cascade="all, delete-orphan"))

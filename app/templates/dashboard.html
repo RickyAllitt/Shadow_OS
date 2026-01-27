@@ -216,191 +216,242 @@
             </div>
             {% endif %}
 
-            <div style="text-align: center; margin-bottom: 20px;">
-                <button onclick="document.getElementById('shadowArmyModal').style.display='flex'" class="btn-small"
-                    style="width: 100%; border-color: #b19cd9; color: #b19cd9; margin-bottom: 10px;">
-                    VIEW SHADOW ARMY ({{ player.shadows|length }})
-                </button>
-                <div style="display: flex; gap: 5px;">
-                    <a href="{{ url_for('main.analytics') }}" class="btn-small"
-                        style="flex: 1; text-align: center; border-color: cyan; color: cyan; text-decoration: none; font-size: 0.8em; display: flex; align-items: center; justify-content: center;">
-                        SYSTEM LOGS
-                    </a>
-                    <a href="{{ url_for('main.focus_mode') }}" class="btn-small"
-                        style="flex: 1; text-align: center; border-color: #555; color: #aaa; text-decoration: none; font-size: 0.8em; display: flex; align-items: center; justify-content: center;">
-                        ENTER VOID
-                    </a>
-                </div>
-                <div style="margin-top: 5px;">
-                    <a href="{{ url_for('main.shop') }}" class="btn-small"
-                        style="width: 100%; border-color: var(--color-gold); color: var(--color-gold); display: block; text-align: center; text-decoration: none;">
-                        ACCESS STORE
-                    </a>
-                </div>
-                <!-- VACATION SYSTEM -->
-                <div
-                    style="margin-top: 10px; border: 1px solid {% if player.is_on_vacation %}var(--color-primary){% else %}#444{% endif %}; padding: 10px; border-radius: 5px; background: rgba(0,0,0,0.2); position: relative;">
-                    {% if player.is_on_vacation %}
-                    <div style="color: var(--color-primary); font-weight: bold; font-size: 0.9em; margin-bottom: 5px;">
-                        🌴 ON VACATION 🌴</div>
-                    <div style="font-size: 0.7em; color: #aaa;">The system is currently frozen.</div>
-                    {% else %}
-                    <button onclick="document.getElementById('vacationModal').style.display='flex'" class="btn-small"
-                        style="width: 100%; border-color: #00bcd4; color: #00bcd4;">
-                        GO ON VACATION ({{ player.vacation_count }})
-                    </button>
-                    {% endif %}
-                </div>
-            </div>
+            <!-- BUTTONS MOVED TO MAIN DASHBOARD GRID -->
+    </div>
 
-            <div class="economy-box" style="margin-bottom: 20px;">
-                <div class="gold-display"
-                    style="display: flex; align-items: center; gap: 10px; color: var(--color-gold);">
-                    <span class="material-icons">monetization_on</span>
-                    <span style="font-size: 1.2em; font-weight: bold;">{{ player.gold }} G</span>
-                </div>
-                <div class="coin-display"
-                    style="display: flex; align-items: center; gap: 10px; color: var(--color-purple-light); margin-top: 5px;">
-                    <span class="material-icons">stars</span>
-                    <span style="font-size: 1.2em; font-weight: bold;">{{ player.coins }} C</span>
-                </div>
-            </div>
-
-            <div class="stats-list">
-                <div class="stat-row"><span>STR</span> <b {% if player.has_debuff
-                        %}style="color: var(--color-text-muted);" {% endif %}>{{ stats.strength }} {% if
-                        player.has_debuff %}<span style="color:red; font-size: 0.8em;">(-20%)</span>{% endif %}</b>
-                </div>
-                <div class="stat-row"><span>AGI</span> <b {% if player.has_debuff
-                        %}style="color: var(--color-text-muted);" {% endif %}>{{ stats.agility }} {% if
-                        player.has_debuff %}<span style="color:red; font-size: 0.8em;">(-20%)</span>{% endif %}</b>
-                </div>
-                <div class="stat-row"><span>SEN</span> <b {% if player.has_debuff
-                        %}style="color: var(--color-text-muted);" {% endif %}>{{ stats.sense }} {% if player.has_debuff
-                        %}<span style="color:red; font-size: 0.8em;">(-20%)</span>{% endif %}</b></div>
-                <div class="stat-row"><span>VIT</span> <b {% if player.has_debuff
-                        %}style="color: var(--color-text-muted);" {% endif %}>{{ stats.vitality }} {% if
-                        player.has_debuff %}<span style="color:red; font-size: 0.8em;">(-20%)</span>{% endif %}</b>
-                </div>
-                <div class="stat-row"><span>INT</span> <b {% if player.has_debuff
-                        %}style="color: var(--color-text-muted);" {% endif %}>{{ stats.intelligence }} {% if
-                        player.has_debuff %}<span style="color:red; font-size: 0.8em;">(-20%)</span>{% endif %}</b>
-                </div>
-            </div>
-
-        </section>
-
-        <!-- EQUIPMENT SECTION (Quick View) -->
-        <div class="inventory-section" style="margin-top: 20px;">
-            <h3 style="font-size: 0.9em; color: var(--color-text-muted); margin-bottom: 10px;">EQUIPMENT</h3>
-
-            <!-- PAPER DOLL SLOTS (Limited to 4 original) -->
-            <div class="equipment-slots"
-                style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
-                {% for slot in ['head', 'body', 'weapon', 'accessory'] %}
-
-                {# Robust finding of equipped item using namespace #}
-                {% set ns = namespace(found=None) %}
-                {% for inv in player.inventory %}
-                {% if inv.is_equipped and inv.item.slot == slot %}
-                {% set ns.found = inv %}
-                {% endif %}
-                {% endfor %}
-                {% set equipped_item = ns.found %}
-
-                <div class="slot-box"
-                    style="{% if equipped_item %}background: var(--color-primary-dim); border: 1px solid var(--color-primary); box-shadow: 0 0 10px var(--color-primary-glow);{% else %}background: rgba(0,0,0,0.3); border: 1px dashed #444;{% endif %} padding: 10px; border-radius: 5px; min-height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative;">
-                    <span
-                        style="font-size: 0.7em; color: #666; text-transform: uppercase; position: absolute; top: 5px; left: 5px;">{{
-                        slot }}</span>
-                    {% if equipped_item %}
-                    <div style="text-align: center; margin-top: 15px;">
-                        <span style="color: #fff; font-size: 0.9em; display: block;">{{ equipped_item.item.name
-                            }}</span>
-                        <span style="color: cyan; font-size: 0.8em;">{{ equipped_item.item.stat_bonus }} +{{
-                            equipped_item.item.stat_value }}</span>
-                        <!-- Quick Unequip -->
-                        <form action="{{ url_for('main.unequip_item_route', inv_id=equipped_item.id) }}" method="POST"
-                            style="margin-top: 5px;">
-                            <button type="submit" class="btn-small"
-                                style="padding: 2px 8px; font-size: 0.7em; border: 1px solid #555;">UNEQUIP</button>
-                        </form>
-                    </div>
-                    {% else %}
-                    <span style="color: #444; font-size: 2em; margin-top: 10px;">
-                        {% if slot == 'weapon' %}⚔️{% elif slot == 'head' %}🪖{% elif slot == 'body' %}👕{% elif slot ==
-                        'accessory' %}💍{% endif %}
-                    </span>
-                    {% endif %}
-                </div>
-                {% endfor %}
-            </div>
-
-            <a href="{{ url_for('main.inventory') }}" class="btn-small"
-                style="width: 100%; display: block; text-align: center; border-color: #777; color: #ccc; text-decoration: none; padding: 10px;">
-                OPEN INVENTORY / BAG
-            </a>
+    <div class="economy-box" style="margin-bottom: 20px;">
+        <div class="gold-display" style="display: flex; align-items: center; gap: 10px; color: var(--color-gold);">
+            <span class="material-icons">monetization_on</span>
+            <span style="font-size: 1.2em; font-weight: bold;">{{ player.gold }} G</span>
         </div>
+        <div class="coin-display"
+            style="display: flex; align-items: center; gap: 10px; color: var(--color-purple-light); margin-top: 5px;">
+            <span class="material-icons">stars</span>
+            <span style="font-size: 1.2em; font-weight: bold;">{{ player.coins }} C</span>
+        </div>
+    </div>
 
+    <div class="stats-list">
+        <div class="stat-row"><span>STR</span> <b {% if player.has_debuff %}style="color: var(--color-text-muted);" {%
+                endif %}>{{ stats.strength }} {% if
+                player.has_debuff %}<span style="color:red; font-size: 0.8em;">(-20%)</span>{% endif %}</b>
+        </div>
+        <div class="stat-row"><span>AGI</span> <b {% if player.has_debuff %}style="color: var(--color-text-muted);" {%
+                endif %}>{{ stats.agility }} {% if
+                player.has_debuff %}<span style="color:red; font-size: 0.8em;">(-20%)</span>{% endif %}</b>
+        </div>
+        <div class="stat-row"><span>SEN</span> <b {% if player.has_debuff %}style="color: var(--color-text-muted);" {%
+                endif %}>{{ stats.sense }} {% if player.has_debuff
+                %}<span style="color:red; font-size: 0.8em;">(-20%)</span>{% endif %}</b></div>
+        <div class="stat-row"><span>VIT</span> <b {% if player.has_debuff %}style="color: var(--color-text-muted);" {%
+                endif %}>{{ stats.vitality }} {% if
+                player.has_debuff %}<span style="color:red; font-size: 0.8em;">(-20%)</span>{% endif %}</b>
+        </div>
+        <div class="stat-row"><span>INT</span> <b {% if player.has_debuff %}style="color: var(--color-text-muted);" {%
+                endif %}>{{ stats.intelligence }} {% if
+                player.has_debuff %}<span style="color:red; font-size: 0.8em;">(-20%)</span>{% endif %}</b>
+        </div>
+    </div>
 
+    </section>
 
-        <!-- RECOVERY SECTION (COMPACT) -->
-        <div class="recovery-compact" style="margin-top: 15px; border-top: 1px solid #333; padding-top: 10px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                <span style="font-size: 0.8em; color: var(--color-text-muted);">CONDITION</span>
+    <!-- EQUIPMENT SECTION (Quick View) -->
+    <div class="inventory-section" style="margin-top: 20px;">
+        <h3 style="font-size: 0.9em; color: var(--color-text-muted); margin-bottom: 10px;">EQUIPMENT</h3>
+
+        <!-- PAPER DOLL SLOTS (Limited to 4 original) -->
+        <div class="equipment-slots"
+            style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
+            {% for slot in ['head', 'body', 'weapon', 'accessory'] %}
+
+            {# Robust finding of equipped item using namespace #}
+            {% set ns = namespace(found=None) %}
+            {% for inv in player.inventory %}
+            {% if inv.is_equipped and inv.item.slot == slot %}
+            {% set ns.found = inv %}
+            {% endif %}
+            {% endfor %}
+            {% set equipped_item = ns.found %}
+
+            <div class="slot-box"
+                style="{% if equipped_item %}background: var(--color-primary-dim); border: 1px solid var(--color-primary); box-shadow: 0 0 10px var(--color-primary-glow);{% else %}background: rgba(0,0,0,0.3); border: 1px dashed #444;{% endif %} padding: 10px; border-radius: 5px; min-height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative;">
                 <span
-                    style="font-size: 0.8em; font-weight: bold; color: {% if player.condition == 'WELL RESTED' %}var(--color-primary){% elif player.condition == 'TIRED' %}orange{% else %}#ccc{% endif %};">
-                    {{ player.condition }}
+                    style="font-size: 0.7em; color: #666; text-transform: uppercase; position: absolute; top: 5px; left: 5px;">{{
+                    slot }}</span>
+                {% if equipped_item %}
+                <div style="text-align: center; margin-top: 15px;">
+                    <span style="color: #fff; font-size: 0.9em; display: block;">{{ equipped_item.item.name
+                        }}</span>
+                    <span style="color: cyan; font-size: 0.8em;">{{ equipped_item.item.stat_bonus }} +{{
+                        equipped_item.item.stat_value }}</span>
+                    <!-- Quick Unequip -->
+                    <form action="{{ url_for('main.unequip_item_route', inv_id=equipped_item.id) }}" method="POST"
+                        style="margin-top: 5px;">
+                        <button type="submit" class="btn-small"
+                            style="padding: 2px 8px; font-size: 0.7em; border: 1px solid #555;">UNEQUIP</button>
+                    </form>
+                </div>
+                {% else %}
+                <span style="color: #444; font-size: 2em; margin-top: 10px;">
+                    {% if slot == 'weapon' %}⚔️{% elif slot == 'head' %}🪖{% elif slot == 'body' %}👕{% elif slot ==
+                    'accessory' %}💍{% endif %}
                 </span>
-            </div>
-
-            <!-- Active Effects (Icons) -->
-            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;">
-                {% if player.is_on_vacation %}
-                <span style="color: #00bcd4; font-size: 0.8em; cursor: help;" title="Vacation: System Frozen">🌴</span>
-                {% endif %}
-                {% if player.condition == 'WELL RESTED' %}
-                <span style="color: var(--color-primary); font-size: 0.8em; cursor: help;"
-                    title="Well Rested: +10% XP">⚡</span>
-                {% endif %}
-                {% if player.intelligence >= 10 %}
-                <span style="color: var(--color-primary); font-size: 0.8em; cursor: help;"
-                    title="High INT: XP Bonus active">🧠</span>
-                {% endif %}
-                {% if player.has_debuff %}
-                <span style="color: var(--color-danger); font-size: 0.8em; cursor: help;"
-                    title="System Glitch: -20% Stats">⚠️</span>
-                {% endif %}
-                {% if player.in_penalty_zone %}
-                <span style="color: var(--color-danger); font-size: 0.8em; cursor: help;"
-                    title="Lockdown: Shop Closed">🔒</span>
-                {% endif %}
-
-                {% if player.job_class != 'None' %}
-                {% if player.job_class == 'Assassin' %}<span style="color:#ffd700; font-size: 0.8em;"
-                    title="Greed: +10% Gold">💰</span>{% endif %}
-                {% if player.job_class == 'Mage' %}<span style="color:#9d4edd; font-size: 0.8em;"
-                    title="Wisdom: +10% XP">🔮</span>{% endif %}
-                {% if player.job_class == 'Tank' %}<span style="color:#a8dadc; font-size: 0.8em;"
-                    title="Iron Wall: Penalty Resist">🛡️</span>{% endif %}
                 {% endif %}
             </div>
-
-            <!-- Sleep Form (Collapsed/Button) -->
-            <div style="text-align: right;">
-                <button onclick="document.getElementById('sleepModal').style.display='flex'"
-                    class="btn-sm btn-sleep-log">
-                    ☾ LOG SLEEP
-                </button>
-            </div>
+            {% endfor %}
         </div>
 
-        <!-- SHOP PANEL MOVED TO LEFT COLUMN -->
-        <!-- SHOP PANEL MOVED TO /shop -->
+        <a href="{{ url_for('main.inventory') }}" class="btn-small"
+            style="width: 100%; display: block; text-align: center; border-color: #777; color: #ccc; text-decoration: none; padding: 10px;">
+            OPEN INVENTORY / BAG
+        </a>
+    </div>
 
-    </div> <!-- END LEFT COLUMN -->
 
-    <!-- RIGHT COLUMN: QUESTS -->
+
+    <!-- RECOVERY SECTION (COMPACT) -->
+    <div class="recovery-compact" style="margin-top: 15px; border-top: 1px solid #333; padding-top: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+            <span style="font-size: 0.8em; color: var(--color-text-muted);">CONDITION</span>
+            <span
+                style="font-size: 0.8em; font-weight: bold; color: {% if player.condition == 'WELL RESTED' %}var(--color-primary){% elif player.condition == 'TIRED' %}orange{% else %}#ccc{% endif %};">
+                {{ player.condition }}
+            </span>
+        </div>
+
+        <!-- Active Effects (Icons) -->
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;">
+            {% if player.is_on_vacation %}
+            <span style="color: #00bcd4; font-size: 0.8em; cursor: help;" title="Vacation: System Frozen">🌴</span>
+            {% endif %}
+            {% if player.condition == 'WELL RESTED' %}
+            <span style="color: var(--color-primary); font-size: 0.8em; cursor: help;"
+                title="Well Rested: +10% XP">⚡</span>
+            {% endif %}
+            {% if player.intelligence >= 10 %}
+            <span style="color: var(--color-primary); font-size: 0.8em; cursor: help;"
+                title="High INT: XP Bonus active">🧠</span>
+            {% endif %}
+            {% if player.has_debuff %}
+            <span style="color: var(--color-danger); font-size: 0.8em; cursor: help;"
+                title="System Glitch: -20% Stats">⚠️</span>
+            {% endif %}
+            {% if player.in_penalty_zone %}
+            <span style="color: var(--color-danger); font-size: 0.8em; cursor: help;"
+                title="Lockdown: Shop Closed">🔒</span>
+            {% endif %}
+
+            {% if player.job_class != 'None' %}
+            {% if player.job_class == 'Assassin' %}<span style="color:#ffd700; font-size: 0.8em;"
+                title="Greed: +10% Gold">💰</span>{% endif %}
+            {% if player.job_class == 'Mage' %}<span style="color:#9d4edd; font-size: 0.8em;"
+                title="Wisdom: +10% XP">🔮</span>{% endif %}
+            {% if player.job_class == 'Tank' %}<span style="color:#a8dadc; font-size: 0.8em;"
+                title="Iron Wall: Penalty Resist">🛡️</span>{% endif %}
+            {% endif %}
+        </div>
+
+        <!-- Sleep Form (Collapsed/Button) -->
+        <div style="text-align: right;">
+            <button onclick="document.getElementById('sleepModal').style.display='flex'" class="btn-sm btn-sleep-log">
+                ☾ LOG SLEEP
+            </button>
+        </div>
+    </div>
+
+    <!-- SHOP PANEL MOVED TO LEFT COLUMN -->
+    <!-- SHOP PANEL MOVED TO /shop -->
+
+</div> <!-- END LEFT COLUMN -->
+
+<!-- RIGHT COLUMN: SYSTEM DECK & QUESTS -->
+<div style="display: flex; flex-direction: column; gap: 20px;">
+
+    <!-- SYSTEM ACTION DECK -->
+    <section class="panel system-deck" style="padding: 15px;">
+        <h2
+            style="margin-bottom: 15px; font-size: 1em; color: var(--color-text-muted); border-bottom: 1px solid #333; padding-bottom: 5px;">
+            SYSTEM COMMANDS</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px;">
+
+            <!-- 1. SHADOW ARMY (Purple) -->
+            <button onclick="document.getElementById('shadowArmyModal').style.display='flex'" class="btn-action"
+                style="background: rgba(157, 78, 221, 0.1); border: 1px solid #9d4edd; color: #9d4edd;">
+                <span class="material-icons" style="font-size: 1.5em; display: block; margin-bottom: 5px;">groups</span>
+                ARMY ({{ player.shadows|length }})
+            </button>
+
+            <!-- 2. ACCESS STORE (Gold) -->
+            <a href="{{ url_for('main.shop') }}" class="btn-action"
+                style="background: rgba(255, 215, 0, 0.1); border: 1px solid var(--color-gold); color: var(--color-gold); text-decoration: none;">
+                <span class="material-icons"
+                    style="font-size: 1.5em; display: block; margin-bottom: 5px;">shopping_cart</span>
+                STORE
+            </a>
+
+            <!-- 3. SYSTEM LOGS (Blue) -->
+            <a href="{{ url_for('main.analytics') }}" class="btn-action"
+                style="background: rgba(0, 255, 255, 0.1); border: 1px solid cyan; color: cyan; text-decoration: none;">
+                <span class="material-icons"
+                    style="font-size: 1.5em; display: block; margin-bottom: 5px;">assessment</span>
+                LOGS
+            </a>
+
+            <!-- 4. ENTER VOID (Dark/Grey) -->
+            <a href="{{ url_for('main.focus_mode') }}" class="btn-action"
+                style="background: rgba(255, 255, 255, 0.05); border: 1px solid #666; color: #ccc; text-decoration: none;">
+                <span class="material-icons"
+                    style="font-size: 1.5em; display: block; margin-bottom: 5px;">self_improvement</span>
+                VOID
+            </a>
+
+            <!-- 5. VACATION (Teal) -->
+            {% if player.is_on_vacation %}
+            <div class="btn-action"
+                style="background: rgba(0, 188, 212, 0.2); border: 1px solid #00bcd4; color: #00bcd4; cursor: default;">
+                <span style="font-size: 1.5em; display: block; margin-bottom: 5px;">🌴</span>
+                FROZEN
+            </div>
+            {% else %}
+            <button onclick="document.getElementById('vacationModal').style.display='flex'" class="btn-action"
+                style="background: rgba(0, 188, 212, 0.1); border: 1px solid #00bcd4; color: #00bcd4;">
+                <span class="material-icons"
+                    style="font-size: 1.5em; display: block; margin-bottom: 5px;">beach_access</span>
+                VACATION
+            </button>
+            {% endif %}
+
+            <!-- 6. PENALTY (Orange) -->
+            <button onclick="document.getElementById('penaltyConfigModal').style.display='flex'" class="btn-action"
+                style="background: rgba(255, 152, 0, 0.1); border: 1px solid #ff9800; color: #ff9800;">
+                <span class="material-icons"
+                    style="font-size: 1.5em; display: block; margin-bottom: 5px;">warning</span>
+                PENALTY
+            </button>
+
+        </div>
+        <style>
+            .btn-action {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                padding: 15px 5px;
+                border-radius: 8px;
+                transition: all 0.2s;
+                cursor: pointer;
+                font-weight: bold;
+                font-size: 0.8em;
+                text-align: center;
+            }
+
+            .btn-action:hover {
+                filter: brightness(1.2);
+                transform: translateY(-2px);
+                box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            }
+        </style>
+    </section>
     <section class="panel quest-panel">
         <div
             style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid var(--color-primary-dim); padding-bottom: 10px;">
@@ -428,7 +479,10 @@
                 established.</p>
             {% else %}
             {% for quest in dailies %}
-            <div class="quest-card" {% if quest.is_completed %}style="opacity: 0.6; filter: grayscale(1);" {% endif %}>
+            {% set p_color = '#f44336' if quest.priority == 1 else '#ff9800' if quest.priority == 2 else '#ffeb3b' if
+            quest.priority == 3 else '#2196f3' %}
+            <div class="quest-card"
+                style="border-left: 4px solid {{ p_color }}; {% if quest.is_completed %}opacity: 0.6; filter: grayscale(1);{% endif %}">
                 <div style="flex-grow: 1;">
                     <span class="rank-badge rank-{{ quest.rank.lower() }}">{{ quest.rank }}</span>
                     <span class="quest-title" {% if quest.is_completed %}style="text-decoration: line-through;" {% endif
@@ -481,7 +535,9 @@
             <p style="color: #555; font-style: italic; font-size: 0.9em; margin-bottom: 15px;">No upcoming tasks.</p>
             {% else %}
             {% for quest in scheduled %}
-            <div class="quest-card">
+            {% set p_color = '#f44336' if quest.priority == 1 else '#ff9800' if quest.priority == 2 else '#ffeb3b' if
+            quest.priority == 3 else '#2196f3' %}
+            <div class="quest-card" style="border-left: 4px solid {{ p_color }};">
                 <div style="flex-grow: 1;">
                     <span class="rank-badge rank-{{ quest.rank.lower() }}">{{ quest.rank }}</span>
                     <span class="quest-title">{{ quest.title }}</span>
@@ -530,7 +586,9 @@
             <p style="color: #555; font-style: italic; font-size: 0.9em;">Empty.</p>
             {% else %}
             {% for quest in backlog %}
-            <div class="quest-card">
+            {% set p_color = '#f44336' if quest.priority == 1 else '#ff9800' if quest.priority == 2 else '#ffeb3b' if
+            quest.priority == 3 else '#2196f3' %}
+            <div class="quest-card" style="border-left: 4px solid {{ p_color }};">
                 <div style="flex-grow: 1;">
                     <span class="rank-badge rank-{{ quest.rank.lower() }}">{{ quest.rank }}</span>
                     <span class="quest-title">{{ quest.title }}</span>
@@ -571,6 +629,9 @@
     </section>
 
     <!-- OLD SHOP LOCATION REMOVED from line 378 -->
+
+
+</div> <!-- End Right Column Flex -->
 
 </div> <!-- End Dashboard Grid -->
 
@@ -1006,4 +1067,44 @@
         }
     });
 </script>
+
+<!-- Penalty Config Modal -->
+<div id="penaltyConfigModal" class="modal"
+    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 3000; justify-content: center; align-items: center;">
+    <div class="modal-content system-panel"
+        style="width: 90%; max-width: 400px; padding: 25px; border: 1px solid var(--color-primary); box-shadow: 0 0 20px rgba(0,255,100,0.2);">
+
+        <h2
+            style="color: var(--color-primary); font-family: 'Orbitron', sans-serif; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
+            SYSTEM OVERRIDE</h2>
+
+        <p style="color: #ccc; margin-bottom: 20px;">
+            Rewriting the penalty protocol requires a system bribe.<br>
+            <span style="color: var(--color-gold); font-weight: bold;">COST: 250 COINS</span>
+        </p>
+
+        <form action="/update_penalty" method="POST"
+            onsubmit="return confirm('WARNING: This action will deduct 250 Coins. This cannot be undone. Proceed?');">
+            <label style="color: var(--color-text-muted); display: block; margin-bottom: 5px;">NEW PENALTY
+                CONDITION</label>
+            <input type="text" name="penalty_description" value="{{ player.penalty_description }}"
+                style="width: 100%; padding: 10px; background: rgba(0,0,0,0.5); border: 1px solid #444; color: white; margin-bottom: 20px;"
+                required>
+
+            <div style="display: flex; gap: 10px;">
+                <button type="button" onclick="document.getElementById('penaltyConfigModal').style.display='none'"
+                    class="btn-small" style="flex: 1; border-color: #555; color: #888;">CANCEL</button>
+
+                {% if player.coins >= 250 %}
+                <button type="submit" class="btn-complete"
+                    style="flex: 1; border-color: var(--color-gold); color: var(--color-gold);">CONFIRM PAYMENT</button>
+                {% else %}
+                <button type="button" disabled class="btn-small"
+                    style="flex: 1; opacity: 0.5; cursor: not-allowed; border-color: var(--color-danger); color: var(--color-danger);">INSUFFICIENT
+                    FUNDS</button>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
 {% endblock %}

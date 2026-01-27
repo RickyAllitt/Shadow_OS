@@ -44,7 +44,7 @@
 
             <div style="display: flex; gap: 15px; margin-bottom: 20px;">
                 <div style="flex: 1;">
-                    <label style="color: var(--color-text-muted); display: block; margin-bottom: 5px;">PRIORITY
+                    <label style="color: var(--color-text-muted); display: block; margin-bottom: 5px;">DIFFICULTY
                         CLASS</label>
                     <select name="rank"
                         style="width: 100%; padding: 8px; background: #111; color: white; border: 1px solid #444; border-radius: 4px;">
@@ -68,6 +68,19 @@
                         <option value="SEN">SEN (Art/Social)</option>
                     </select>
                 </div>
+            </div>
+
+            <!-- Priority Selection -->
+            <div style="margin-bottom: 20px;">
+                <label style="color: var(--color-text-muted); display: block; margin-bottom: 5px;">URGENCY
+                    PRIORITY</label>
+                <select name="priority"
+                    style="width: 100%; padding: 10px; background: #111; color: white; border: 1px solid #444; border-radius: 4px;">
+                    <option value="1">1 - CRITICAL (URGENT)</option>
+                    <option value="2">2 - HIGH</option>
+                    <option value="3">3 - MEDIUM</option>
+                    <option value="4" selected>4 - LOW (DEFAULT)</option>
+                </select>
             </div>
 
             <div

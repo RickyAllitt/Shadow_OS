@@ -72,6 +72,8 @@ def add_quest():
         # Better:
         xp, _, _ = calculate_rewards(rank)
     
+    priority = int(request.form.get('priority', 4))
+    
     quest = Quest(
         title=title, 
         description=description,
@@ -81,7 +83,8 @@ def add_quest():
         player_id=current_user.id,
         is_daily=is_daily,
         start_date=start_date,
-        due_date=due_date
+        due_date=due_date,
+        priority=priority
     )
     
     db.session.add(quest)
@@ -425,6 +428,7 @@ def edit_quest(id):
         quest.due_date = datetime.strptime(due_str, '%Y-%m-%d') if due_str else None
         
         quest.is_daily = True if request.form.get('is_daily') else False
+        quest.priority = int(request.form.get('priority', 4))
         
         # Progress
         try:
@@ -597,9 +601,30 @@ def unequip_item_route(inv_id):
         flash(msg, "success")
     else:
         flash(msg, "error")
-        
+
     if request.form.get('redirect_to') == 'inventory':
         return redirect(url_for('main.inventory'))
+    return redirect(url_for('main.dashboard'))
+
+@bp.route('/update_penalty', methods=['POST'])
+@login_required
+def update_penalty():
+    new_desc = request.form.get('penalty_description')
+    
+    if not new_desc or not new_desc.strip():
+        flash("Description cannot be empty.", "error")
+        return redirect(url_for('main.dashboard'))
+        
+    if current_user.coins < 250:
+        flash("Msng. Funds. Rqd: 250 Coins.", "error") # Compact message for style
+        return redirect(url_for('main.dashboard'))
+        
+    # Process Transaction
+    current_user.coins -= 250
+    current_user.penalty_description = new_desc.strip()
+    db.session.commit()
+    
+    flash(f"PENALTY PROTOCOL REWRITTEN. -250 COINS.", "system_popup")
     return redirect(url_for('main.dashboard'))
 
 @bp.route('/use_item/<int:inv_id>', methods=['POST'])

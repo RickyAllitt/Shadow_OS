@@ -8,6 +8,12 @@ A gamified life-management system inspired by *Solo Leveling*. Track your produc
 
 ### 1. The Dashboard (The HUD)
 - **Status Window**: Real-time display of **STR**, **INT**, **AGI**, **VIT**, and **SEN**.
+- **Stat Benefits**: 
+    - **INT**: +5% XP per 10 points.
+    - **STR**: Reduces penalty debuff severity.
+    - **AGI**: +5% Coin rewards per 10 points.
+    - **VIT**: Reduces permanent stat loss from failure.
+    - **SNS**: Scales Shadow Army passive buffs.
 - **Visual Feedback**: Interface glitching and distortion based on health and penalty status.
 - **Active Effects**: Icons for conditions (Well Rested, Tired, System Frozen) and passive buffs.
 - **Persistent Header**: A dynamic banner displaying your Level, Rank, and XP progress.
@@ -32,8 +38,11 @@ A gamified life-management system inspired by *Solo Leveling*. Track your produc
 - **Monthly Limit**: Highly restricted usage—only one vacation activation permitted per calendar month.
 - **Visual Overlay**: A full-screen "FROZEN" effect with a persistent bottom control bar for termination.
 
-### 5. Progression & Economy
-- **Class Advancement**: Unlock specialized paths (*Assassin*, *Mage*, *Tank*) at key milestones.
+### 5. Progression & Classes
+- **Class Advancement**: Unlock specialized paths at key milestones:
+    - **Assassin**: +10% Coin rewards.
+    - **Mage**: +10% XP rewards.
+    - **Tank**: Grace period against penalties.
 - **The Economy**: Earn **Gold (G)** for purchases and **Coins (C)** for rare artifacts.
 - **Inventory & Shop**: Equip artifacts in Head, Body, Weapon, and Accessory slots to boost stats.
 - **Leaderboard**: Compete with other 'Hunters' to see who has leveled up the most or taken the most vacations.

@@ -196,8 +196,11 @@ def process_quest_completion(player, quest):
     # 1. Calculate Rewards
     # 1. Calculate Rewards (Pass Level for Scaling)
     base_xp, base_gold, base_coins = calculate_rewards(quest.rank, player.level)
-    if quest.xp_reward: # Override if set on quest
+    # If quest has explicit rewards set (>0), use them. Otherwise use rank-based.
+    if quest.xp_reward and quest.xp_reward > 10: # 10 is the model default
         base_xp = quest.xp_reward
+    if quest.gold_reward and quest.gold_reward > 0:
+        base_gold = quest.gold_reward
         
     # User Rule: Dailies give NO Gold and NO XP (individually).
     if quest.is_daily:
@@ -209,10 +212,14 @@ def process_quest_completion(player, quest):
     int_multiplier = 1 + (player.intelligence / 10) * 0.05
     xp_gain = int(base_xp * int_multiplier)
     
+    # AGI Multiplier: +5% Coins per 10 AGI
+    agi_multiplier = 1 + (player.agility / 10) * 0.05
+    coin_gain = int(base_coins * agi_multiplier)
+    
     # --- CLASS BONUSES ---
-    # Assassin: +10% Gold
+    # Assassin: +10% Coins
     if player.job_class == 'Assassin':
-        base_gold = int(base_gold * 1.10)
+        coin_gain = int(coin_gain * 1.10)
         
     # Mage: +10% XP
     if player.job_class == 'Mage':
@@ -220,7 +227,7 @@ def process_quest_completion(player, quest):
 
     player.xp += xp_gain
     player.gold += base_gold
-    player.coins += base_coins
+    player.coins += coin_gain
     
     # 2. Apply Stat Buffs
     _apply_quest_stat_reward(player, quest)
@@ -261,7 +268,7 @@ def process_quest_completion(player, quest):
     db.session.commit()
     
     can_arise = (quest.rank == 'S')
-    return xp_gain, base_gold, base_coins, (player.level > initial_level), daily_bonus, can_arise
+    return xp_gain, base_gold, coin_gain, (player.level > initial_level), daily_bonus, can_arise
 
 def _apply_quest_stat_reward(player, quest):
     """Helper to apply stat rewards from a quest."""
@@ -423,12 +430,16 @@ def check_daily_reset(player):
                     player.level = max(1, player.level - 3) # Lose 3 Levels
                     player.xp = 0 # Reset XP bar
                     player.xp_required = calculate_xp_required(player.level)
-                    # Stat Loss (Massive Pain)
-                    player.strength = max(1, player.strength - 3)
-                    player.intelligence = max(1, player.intelligence - 3)
-                    player.agility = max(1, player.agility - 3)
-                    player.sense = max(1, player.sense - 3)
-                    player.vitality = max(1, player.vitality - 3)
+                    # Stat Loss (Massive Pain, mitigated by Vitality)
+                    # Base loss is 3. Endurance reduces this by 10% per 10 VIT.
+                    endurance = (player.vitality / 10) * 0.1
+                    loss = max(1, int(3 * (1.0 - endurance)))
+                    
+                    player.strength = max(1, player.strength - loss)
+                    player.intelligence = max(1, player.intelligence - loss)
+                    player.agility = max(1, player.agility - loss)
+                    player.sense = max(1, player.sense - loss)
+                    player.vitality = max(1, player.vitality - loss)
                     
                 player.consecutive_missed_days = 0 # The debt is paid in blood
                 player.in_penalty_zone = False # Unlocked, but broken
@@ -476,8 +487,9 @@ def get_categorized_quests(player_id):
         else:
             backlog.append(q)
             
-    # Sort Scheduled
-    scheduled.sort(key=lambda x: x.due_date if x.due_date else datetime.max.replace(tzinfo=timezone.utc))
+    # Sort Scheduled: First by due_date, then by priority (1=Critical, 4=Low)
+    # We use a large date for tasks without due_date to put them at the end.
+    scheduled.sort(key=lambda x: (x.due_date if x.due_date else datetime.max.replace(tzinfo=timezone.utc), x.priority))
     
     
     return dailies, scheduled, backlog
@@ -739,18 +751,20 @@ def calculate_total_stats(player):
             if target_stat in stats:
                 stats[target_stat] += inv_item.item.stat_value
                 
-    # Shadow Army Buffs (Percentage Scaling)
-    # Each Shadow gives +1% All Stats (default)
+    # Shadow Army Buffs (Commanding Presence: Base 1% + 0.1% per 10 SNS)
     shadow_count = len(player.shadows)
     if shadow_count > 0:
-        multiplier = 1 + (shadow_count * 0.01) # e.g. 5 shadows = 1.05x
+        sense_bonus = (player.sense / 10) * 0.001 # +0.1% per 10 SNS
+        multiplier = 1 + (shadow_count * (0.01 + sense_bonus))
         for key in stats:
             stats[key] = int(stats[key] * multiplier)
                 
-    # Penalty Debuff (-20%)
+    # Penalty Debuff (Physical Resilience: Base -20% + 1% per 10 STR)
     if player.has_debuff:
+        resilience = (player.strength / 10) * 0.01 # +1% recovery per 10 STR
+        penalty_factor = max(0.0, 0.8 + resilience) # 0.8 is base (-20%)
         for key in stats:
-            stats[key] = int(stats[key] * 0.8)
+            stats[key] = int(stats[key] * min(1.0, penalty_factor))
             
     return stats
 
@@ -792,13 +806,20 @@ def end_vacation(player):
     weeks = int(duration.days / 7)
     
     # Stat Penalty: -1 to every stat for every week ACTUALLY spent
+    # Endurance (Vitality) reduces this loss by 10% per 10 VIT.
     if weeks > 0:
-        player.strength = max(1, player.strength - weeks)
-        player.intelligence = max(1, player.intelligence - weeks)
-        player.agility = max(1, player.agility - weeks)
-        player.sense = max(1, player.sense - weeks)
-        player.vitality = max(1, player.vitality - weeks)
-        msg = f"VACATION OVER: You returned after {duration.days} days. Stats reduced by {weeks}."
+        endurance = (player.vitality / 10) * 0.1
+        final_loss = max(0, int(weeks * (1.0 - endurance)))
+        
+        if final_loss > 0:
+            player.strength = max(1, player.strength - final_loss)
+            player.intelligence = max(1, player.intelligence - final_loss)
+            player.agility = max(1, player.agility - final_loss)
+            player.sense = max(1, player.sense - final_loss)
+            player.vitality = max(1, player.vitality - final_loss)
+            msg = f"VACATION OVER: You returned after {duration.days} days. Stats reduced by {final_loss} (Endurance mitigated {weeks - final_loss})."
+        else:
+            msg = f"VACATION OVER: You returned after {duration.days} days. Your high Vitality prevented all stat decay."
     else:
         msg = "VACATION OVER: Welcome back, Hunter. No stat reduction applied."
         
