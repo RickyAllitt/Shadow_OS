@@ -151,6 +151,34 @@
     <div class="timer-display" id="timer">00:00</div>
     <div class="status-msg" id="status">SYSTEM ACTIVE</div>
     <div class="fail-msg" id="failMsg">CONNECTION LOST.<br>PROTOCOL FAILED.</div>
+
+    <button onclick="showAbortModal()"
+        style="background: transparent; border: 1px solid #333; color: #666; margin-top: 40px; padding: 8px 20px; cursor: pointer; transition: all 0.3s;"
+        onmouseover="this.style.borderColor='red'; this.style.color='red';"
+        onmouseout="this.style.borderColor='#333'; this.style.color='#666';">
+        ABORT
+    </button>
+</div>
+
+<!-- ABORT MODAL -->
+<div id="abortModal"
+    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 999; align-items: center; justify-content: center; flex-direction: column;">
+    <h2 style="color: var(--color-danger); text-shadow: 0 0 10px var(--color-danger); margin-bottom: 20px;">SYSTEM
+        WARNING</h2>
+    <p id="abortMsg"
+        style="color: #ccc; font-family: monospace; text-align: center; max-width: 400px; line-height: 1.5; margin-bottom: 40px;">
+        ABANDON PROTOCOL?
+    </p>
+    <div style="display: flex; gap: 20px;">
+        <button onclick="confirmAbort()"
+            style="background: transparent; border: 1px solid var(--color-danger); color: var(--color-danger); padding: 10px 30px; cursor: pointer;">
+            CONFIRM ABORT
+        </button>
+        <button onclick="closeAbortModal()"
+            style="background: transparent; border: 1px solid cyan; color: cyan; padding: 10px 30px; cursor: pointer;">
+            RESUME
+        </button>
+    </div>
 </div>
 
 <script>
@@ -160,7 +188,7 @@
     let currentRound = 1;
 
     let isFocus = true; // true = Focus, false = Rest
-    let timeLeft = 0;
+    let endTime = 0;
     let timerId = null;
     let blurTime = null;
     let hasFailed = false;
@@ -169,7 +197,81 @@
     const audioAlarm = new Audio("{{ url_for('static', filename='sounds/timer_alarm.mp3') }}");
     const audioFail = new Audio("{{ url_for('static', filename='sounds/glitch_error.mp3') }}");
 
+    // PERSISTENCE
+    const STORAGE_KEY = 'SL_FOCUS_STATE';
+
+    function saveState() {
+        if (hasFailed) return;
+        const state = {
+            focusMinutes, restMinutes, totalRounds, currentRound,
+            isFocus, endTime,
+            timestamp: Date.now()
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function clearState() {
+        localStorage.removeItem(STORAGE_KEY);
+    }
+
+    function restoreState() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return false;
+
+            const state = JSON.parse(raw);
+
+            // Restore Config
+            focusMinutes = state.focusMinutes;
+            restMinutes = state.restMinutes;
+            totalRounds = state.totalRounds;
+            currentRound = state.currentRound;
+            isFocus = state.isFocus;
+            endTime = state.endTime;
+
+            const now = Date.now();
+            // If the session ended while we were away
+            if (endTime < now) {
+                // Technically we could fast forward rounds, but for simplicity
+                // let's just let the next tick() handle the transition or finish.
+            }
+
+            // Resume UI
+            document.getElementById('menu').style.display = 'none';
+            document.getElementById('session').style.display = 'flex';
+
+            if (isFocus) updateUI("FOCUS PHASE", "cyan");
+            else updateUI("RECOVERY PHASE", "#4caf50");
+
+            // Restart Timer
+            if (timerId) clearInterval(timerId);
+            timerId = setInterval(tick, 1000);
+            tick();
+
+            return true;
+        } catch (e) {
+            console.error("Restore failed", e);
+            clearState();
+            return false;
+        }
+    }
+
+    // Prime audio on user interaction to allow autoplay later
+    function primeAudio() {
+        audioAlarm.play().then(() => {
+            audioAlarm.pause();
+            audioAlarm.currentTime = 0;
+        }).catch(e => console.log("Audio Prime Blocked"));
+
+        audioFail.play().then(() => {
+            audioFail.pause();
+            audioFail.currentTime = 0;
+        }).catch(e => console.log("Audio Prime Blocked"));
+    }
+
     function initProtocol() {
+        primeAudio(); // Critical for mobile browsers
+
         focusMinutes = parseInt(document.getElementById('focusTime').value);
         restMinutes = parseInt(document.getElementById('restTime').value);
         totalRounds = parseInt(document.getElementById('rounds').value);
@@ -182,34 +284,54 @@
 
     function startRound() {
         isFocus = true;
-        timeLeft = focusMinutes * 60;
+        // Calculate strict end time based on system clock
+        const durationSeconds = focusMinutes * 60;
+        endTime = Date.now() + (durationSeconds * 1000);
+
+        saveState();
 
         updateUI("FOCUS PHASE", "cyan");
+        // Update more frequently to catch end time accurately, but logic handles drift
+        if (timerId) clearInterval(timerId);
         timerId = setInterval(tick, 1000);
+        tick(); // Immediate update
     }
 
     function startRest() {
         isFocus = false;
-        timeLeft = restMinutes * 60;
+        const durationSeconds = restMinutes * 60;
+        endTime = Date.now() + (durationSeconds * 1000);
+
+        saveState();
 
         updateUI("RECOVERY PHASE", "#4caf50"); // Green for rest
+        if (timerId) clearInterval(timerId);
         timerId = setInterval(tick, 1000);
+        tick();
     }
 
     function tick() {
         if (hasFailed) return;
 
-        timeLeft--;
-        updateTimerDisplay();
+        const now = Date.now();
+        const diff = endTime - now;
 
-        if (timeLeft <= 0) {
+        // BATTERY OPTIMIZATION: Skip DOM updates if hidden
+        // But always check for completion
+        if (!document.hidden) {
+            updateTimerDisplay(Math.max(0, Math.ceil(diff / 1000)));
+        }
+
+        if (diff <= 0) {
             clearInterval(timerId);
-            audioAlarm.play().catch(e => console.log("Audio Error"));
+            timerId = null;
+            updateTimerDisplay(0); // Ensure it shows 00:00
+
+            audioAlarm.play().catch(e => console.log("Audio Play Error: " + e));
+
             if (isFocus) {
-                // Focus Done -> Trigger Reward & Switch to Rest or Finish
                 completeFocusSegment();
             } else {
-                // Rest Done -> Next Round
                 currentRound++;
                 if (currentRound > totalRounds) {
                     finishProtocol();
@@ -225,17 +347,15 @@
         document.getElementById('status').innerText = statusText;
         document.getElementById('status').style.color = color;
         document.getElementById('timer').style.textShadow = `0 0 20px ${color}`;
-        updateTimerDisplay();
     }
 
-    function updateTimerDisplay() {
-        const m = Math.floor(timeLeft / 60);
-        const s = timeLeft % 60;
+    function updateTimerDisplay(secondsLeft) {
+        const m = Math.floor(secondsLeft / 60);
+        const s = secondsLeft % 60;
         document.getElementById('timer').innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     }
 
     function completeFocusSegment() {
-        // Send reward for this specific round
         fetch('/focus_complete', {
             method: 'POST',
             headers: {
@@ -244,12 +364,9 @@
             },
             body: JSON.stringify({ minutes: focusMinutes })
         }).then(res => res.json()).then(data => {
-            if (data.success) {
-                console.log("Reward granting success.");
-            }
+            console.log("Reward granted.");
         });
 
-        // Check if last round
         if (currentRound >= totalRounds) {
             finishProtocol();
         } else {
@@ -258,6 +375,7 @@
     }
 
     function finishProtocol() {
+        clearState();
         document.getElementById('status').innerText = "PROTOCOL COMPLETE";
         document.getElementById('status').style.color = "gold";
         document.getElementById('timer').innerText = "DONE";
@@ -269,7 +387,8 @@
 
     function failSession() {
         hasFailed = true;
-        clearInterval(timerId);
+        clearState();
+        if (timerId) clearInterval(timerId);
         audioFail.play().catch(e => console.log("Audio Error"));
         document.getElementById('timer').style.display = 'none';
         document.getElementById('status').style.display = 'none';
@@ -280,31 +399,94 @@
         }, 3000);
     }
 
-    // VISIBILITY CHECK
-    document.addEventListener("visibilitychange", () => {
-        if (hasFailed || !timerId) return;
+    let partialMinutesToSave = 0;
 
-        // Strict Mode only applies during FOCUS
-        if (!isFocus) return;
+    function showAbortModal() {
+        partialMinutesToSave = 0;
 
-        if (document.hidden) {
-            blurTime = Date.now();
-            document.getElementById('status').innerText = "WARNING: RETURN IMMEDIATELY";
-            document.getElementById('status').style.color = "red";
+        // Calculate accrued time
+        if (isFocus && endTime > 0) {
+            const now = Date.now();
+            const timeLeft = Math.max(0, endTime - now);
+            const durationMs = focusMinutes * 60 * 1000;
+            const elapsedMs = durationMs - timeLeft;
+            partialMinutesToSave = Math.floor(elapsedMs / 1000 / 60);
+        }
+
+        const msgElement = document.getElementById('abortMsg');
+        if (partialMinutesToSave > 0) {
+            msgElement.innerHTML = `TERMINATING SESSION.<br><br>DATA SALVAGE: <span style="color:cyan">${partialMinutesToSave} MINUTES</span> WILL BE SAVED.`;
         } else {
-            // Returned
-            if (blurTime) {
-                const timeAway = (Date.now() - blurTime) / 1000;
+            msgElement.innerHTML = `TERMINATING SESSION.<br><br><span style="color:red">WARNING: NO DATA WILL BE SAVED.</span>`;
+        }
 
-                if (timeAway > 20) {
-                    failSession();
-                } else {
-                    document.getElementById('status').innerText = "SYSTEM ACTIVE";
-                    document.getElementById('status').style.color = "cyan";
-                    blurTime = null;
-                }
+        document.getElementById('abortModal').style.display = 'flex';
+    }
+
+    function closeAbortModal() {
+        document.getElementById('abortModal').style.display = 'none';
+    }
+
+    async function confirmAbort() {
+        clearState();
+        if (timerId) clearInterval(timerId);
+
+        if (partialMinutesToSave > 0) {
+            try {
+                await fetch('/focus_complete', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    },
+                    body: JSON.stringify({ minutes: partialMinutesToSave })
+                });
+            } catch (e) {
+                console.error("Failed to save partial progress:", e);
+                alert("Warning: Could not save progress.");
             }
         }
+        window.location.href = "{{ url_for('main.dashboard') }}";
+    }
+
+    // VISIBILITY CHECK
+    document.addEventListener("visibilitychange", () => {
+        if (hasFailed) return;
+
+        if (document.hidden) {
+            // BATTERY OPTIMIZATION: When hidden, we rely on the Date.now() check in tick()
+            // Strict Mode only applies during FOCUS
+            if (isFocus) {
+                blurTime = Date.now();
+                document.getElementById('status').innerText = "WARNING: RETURN IMMEDIATELY";
+                document.getElementById('status').style.color = "red";
+            }
+        } else {
+            // Returned to view
+            // Update display immediately with correct time
+            if (endTime > 0) {
+                const diff = endTime - Date.now();
+                updateTimerDisplay(Math.max(0, Math.ceil(diff / 1000)));
+            }
+
+            if (isFocus && blurTime) {
+                const timeAway = (Date.now() - blurTime) / 1000;
+
+                // We allow screen-off now, so we removed the auto-fail.
+                // Just welcome them back.
+                document.getElementById('status').innerText = "SYSTEM ACTIVE";
+                document.getElementById('status').style.color = "cyan";
+                blurTime = null;
+
+                // Optional: You could log 'timeAway' for analytics if desired
+                console.log(`User was away/screen-off for ${timeAway}s`);
+            }
+        }
+    });
+
+    // Auto-Restore
+    document.addEventListener("DOMContentLoaded", () => {
+        restoreState();
     });
 </script>
 {% endblock %}
