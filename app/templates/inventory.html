@@ -12,7 +12,8 @@
     <div class="panel" style="grid-column: 1 / -1; max-width: 1800px; margin: 0 auto;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <h2 style="margin: 0;">INVENTORY</h2>
-            <a href="{{ url_for('main.dashboard') }}" class="btn-small">BACK</a>
+            <a href="{{ url_for('main.dashboard') }}" class="btn-complete"
+                style="text-decoration: none; padding: 10px 20px; margin-left: 100px;">BACK TO DASHBOARD</a>
         </div>
 
         <div class="inventory-section">
@@ -50,6 +51,7 @@
                     {% if inv.is_equipped %}
                     <form action="{{ url_for('main.unequip_item_route', inv_id=inv.id) }}" method="POST"
                         style="margin:0;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" name="redirect_to" value="inventory">
                         <button type="submit" class="btn btn-sm"
                             style="border: 1px solid #777; color: #777; background: transparent;">UNEQUIP</button>
@@ -57,6 +59,7 @@
                     {% else %}
                     <form action="{{ url_for('main.equip_item_route', inv_id=inv.id) }}" method="POST"
                         style="margin:0;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" name="redirect_to" value="inventory">
                         <button type="submit" class="btn btn-sm"
                             style="background: cyan; border: none; color: black; font-weight: 900; box-shadow: 0 0 5px cyan;">EQUIP</button>
@@ -65,6 +68,7 @@
                     {% else %}
                     <!-- Consumable -->
                     <form action="{{ url_for('main.use_item_route', inv_id=inv.id) }}" method="POST" style="margin:0;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" name="redirect_to" value="inventory">
                         <button type="submit" class="btn btn-sm"
                             style="background: #00ff00; border: none; color: black; font-weight: 900; box-shadow: 0 0 5px #00ff00;">USE</button>

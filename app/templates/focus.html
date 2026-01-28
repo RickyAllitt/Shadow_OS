@@ -195,7 +195,9 @@
 
     // AUDIO
     const audioAlarm = new Audio("{{ url_for('static', filename='sounds/timer_alarm.mp3') }}");
+    audioAlarm.volume = 0.6;
     const audioFail = new Audio("{{ url_for('static', filename='sounds/glitch_error.mp3') }}");
+    audioFail.volume = 0.6;
 
     // PERSISTENCE
     const STORAGE_KEY = 'SL_FOCUS_STATE';

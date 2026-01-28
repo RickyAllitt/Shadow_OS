@@ -358,8 +358,8 @@ def check_daily_reset(player):
         now = datetime.now(timezone.utc)
         if player.vacation_end_date and now >= player.vacation_end_date.replace(tzinfo=timezone.utc):
             end_vacation(player)
-            return True # Reset might occur after vacation ends
-        return False
+            return True, ["VACATION ENDED. WELCOME BACK, HUNTER."] # Reset might occur after vacation ends
+        return False, []
 
     now = datetime.now(timezone.utc)
     today_midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)

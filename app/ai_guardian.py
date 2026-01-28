@@ -26,7 +26,7 @@ class TheArchitect:
             return None
             
         try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemma-3-12b-it:generateContent?key={api_key}"
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemma-3-4b-it:generateContent?key={api_key}"
             headers = {
                 "Content-Type": "application/json"
             }

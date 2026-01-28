@@ -13,6 +13,7 @@
         </div>
 
         <form action="/add_quest" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div style="margin-bottom: 15px;">
                 <label style="color: var(--color-text-muted); display: block; margin-bottom: 5px;">OBJECTIVE</label>
                 <input type="text" name="title" placeholder="Enter task description..."

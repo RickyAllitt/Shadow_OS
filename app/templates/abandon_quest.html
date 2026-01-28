@@ -20,6 +20,7 @@
         </div>
 
         <form action="/delete_quest/{{ quest.id }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div style="display: flex; justify-content: space-between; gap: 20px;">
                 <a href="/" class="btn-small"
                     style="text-decoration: none; padding: 12px 0; width: 100%; border-color: #555; color: #aaa;">CANCEL</a>

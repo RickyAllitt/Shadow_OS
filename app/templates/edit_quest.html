@@ -6,6 +6,7 @@
         <h2 style="margin-bottom: 20px;">EDIT QUEST</h2>
 
         <form action="/edit_quest/{{ quest.id }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <label style="color: var(--color-text-muted); display: block; margin-bottom: 5px;">Objective</label>
             <input type="text" name="title" value="{{ quest.title }}" required {% if quest.is_daily %}disabled
                 style="width: 100%; padding: 12px; background: #222; border: 1px solid #444; color: #888; margin-bottom: 20px; cursor: not-allowed;"

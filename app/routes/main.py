@@ -159,13 +159,14 @@ def buy_item(item_id):
     if not item:
         return redirect(url_for('main.dashboard'))
         
-    # CHECK UNIQUE OWNERSHIP FOR COIN ITEMS
-    # Users can only hold ONE copy of any item costing Coins (Equipment or Special)
-    if item.currency == 'coins':
-        exists = Inventory.query.filter_by(player_id=player.id, item_id=item.id).first()
-        if exists:
-             flash(f"You already own {item.name}. (Limit: 1)", "error")
-             return redirect(url_for('main.dashboard'))
+    # CHECK UNIQUE OWNERSHIP (For both Gold and Coins)
+    # Users can only hold ONE copy of any item (Equipment or Special)
+    exists = Inventory.query.filter_by(player_id=player.id, item_id=item.id).first()
+    if exists:
+            flash(f"You already own {item.name}. (Limit: 1)", "error")
+            if request.args.get('json'):
+                return jsonify({'success': False, 'message': f"You already own {item.name}."})
+            return redirect(url_for('main.dashboard'))
         
     if player.gold >= item.cost:
         # Check stock
@@ -723,19 +724,21 @@ def analytics():
     
     # Prepare data for Chart.js
     dates = [s.date.strftime('%Y-%m-%d') for s in snapshots]
-    # Simple growth metric: Level
-    levels = [s.level for s in snapshots]
     
-    # Stats for Radar
-    stats = {
-        'STR': current_user.strength,
-        'INT': current_user.intelligence,
-        'AGI': current_user.agility,
-        'VIT': current_user.vitality,
-        'SNS': current_user.sense
-    }
+    # Growth metric: Total Stats (Sum of all attributes) - Shows daily effort better than Level
+    growth_data = [s.total_stats for s in snapshots]
+    if not growth_data and current_user.snapshots:
+         # Fallback if snapshots exist but are empty for some reason
+         growth_data = [s.level for s in snapshots]
+         
+    # If no snapshots yet, provide current state as a single point
+    if not snapshots:
+        dates = [datetime.now().strftime('%Y-%m-%d')]
+        # Calculate current total stats
+        current_total = current_user.strength + current_user.intelligence + current_user.agility + current_user.vitality + current_user.sense
+        growth_data = [current_total]
     
-    return render_template('analytics.html', dates=dates, levels=levels, stats=stats)
+    return render_template('analytics.html', dates=dates, growth_data=growth_data)
 
 @bp.route('/focus')
 @login_required

@@ -30,6 +30,7 @@
                     <span style="color: var(--color-gold); font-weight: bold;">-{{ purchase.cost }} G</span>
                     {% if not purchase.is_claimed %}
                     <form action="/claim_purchase/{{ purchase.id }}" method="POST" style="margin: 0;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn-small"
                             style="font-size: 0.7em; padding: 2px 5px; background: var(--color-primary); color: black;">CLAIM</button>
                     </form>

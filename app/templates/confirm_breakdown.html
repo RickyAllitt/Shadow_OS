@@ -20,7 +20,7 @@
         <hr style="border-color: #333; margin: 15px 0;">
         <p style="color: #aaa;">
             <b>Operation:</b> DECOMPOSE<br>
-            <b>Model:</b> GEMINI-2.5-FLASH / HEURISTIC FALLBACK<br>
+            <b>Model:</b> GEMMA-3-4B-IT / HEURISTIC FALLBACK<br>
             <b>Output:</b> 3-5 Sub-Routines
         </p>
     </div>
@@ -31,6 +31,7 @@
         </p>
 
         <form action="{{ url_for('main.architect_breakdown', quest_id=quest.id) }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div style="display: flex; gap: 20px; justify-content: center;">
                 <a href="{{ url_for('main.dashboard') }}" class="btn-small"
                     style="padding: 10px 20px; border-color: #666; color: #aaa; text-decoration: none; display: inline-block;">

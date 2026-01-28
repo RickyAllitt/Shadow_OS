@@ -46,6 +46,29 @@
         {% block content %}{% endblock %}
     </div>
 
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            // 3. System Notifications
+            const flashes = document.querySelectorAll('.flash-msg');
+            if (flashes.length > 0) {
+                // Audio is handled by page-specific scripts if needed, or we can check global
+                if (window.audioManager) {
+                    // Simple check if major event happened (approximate check relying on class presence)
+                    const majorEvent = document.querySelector('.flash-msg.levelup') || document.querySelector('.flash-msg.arise_trigger');
+                    if (!majorEvent) window.audioManager.play('notification');
+                }
+
+                // Auto-Dismiss after 2.5 seconds
+                setTimeout(() => {
+                    flashes.forEach(el => {
+                        el.style.transition = "opacity 0.5s ease";
+                        el.style.opacity = "0";
+                        setTimeout(() => el.remove(), 500);
+                    });
+                }, 2500);
+            }
+        });
+    </script>
 </body>
 
 </html>

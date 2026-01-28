@@ -30,6 +30,24 @@
         cursor: pointer;
     }
 
+    .btn-cancel {
+        background: transparent;
+        border: 1px solid #555;
+        color: #888;
+        padding: 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-family: var(--font-heading);
+        transition: all 0.2s;
+        width: 100%;
+    }
+
+    .btn-cancel:hover {
+        border-color: #aaa;
+        color: #fff;
+        background: rgba(255, 255, 255, 0.05);
+    }
+
     .btn-sleep-log:hover {
         background: var(--color-primary);
         color: black;
@@ -693,7 +711,7 @@
             <div style="display: flex; gap: 10px;">
                 <button type="button" class="btn-cancel"
                     onclick="document.getElementById('sleepModal').style.display='none'">CANCEL</button>
-                <button type="submit" class="btn-confirm">CONFIRM</button>
+                <button type="submit" class="btn-complete" style="width: 100%; padding: 10px;">CONFIRM</button>
             </div>
         </form>
     </div>
@@ -710,7 +728,7 @@
         },
         play: function (name) {
             if (this.sounds[name]) {
-                this.sounds[name].volume = 0.5;
+                this.sounds[name].volume = 0.6;
                 this.sounds[name].currentTime = 0;
                 this.sounds[name].play().catch(e => console.log("Audio play blocked/missing: " + name));
             }
@@ -838,6 +856,17 @@
                 document.getElementById('systemModalText').innerHTML = `<p style='margin-bottom: 15px;'>${data.message}</p>`;
                 document.getElementById('systemModal').style.display = 'flex';
 
+                // Auto-fade purchase popup
+                setTimeout(() => {
+                    const modal = document.getElementById('systemModal');
+                    modal.style.transition = "opacity 0.5s ease";
+                    modal.style.opacity = "0";
+                    setTimeout(() => {
+                        modal.style.display = 'none';
+                        modal.style.opacity = "1";
+                    }, 500);
+                }, 2000);
+
                 SoundManager.play('buy');
 
                 // Reset Button State
@@ -873,6 +902,7 @@
                 of vacation.</span>
         </p>
         <form action="{{ url_for('main.start_vacation_route') }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div style="margin-bottom: 25px;">
                 <label style="display: block; color: var(--color-text-muted); margin-bottom: 10px;">Vacation Duration
                     (Days):</label>
@@ -944,6 +974,7 @@
                 ABORT
             </button>
             <form action="{{ url_for('main.end_vacation_route') }}" method="POST" style="flex: 1;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn-small"
                     style="width: 100%; padding: 15px; border-color: var(--color-danger); color: var(--color-danger); background: rgba(255,0,0,0.25); font-weight: 900; font-size: 1rem; letter-spacing: 1px;">
                     CONFIRM
@@ -962,6 +993,7 @@
     <p style="color: #ccc; margin-bottom: 30px; font-size: 1.2em;">The shadow of your achievement waits to be born.</p>
 
     <form id="ariseForm" method="POST" action="">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="glow-effect"
             style="background: transparent; border: 2px solid #b19cd9; color: #b19cd9; padding: 15px 40px; font-size: 1.5em; cursor: pointer; letter-spacing: 2px;">
             EXTRACT SHADOW
@@ -1100,6 +1132,7 @@
 
         <form action="/update_penalty" method="POST"
             onsubmit="return confirm('WARNING: This action will deduct 250 Coins. This cannot be undone. Proceed?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <label style="color: var(--color-text-muted); display: block; margin-bottom: 5px;">NEW PENALTY
                 CONDITION</label>
             <input type="text" name="penalty_description" value="{{ player.penalty_description }}"
@@ -1169,23 +1202,7 @@
             }, 500);
         }
 
-        // 3. System Notifications
-        const flashes = document.querySelectorAll('.flash-msg');
-        if (flashes.length > 0) {
-            // Only play standard notification if no major event occurred
-            if (!majorEventTriggered && window.audioManager) {
-                window.audioManager.play('notification');
-            }
 
-            // Auto-Dismiss after 5 seconds
-            setTimeout(() => {
-                flashes.forEach(el => {
-                    el.style.transition = "opacity 0.5s ease";
-                    el.style.opacity = "0";
-                    setTimeout(() => el.remove(), 500);
-                });
-            }, 5000);
-        }
     });
 </script>
 

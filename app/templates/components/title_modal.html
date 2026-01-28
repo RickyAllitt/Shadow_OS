@@ -9,6 +9,7 @@
             {% for pt in player.unlocked_titles %}
             <form action="{{ url_for('main.equip_title_route', title_id=pt.title.id) }}" method="POST"
                 style="margin-bottom: 10px;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="quest-card rank-{{ 'S' if 'S-Rank' in pt.title.name else 'E' }}"
                     style="width: 100%; text-align: left; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: rgba(0,0,0,0.6); border: 1px solid #444;">
                     <div>
