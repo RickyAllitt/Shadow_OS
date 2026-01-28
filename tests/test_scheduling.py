@@ -37,7 +37,7 @@ def test_daily_reset_logic(app):
         db.session.commit()
         
         # Action: Check reset
-        was_reset = check_daily_reset(user)
+        was_reset, msgs = check_daily_reset(user)
         
         assert was_reset is True
         

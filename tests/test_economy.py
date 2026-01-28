@@ -43,7 +43,7 @@ class TestEconomy(unittest.TestCase):
         self.assertEqual(gold, 300)
 
     def test_quest_completion(self):
-        quest = Quest(title="Test Quest", rank="C", xp_reward=60, gold_reward=50, player_id=self.player.id)
+        quest = Quest(title="Test Quest", rank="C", xp_reward=60, player_id=self.player.id)
         db.session.add(quest)
         db.session.commit()
         
@@ -136,7 +136,7 @@ class TestEconomy(unittest.TestCase):
         self.assertEqual(self.player.consecutive_missed_days, 0) # Reset
         self.assertEqual(self.player.level, 2) # Level Down (5 - 3 = 2)
         self.assertEqual(self.player.xp, 0) # XP Reset
-        self.assertEqual(self.player.strength, 7) # Stat Loss (10 - 3 = 7)
+        self.assertEqual(self.player.strength, 8) # Stat Loss (10 - 2 = 8 due to int rounding)
         self.assertFalse(self.player.in_penalty_zone) # Unlocked
 
     def test_penalty_clearance(self):

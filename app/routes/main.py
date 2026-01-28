@@ -4,7 +4,7 @@ from sqlalchemy import or_
 from app.extensions import db
 from app.models import Player, Quest, RewardItem, QuestComment, PurchaseLog, Inventory, DailySnapshot
 from app.services import (check_weekly_reset, check_daily_reset, get_categorized_quests, 
-                          calculate_rewards, process_quest_completion, ensure_welcome_quest, 
+                          calculate_rewards, process_quest_completion, 
                           calculate_total_stats, extract_shadow, start_vacation, end_vacation)
 from datetime import datetime, timezone
 
@@ -16,12 +16,15 @@ def dashboard():
     if check_weekly_reset(current_user):
         flash("WEEKLY RESET: Gold has been reset to 0.", "system_popup")
     
-    if check_daily_reset(current_user):
+    reset_occurred, msgs = check_daily_reset(current_user)
+    if reset_occurred:
         flash("DAILY RESET: Daily quests have been refreshed.", "system_popup")
+        for msg in msgs:
+            flash(msg, "system_popup")
 
     player = current_user
     
-    check_daily_reset(player)
+
     
     # Get Items
     dailies, scheduled, backlog = get_categorized_quests(player.id)
@@ -30,8 +33,7 @@ def dashboard():
     if not player.setup_complete:
         return redirect(url_for('main.setup_page'))
     
-    # Get Items
-    dailies, scheduled, backlog = get_categorized_quests(player.id)
+
     
     # Calculate Total Stats (Base + Equipment + Debuffs)
     total_stats = calculate_total_stats(player)
@@ -68,8 +70,7 @@ def add_quest():
         flash(f"System Analysis: Rank {rank} | Stat {stat} | XP {xp}", "info")
     else:
         xp_map = {'E': 10, 'D': 20, 'C': 50, 'B': 100, 'A': 200, 'S': 500}
-        # Use centralized logic, or stick to this if we want to preview?
-        # Better:
+        # Use centralized logic
         xp, _, _ = calculate_rewards(rank)
     
     priority = int(request.form.get('priority', 4))
@@ -459,7 +460,6 @@ def edit_quest(id):
         return redirect(url_for('main.dashboard'))
         
     # Reuse dashboard? Or render a specific edit page?
-    # Simple edit page.
     return render_template('edit_quest.html', quest=quest)
 
 @bp.route('/architect/breakdown/<int:quest_id>', methods=['GET', 'POST'])
@@ -482,7 +482,7 @@ def architect_breakdown(quest_id):
         return redirect(url_for('main.dashboard'))
 
     created_count = 0
-    created_count = 0
+
     for task_data in sub_tasks:
         # Extract data (handle both string list and dict list for backward compatibility)
         if isinstance(task_data, str):

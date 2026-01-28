@@ -92,6 +92,7 @@
     <div class="setup-subtitle">CONFIGURE DAILY PROTOCOL</div>
 
     <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <p style="color: #ccc; margin-bottom: 20px; text-align: center;">
             To proceed, you must establish 4 Daily Quests. These are non-negotiable tasks required for your survival.
         </p>

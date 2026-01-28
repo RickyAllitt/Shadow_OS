@@ -6,6 +6,7 @@
         <h2 style="margin-bottom: 30px;">HUNTER REGISTRATION</h2>
 
         <form action="/register" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div style="margin-bottom: 20px;">
                 <input type="text" name="username" placeholder="Hunter Name" required
                     style="width: 100%; padding: 12px; background: black; border: 1px solid var(--color-primary); color: white; border-radius: 4px;">

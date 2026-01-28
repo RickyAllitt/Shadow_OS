@@ -8,8 +8,9 @@ def create_app(config_class=Config):
 
     # Initialize extensions
     db.init_app(app)
-    from .extensions import login_manager
+    from .extensions import login_manager, csrf
     login_manager.init_app(app)
+    csrf.init_app(app)
     login_manager.login_view = 'auth.login'
 
     # Register Blueprints

@@ -48,6 +48,16 @@ A gamified life-management system inspired by *Solo Leveling*. Track your produc
 - **Leaderboard**: Compete with other 'Hunters' to see who has leveled up the most or taken the most vacations.
 - **History Log**: Comprehensive log of all completed quests and cleared penalties.
 
+
+## 🛡️ Security Implementation
+The system is hardened against common web vulnerabilities to ensure a secure operating environment:
+
+- **CSRF Protection**: Global Cross-Site Request Forgery protection using `Flask-WTF`. all forms and AJAX requests are secured with unique tokens.
+- **Input Sanitization**: Strict validation on logical inputs (e.g., negative integers in focus mode).
+- **XSS Prevention**: Semantic templating with Jinja2 auto-escaping.
+- **SQL Injection**: Comprehensive use of SQLAlchemy ORM to abstract and parameterize all database queries.
+- **Authentication**: Secure session management via `Flask-Login`.
+
 ## 🛠 Setup & Installation
 
 ### Prerequisites
@@ -56,17 +66,30 @@ A gamified life-management system inspired by *Solo Leveling*. Track your produc
 
 ### Installation
 1.  **Clone the Repository**
+    ```bash
+    git clone https://github.com/your-username/solo-leveling-system.git
+    cd solo-leveling-system
+    ```
+
 2.  **Environment Setup**:
     ```bash
     python -m venv env
     source env/bin/activate  # or env\Scripts\activate on Windows
     pip install -r requirements.txt
     ```
+
 3.  **Global Variables**:
-    Create a `.env` file or export `GEMINI_API_KEY` for AI features.
+    Create a `.env` file in the root directory:
+    ```env
+    FLASK_APP=run.py
+    FLASK_ENV=development
+    SECRET_KEY=your-super-secret-key-change-this
+    GEMINI_API_KEY=your-google-gemini-api-key
+    ```
+
 4.  **Database Initialization**:
     ```bash
-    flask db upgrade  # or let the app auto-initialize on first run
+    python migrate_db.py
     ```
 
 ### Running the System
@@ -76,10 +99,18 @@ python run.py
 Access the interface at `http://localhost:5000`.
 
 ## 🧪 Testing
-The system includes a comprehensive test suite for verifying core logic:
+The system includes a comprehensive test suite covering Economy, Quest Logic, AI Integration, and Scheduling.
+
+**Run All Tests:**
 ```bash
 pytest
 ```
 
+**Run Specific Test Module:**
+```bash
+pytest tests/test_economy.py
+```
+
 ---
-*"I alone level up."*
+> *"I alone level up."*
+

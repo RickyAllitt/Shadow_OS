@@ -7,7 +7,7 @@ def seed_database():
     # 1. Create the Player (The User)
     if not Player.query.first():
         new_player = Player(
-            name="Player One",          
+            name="Player One",
             # Title is set via relationship logic now
             level=1,
             xp=0,
@@ -24,9 +24,7 @@ def seed_database():
         )
         db.session.add(new_player)
         print(">> Player Created.")
-        # Title handling happens in process_quest_completion or manual checks now
-        # We assume migration script handles default title assignment for new players via default in DB or signals?
-        # Better: Assign default title here if it exists
+        # Assign default title here if it exists
         default_title = Title.query.filter_by(name="E-Rank Hunter").first()
         if default_title:
              new_player.current_title = default_title
@@ -35,7 +33,6 @@ def seed_database():
              assoc = PlayerTitle(player=new_player, title=default_title)
              db.session.add(assoc)
 
-    # 2. Create Default Shop Items (Rewards)
     # 2. Create Default Shop Items (Rewards)
     # Define all desired items
     desired_items = [
@@ -372,6 +369,7 @@ def check_daily_reset(player):
     
     if player.last_daily_reset < today_midnight:
         # A new day has dawned. Judgment Time.
+        messages = []
         
         # 1. Capture Analytics Snapshot (Before reset changes stats or levels down)
         _create_daily_snapshot(player)
@@ -391,6 +389,8 @@ def check_daily_reset(player):
         if not success:
             # FAILURE LOGIC
             player.consecutive_missed_days += 1
+            # GLOBAL FAILURE COUNT: Every miss counts as a failure on the leaderboard
+            player.penalties_count += 1
             
             # --- CLASS BONUS: TANK ---
             # Tanks ignore the first day of failure (Grace Period)
@@ -399,18 +399,23 @@ def check_daily_reset(player):
                 effective_missed_days = max(0, effective_missed_days - 1)
             
             # Stage 1: Debuff (Immediate)
-            if effective_missed_days >= 1:
+            if effective_missed_days == 1:
+                player.has_debuff = True
+                messages.append("SYSTEM ALERT: Daily Quests Failed. Physical Condition degraded (-20% Stats).")
+            elif effective_missed_days > 1:
+                # Ensure debuff stays on
                 player.has_debuff = True
             
             # Stage 2: Penalty Zone (2 Days Missed -> Tanks: 3 Days)
-            if effective_missed_days >= 2:
+            if effective_missed_days == 2:
                 player.in_penalty_zone = True
+                messages.append("SYSTEM ALERT: PENALTY ZONE ENTERED. A Penalty Quest has been issued.")
                 
                 # Check if penalty quest exists, if not create one
                 existing_penalty = Quest.query.filter_by(player_id=player.id, is_penalty=True, is_completed=False).first()
                 if not existing_penalty:
                     # NEW PENALTY INCIDENT
-                    player.penalties_count += 1
+                    # Note: We already incremented penalties_count above globally.
                     
                     penalty = Quest(
                         title=f"PENALTY: {player.penalty_description}", 
@@ -423,6 +428,8 @@ def check_daily_reset(player):
                         due_date=now + timedelta(hours=12)
                     )
                     db.session.add(penalty)
+            elif effective_missed_days > 2:
+                 player.in_penalty_zone = True
 
             # Stage 3: Level Down (3 Days Missed -> Tanks: 4 Days)
             if effective_missed_days >= 3:
@@ -441,6 +448,15 @@ def check_daily_reset(player):
                     player.sense = max(1, player.sense - loss)
                     player.vitality = max(1, player.vitality - loss)
                     
+                    messages.append("CRITICAL: FAILURE TO COMPLETE PENALTY. LEVEL DOWN INITIATED. STATS REDUCED.")
+                    
+                    # SYSTEM FIX: Clear the lingering Penalty Quest so a new one can be generated next time
+                    active_penalties = Quest.query.filter_by(player_id=player.id, is_penalty=True, is_completed=False).all()
+                    for p_quest in active_penalties:
+                        p_quest.is_completed = True
+                        p_quest.completed_at = now
+                        # No rewards for expired penalty
+                    
                 player.consecutive_missed_days = 0 # The debt is paid in blood
                 player.in_penalty_zone = False # Unlocked, but broken
                 player.has_debuff = False # Removed, but stats are lower permanently
@@ -456,9 +472,9 @@ def check_daily_reset(player):
             
         player.last_daily_reset = now
         db.session.commit()
-        return True
+        return True, messages
         
-    return False
+    return False, []
 
 def get_categorized_quests(player_id):
     """
@@ -690,37 +706,7 @@ def extract_shadow(player, quest_id):
     
     return True, f"ARISE. {quest.title} has joined your Shadow Army."
 
-def ensure_welcome_quest(player):
-    """
-    Checks if the player has any quests at all.
-    If not, seeds a tutorial quest.
-    """
-    quest_count = Quest.query.filter_by(player_id=player.id).count()
-    quest_count = Quest.query.filter_by(player_id=player.id).count()
-    if quest_count == 0:
-        # 1. Tutorial Quest
-        welcome_quest = Quest(
-            title="Welcome to the System: Create a Task",
-            rank="E",
-            player_id=player.id,
-            xp_reward=50,
-            gold_reward=10,
-            stat_reward="INT", # Learning the system
-            is_daily=False
-        )
-        db.session.add(welcome_quest)
-        
-        # 2. Default Dailies x3
-        default_dailies = [
-            Quest(title="Morning Routine", rank="E", player_id=player.id, xp_reward=10, gold_reward=5, stat_reward="VIT", is_daily=True),
-            Quest(title="Exercise / Workout", rank="D", player_id=player.id, xp_reward=25, gold_reward=10, stat_reward="STR", is_daily=True),
-            Quest(title="Study / Work Focus", rank="D", player_id=player.id, xp_reward=25, gold_reward=10, stat_reward="INT", is_daily=True)
-        ]
-        db.session.add_all(default_dailies)
-        
-        db.session.commit()
-        return True
-    return False
+
 
 def calculate_total_stats(player):
     """

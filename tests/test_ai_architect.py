@@ -67,7 +67,7 @@ def test_decompose_task_heuristic(app):
 
 def test_decompose_task_llm(app):
     """Test decomposition with LLM (Gemini)."""
-    mock_content_list = '["Design DB", "Setup Flask", "Create Frontend"]'
+    mock_content_list = '[{"step": "Design DB", "rank": "E"}, {"step": "Setup Flask", "rank": "E"}, {"step": "Create Frontend", "rank": "E"}]'
     mock_body = {
         "candidates": [
             {
@@ -92,4 +92,4 @@ def test_decompose_task_llm(app):
         with patch('urllib.request.urlopen', return_value=mock_urlopen_context):
             tasks = TheArchitect.decompose_task("Build an App")
             assert len(tasks) == 3
-            assert tasks[0] == "Design DB"
+            assert tasks[0]['step'] == "Design DB"
