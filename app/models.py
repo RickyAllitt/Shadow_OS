@@ -89,6 +89,10 @@ class Player(UserMixin, db.Model):
     last_vacation_date = db.Column(db.DateTime, nullable=True)
     vacation_count = db.Column(db.Integer, default=0)
 
+    # --- SETTINGS ---
+    settings_audio = db.Column(db.Boolean, default=True)
+    settings_music = db.Column(db.Boolean, default=True)
+
 class Quest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(100), nullable=False)
@@ -174,6 +178,7 @@ class DailySnapshot(db.Model):
     level = db.Column(db.Integer)
     xp = db.Column(db.Integer)
     total_stats = db.Column(db.Integer) # Sum of stats
+    quests_completed = db.Column(db.Integer, default=0) # Heatmap Data
     
     # Snapshot of core stats
     strength = db.Column(db.Integer)
@@ -219,3 +224,16 @@ class Shadow(db.Model):
     buff_value = db.Column(db.Integer, default=1) # +1% or +1 Flat
     
     player = db.relationship('Player', backref=db.backref('shadows', lazy=True, cascade="all, delete-orphan"))
+
+class Notification(db.Model):
+    """
+    System Notifications (Alerts, Reminders, Warnings).
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
+    message = db.Column(db.String(255), nullable=False)
+    category = db.Column(db.String(20), default="info") # info, warning, error, success
+    is_read = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    player = db.relationship('Player', backref=db.backref('notifications', lazy='dynamic', cascade="all, delete-orphan"))

@@ -2,63 +2,96 @@
 
 > "You do not level up. You survive."
 
-A gamified life-management system inspired by *Solo Leveling*. Track your productive quests, manage your physical and mental attributes, and avoid the lethal penalties of 'The System'.
+A gamified life-management system inspired by *Solo Leveling*. Track your productive quests, manage your physical and mental attributes, and avoid the lethal penalties of 'The System'. This application transforms mundane tasks into a high-stakes RPG where your real-life efforts directly impact your character's progression.
 
 ## 🌑 Core Features
 
 ### 1. The Dashboard (The HUD)
-- **Status Window**: Real-time display of **STR**, **INT**, **AGI**, **VIT**, and **SEN**.
-- **Stat Benefits**: 
-    - **INT**: +5% XP per 10 points.
-    - **STR**: Reduces penalty debuff severity.
-    - **AGI**: +5% Coin rewards per 10 points.
-    - **VIT**: Reduces permanent stat loss from failure.
-    - **SNS**: Scales Shadow Army passive buffs.
-- **Visual Feedback**: Interface glitching and distortion based on health and penalty status.
+The command center of your growth. It visually represents your current status with a high-fidelity interface.
+- **Attributes**: Real-time tracking of **STR**, **INT**, **AGI**, **VIT**, and **SEN**.
+    - **INT**: Increases XP gain (+5% per 10 points).
+    - **STR**: Reduces penalty severity (Debuff protection).
+    - **AGI**: Increases Coin drop rates (+5% per 10 points).
+    - **VIT**: Reduces stat loss probability on failure.
+    - **SEN**: Boosts Shadow Army passive effectiveness.
+- **Currency System**:
+    - **Gold (G)**: Standard currency for buying shop items.
+    - **Coins (C)**: Premium currency for rare artifacts.
+- **Visual Feedback**: The UI actively glitches and distorts when penalties are active or health is low.
+- **Audio Settings**: Toggle sound effects (Level Up, Quest Complete, Arise) and music directly from the navbar.
 - **Active Effects**: Icons for conditions (Well Rested, Tired, System Frozen) and passive buffs.
-- **Persistent Header**: A dynamic banner displaying your Level, Rank, and XP progress.
 
 ### 2. Quests & The AI Architect
-- **Ranked Quests**: E-Rank to S-Rank tasks with varying rewards.
-- **The Architect AI**: Integrated LLM (Gemini) that automatically assigns Stat attributes and Ranks to new tasks.
-- **Task Decomposition**: Use the "⚡" (Architect Breakdown) to shatter large S-Rank goals into actionable sub-tasks.
-- **AI Security**: Hardened prompts with input sanitization and XML-style tagging to prevent instruction overrides.
+- **Ranked Quests**: Tasks are assigned Ranks (E to S) based on difficulty. Higher ranks yield greater rewards.
+- **The Architect AI**: Integrated Google Gemini AI automatically analyzes your task descriptions to:
+    - Assign an appropriate Rank (E-S).
+    - Determine the primary Stat reward (e.g., Coding -> INT, Workout -> STR).
+- **Task Decomposition**: Use the **"⚡" (Breakdown)** feature to let the AI shatter a large S-Rank goal into actionable sub-tasks.
+- **History Log**: A comprehensive audit trail of every quest completed, timestamped for accountability.
 
-### 3. Penalty & Recovery
-- **Daily Protocols**: Recurring tasks that must be completed every 24 hours to avoid penalties.
-- **The Penalty Zone**: Failing dailies triggers state-based punishments:
-    1. **Debuff (-20% Stats)**: System glitching active.
-    2. **Lockdown**: Access to the Shop is restricted.
-    3. **Level Down (-3 Levels)**: Major setback for failing to redeem yourself.
-- **Sleep Log**: Track sleep hours to maintain your "WELL RESTED" condition (+10% XP bonus).
+### 3. Analytics & Heatmap
+- **Activity Heatmap**: A GitHub-style contribution grid visualizing your consistency over the last 365 days. Darker cells indicate higher productivity.
+- **Growth Charts**: Interactive Chart.js graphs tracking your Level and XP growth over time.
+- **Sleep Log**: Track sleep duration to maintain the "WELL RESTED" status (+10% XP Bonus).
 
-### 4. Vacation Mode (System Freeze) 🌴
+### 4. Gamification & Progression
+- **Class Evolution**: Unlock specialized classes at Level 10, 25, and 50.
+    - **Assassin**: Coin Bonus.
+    - **Mage**: XP Bonus.
+    - **Tank**: Grace period against penalties.
+- **Shadow Army**: "Extract" completed S-Rank quests to turn them into Shadows. Shadows provide passive permanent buffs to your stats.
+- **Titles**: Unlock titles (e.g., "The Awakened", "Wolf Slayer") based on achievements like streaks or total gold. Titles provide unique stat multipliers.
+- **Inventory & Shop**: Purchase and equip items (Helmets, Armor, Weapons) that visually appear in your inventory and boost specific stats.
+- **Leaderboard**: Compete with other 'Hunters' to see who has leveled up the most or taken the most vacations.
+
+### 5. Penalty System
+Failure is not without consequence. The System demands consistency.
+- **Daily Protocols**: 4 Mandatory Dailies that reset every 24 hours.
+- **The Penalty Zone**: Failing to complete Dailies by midnight triggers:
+    1.  **Debuff**: -20% to all stats (System Glitching).
+    2.  **Shop Lockdown**: Inability to purchase recovery items.
+    3.  **Level Regression**: Loss of levels if penalties accumulate.
+- **Penalty Quest**: A generated "Survival Quest" (e.g., 50 Pushups) to clear the penalty status.
+
+### 6. Vacation Mode (System Freeze) 🌴
 - **Emergency Suspension**: Freeze the system to stop daily quest timers and avoid penalties while away.
 - **The Price of Peace**: Every full week spent on vacation reduces all stats by **1 point** upon return.
 - **Monthly Limit**: Highly restricted usage—only one vacation activation permitted per calendar month.
 - **Visual Overlay**: A full-screen "FROZEN" effect with a persistent bottom control bar for termination.
 
-### 5. Progression & Classes
-- **Class Advancement**: Unlock specialized paths at key milestones:
-    - **Assassin**: +10% Coin rewards.
-    - **Mage**: +10% XP rewards.
-    - **Tank**: Grace period against penalties.
-- **The Economy**: Earn **Gold (G)** for purchases and **Coins (C)** for rare artifacts.
-- **Inventory & Shop**: Equip artifacts in Head, Body, Weapon, and Accessory slots to boost stats.
-- **Leaderboard**: Compete with other 'Hunters' to see who has leveled up the most or taken the most vacations.
-- **History Log**: Comprehensive log of all completed quests and cleared penalties.
-
+---
 
 ## 🛡️ Security Implementation
-The system is hardened against common web vulnerabilities to ensure a secure operating environment:
+The system is architected with security-first principles to ensure data integrity and safe operation.
 
-- **CSRF Protection**: Global Cross-Site Request Forgery protection using `Flask-WTF`. all forms and AJAX requests are secured with unique tokens.
-- **Input Sanitization**: Strict validation on logical inputs (e.g., negative integers in focus mode).
+### 1. CSRF Protection (Cross-Site Request Forgery)
+- **Implementation**: Utilizes `Flask-WTF` to generate unique CSRF tokens for every session.
+- **Scope**: All HTML forms and AJAX (Fetch API) requests require a valid `X-CSRFToken` header.
+- **Validation**: Server-side checks reject any state-changing request (POST/PUT/DELETE) without a matching token, preventing unauthorized actions from external sites.
+
+### 2. Authentication & Session Management
+- **Library**: `Flask-Login` handles user session management.
+- **Password Security**: Passwords are **never** stored in plain text. They are hashed using `Werkzeug`'s PBKDF2 (SHA256) implementation with unique salts.
+- **Route Protection**: The `@login_required` decorator secures all sensitive endpoints, redirecting unauthenticated traffic to the login gate.
+
+### 3. Input Sanitization & Validation
+- **AI Safety**: Prompts sent to Gemini include strict system instructions (xml-tagging) to prevent Prompt Injection attacks.
+- **Data Integrity**: Route logic validates inputs (e.g., preventing negative values for "Focus Mode" duration or Shop purchases).
+- **ORM Security**: `SQLAlchemy` is used for all database interactions. Its parameterization automatically prevents SQL Injection attacks by treating inputs as data, not executable code.
 - **XSS Prevention**: Semantic templating with Jinja2 auto-escaping.
-- **SQL Injection**: Comprehensive use of SQLAlchemy ORM to abstract and parameterize all database queries.
-- **Authentication**: Secure session management via `Flask-Login`.
 
-## 🛠 Setup & Installation
+---
+
+## 🛠 Tech Stack
+- **Backend**: Python 3.12+, Flask 3.0+
+- **Database**: SQLite (Development), SQLAlchemy ORM
+- **Frontend**: HTML5, CSS3 (Variables, Grid/Flexbox), JavaScript (ES6+, Fetch API)
+- **AI Integration**: Google Generative AI (Gemini Pro)
+- **Visuals**: Chart.js (Analytics), Canvas Confetti (VFX)
+
+---
+
+## � Setup & Installation
 
 ### Prerequisites
 - Python 3.10+
@@ -73,8 +106,8 @@ The system is hardened against common web vulnerabilities to ensure a secure ope
 
 2.  **Environment Setup**:
     ```bash
-    python -m venv env
-    source env/bin/activate  # or env\Scripts\activate on Windows
+    python3 -m venv env
+    source env/bin/activate  # Windows: env\Scripts\activate
     pip install -r requirements.txt
     ```
 
@@ -88,29 +121,25 @@ The system is hardened against common web vulnerabilities to ensure a secure ope
     ```
 
 4.  **Database Initialization**:
+    Run the migration script to set up the schema and create tables.
     ```bash
-    python migrate_db.py
+    python3 migrate_db.py
+    # Then ensure tables are created
+    python3 -c "from app import create_app, db; app=create_app(); app.app_context().push(); db.create_all()"
     ```
 
-### Running the System
-```bash
-python run.py
-```
-Access the interface at `http://localhost:5000`.
+5.  **Running the System**:
+    ```bash
+    python3 run.py
+    ```
+    Access the interface at `http://localhost:5000`.
 
-## 🧪 Testing
-The system includes a comprehensive test suite covering Economy, Quest Logic, AI Integration, and Scheduling.
-
-**Run All Tests:**
+### Testing
+To run the automated test suite (covering Logic, Economy, and Security):
 ```bash
-pytest
-```
-
-**Run Specific Test Module:**
-```bash
-pytest tests/test_economy.py
+# Verify all existing functionality
+python3 -m pytest tests/
 ```
 
 ---
 > *"I alone level up."*
-

@@ -262,6 +262,36 @@ def process_quest_completion(player, quest):
         player.consecutive_missed_days = 0 # Mercy reset
         player.has_debuff = False
         
+    # 6. Heatmap Activity Tracking
+    today_date = datetime.now(timezone.utc).date()
+    # Find or Create Snapshot for TODAY to track activity in real-time
+    existing = DailySnapshot.query.filter_by(player_id=player.id, date=today_date).first()
+    
+    current_total_stats = sum(calculate_total_stats(player).values())
+    
+    if not existing:
+        existing = DailySnapshot(
+            player_id=player.id,
+            date=today_date,
+            quests_completed=0
+        )
+        db.session.add(existing)
+        print(f">> Created Daily Snapshot for {today_date}")
+    else:
+        print(f">> Updating Daily Snapshot for {today_date}")
+        
+    # Update Stats
+    existing.level = player.level
+    existing.xp = player.xp
+    existing.total_stats = current_total_stats
+    existing.strength = player.strength
+    existing.intelligence = player.intelligence
+    existing.agility = player.agility
+    existing.vitality = player.vitality
+    existing.sense = player.sense
+        
+    existing.quests_completed += 1
+        
     db.session.commit()
     
     can_arise = (quest.rank == 'S')
@@ -325,23 +355,32 @@ def _create_daily_snapshot(player):
     today = datetime.now(timezone.utc).date()
     yesterday = today - timedelta(days=1)
     
-    # Check if snapshot exists for yesterday (to avoid duplicates if script runs multiple times)
-    existing = DailySnapshot.query.filter_by(player_id=player.id, date=yesterday).first()
-    if not existing:
+    # Check if snapshot exists for yesterday
+    snap = DailySnapshot.query.filter_by(player_id=player.id, date=yesterday).first()
+    
+    # Calculate stats for the snapshot
+    current_total_stats = sum(calculate_total_stats(player).values())
+    
+    if not snap:
         snap = DailySnapshot(
             player_id=player.id,
             date=yesterday,
-            level=player.level,
-            xp=player.xp,
-            total_stats=sum(calculate_total_stats(player).values()),
-            strength=player.strength,
-            intelligence=player.intelligence,
-            agility=player.agility,
-            vitality=player.vitality,
-            sense=player.sense
+            quests_completed=0 # Should have been zero if not created by activity
         )
         db.session.add(snap)
         print(f">> Created Daily Snapshot for {yesterday}")
+    else:
+        print(f">> Updating Daily Snapshot for {yesterday}")
+
+    # Update/Finalize Stats
+    snap.level = player.level
+    snap.xp = player.xp
+    snap.total_stats = current_total_stats
+    snap.strength = player.strength
+    snap.intelligence = player.intelligence
+    snap.agility = player.agility
+    snap.vitality = player.vitality
+    snap.sense = player.sense
 
 def check_daily_reset(player):
     """
@@ -814,3 +853,79 @@ def end_vacation(player):
     player.vacation_end_date = None
     db.session.commit()
     return True, msg
+
+# --- NOTIFICATION SYSTEM LOGIC ---
+from app.models import Notification
+
+def create_notification(player_id, message, category="info"):
+    """ Helper to create a notification. """
+    notif = Notification(player_id=player_id, message=message, category=category)
+    db.session.add(notif)
+    db.session.commit()
+
+def check_daily_completion_status(app_instance):
+    """
+    Scheduled Job (18:00): Checks if players have completed their dailies.
+    If not, sends a WARNING notification.
+    """
+    with app_instance.app_context():
+        players = Player.query.all()
+        for player in players:
+            if player.is_on_vacation:
+                continue
+                
+            dailies = Quest.query.filter_by(player_id=player.id, is_daily=True).all()
+            if not dailies:
+                continue
+                
+            completed = sum(1 for q in dailies if q.is_completed)
+            total = len(dailies)
+            
+            if completed < total:
+                msg = f"SYSTEM ALERT: Daily Routine incomplete ({completed}/{total}). Failure will result in penalties at midnight."
+                create_notification(player.id, msg, "warning")
+                print(f">> Notification sent to {player.name}: Incomplete Dailies")
+
+def check_upcoming_deadlines(app_instance):
+    """
+    Scheduled Job (08:00): Checks for quests due Today or Tomorrow.
+    """
+    with app_instance.app_context():
+        # Clean up old read notifications first (maintain hygiene)
+        # Delete read notifications older than 7 days
+        cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+        old_notifs = Notification.query.filter(Notification.is_read == True, Notification.created_at < cutoff).delete()
+        db.session.commit()
+        
+        players = Player.query.all()
+        now = datetime.now(timezone.utc)
+        today_end = now.replace(hour=23, minute=59, second=59)
+        tomorrow_end = today_end + timedelta(days=1)
+        
+        for player in players:
+            if player.is_on_vacation:
+                continue
+                
+            # Check Tasks Due Today (excluding Dailies as they are unspoken)
+            urgent_tasks = Quest.query.filter(
+                Quest.player_id == player.id,
+                Quest.is_completed == False,
+                Quest.is_daily == False,
+                Quest.due_date >= now, 
+                Quest.due_date <= today_end
+            ).all()
+            
+            for task in urgent_tasks:
+                create_notification(player.id, f"REMINDER: '{task.title}' is due TODAY.", "warning")
+                
+            # Check Tasks Due Tomorrow
+            future_tasks = Quest.query.filter(
+                Quest.player_id == player.id,
+                Quest.is_completed == False,
+                Quest.is_daily == False,
+                Quest.due_date > today_end, 
+                Quest.due_date <= tomorrow_end
+            ).all()
+            
+            for task in future_tasks:
+                create_notification(player.id, f"HEADS UP: '{task.title}' is due tomorrow.", "info")

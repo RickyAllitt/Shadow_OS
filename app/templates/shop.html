@@ -1,6 +1,29 @@
 {% extends "layout.html" %}
 
 {% block content %}
+<style>
+    .category-header {
+        margin: 0;
+    }
+
+    .category-header.currency-coins {
+        color: var(--color-purple-light);
+    }
+
+    .category-header.currency-gold {
+        color: var(--color-gold);
+    }
+
+    .btn-buy-trigger {
+        width: 100%;
+    }
+
+    .btn-buy-trigger.currency-coins {
+        border-color: var(--color-purple-light);
+        color: var(--color-purple-light);
+    }
+</style>
+
 <div class="dashboard-grid">
     <div class="panel" style="grid-column: 1 / -1; max-width: 1600px; margin: 0 auto; width: 95%;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -31,8 +54,7 @@
             {% for currency, currency_group in shop_items|groupby('currency') %}
 
             <div style="margin-top: 30px; margin-bottom: 10px; border-bottom: 1px solid #444; padding-bottom: 5px;">
-                <h3
-                    style="color: {% if currency == 'coins' %}var(--color-purple-light){% else %}var(--color-gold){% endif %}; margin: 0;">
+                <h3 class="category-header currency-{{ currency }}">
                     {% if currency == 'coins' %}HUNTER'S SHOP (COINS){% else %}REAL WORLD REWARDS (GOLD){% endif %}
                 </h3>
             </div>
@@ -72,17 +94,17 @@
 
                     {% if item.currency == 'coins' %}
                     {% if player.coins >= item.cost %}
-                    <button id="btn-buy-{{ item.id }}" onclick="buyItem({{ item.id }})" class="btn-small"
-                        style="width: 100%; border-color: var(--color-purple-light); color: var(--color-purple-light);">BUY</button>
+                    <button id="btn-buy-{{ item.id }}" data-id="{{ item.id }}"
+                        class="btn-small btn-buy-trigger currency-coins">BUY</button>
                     {% else %}
-                    <button class="btn-small" style="width: 100%; opacity: 0.3; cursor: not-allowed;">LOCKED</button>
+                    <button class="btn-small btn-buy-trigger" style="opacity: 0.3; cursor: not-allowed;">LOCKED</button>
                     {% endif %}
                     {% else %}
                     {% if player.gold >= item.cost %}
-                    <button id="btn-buy-{{ item.id }}" onclick="buyItem({{ item.id }})" class="btn-small"
-                        style="width: 100%;">BUY</button>
+                    <button id="btn-buy-{{ item.id }}" data-id="{{ item.id }}"
+                        class="btn-small btn-buy-trigger">BUY</button>
                     {% else %}
-                    <button class="btn-small" style="width: 100%; opacity: 0.3; cursor: not-allowed;">LOCKED</button>
+                    <button class="btn-small btn-buy-trigger" style="opacity: 0.3; cursor: not-allowed;">LOCKED</button>
                     {% endif %}
                     {% endif %}
                 </div>
@@ -113,16 +135,26 @@
         }
     };
 
+    document.addEventListener('click', function (e) {
+        if (e.target && e.target.classList.contains('btn-buy-trigger')) {
+            const itemId = e.target.getAttribute('data-id');
+            if (itemId) buyItem(itemId);
+        }
+    });
+
     function buyItem(itemId) {
         const btn = document.getElementById(`btn-buy-${itemId}`);
+        if (!btn) return;
+
         const originalText = btn.innerText;
         btn.innerText = "...";
         btn.disabled = true;
 
-        fetch('/buy/' + itemId + '?json=true', {
-            method: 'GET',
+        fetch('/buy/' + itemId, {
+            method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
             }
         })
             .then(response => response.json())
@@ -140,6 +172,7 @@
 
                     // Visual Feedback
                     btn.innerText = "PURCHASED";
+                    btn.classList.add('btn-success');
                     btn.style.borderColor = "var(--color-success)";
                     btn.style.color = "var(--color-success)";
 
@@ -147,6 +180,7 @@
                         btn.innerText = originalText;
                         btn.style.borderColor = "";
                         btn.style.color = "";
+                        btn.classList.remove('btn-success');
                     }, 1500);
 
                 } else {

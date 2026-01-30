@@ -10,7 +10,18 @@ def create_app(config_class=Config):
     db.init_app(app)
     from .extensions import login_manager, csrf
     login_manager.init_app(app)
+    login_manager.init_app(app)
     csrf.init_app(app)
+    
+    from .extensions import scheduler
+    try:
+        scheduler.init_app(app)
+        if not scheduler.running:
+            scheduler.start()
+    except Exception:
+        # Scheduler might be already running during tests
+        pass
+    
     login_manager.login_view = 'auth.login'
 
     # Register Blueprints

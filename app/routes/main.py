@@ -2,11 +2,11 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from sqlalchemy import or_
 from app.extensions import db
-from app.models import Player, Quest, RewardItem, QuestComment, PurchaseLog, Inventory, DailySnapshot
+from app.models import Player, Quest, RewardItem, QuestComment, PurchaseLog, Inventory, DailySnapshot, Notification
 from app.services import (check_weekly_reset, check_daily_reset, get_categorized_quests, 
                           calculate_rewards, process_quest_completion, 
                           calculate_total_stats, extract_shadow, start_vacation, end_vacation)
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 bp = Blueprint('main', __name__)
 
@@ -145,7 +145,7 @@ def complete_quest(id):
 
 
 
-@bp.route('/buy/<int:item_id>')
+@bp.route('/buy/<int:item_id>', methods=['POST'])
 @login_required
 def buy_item(item_id):
     item = db.session.get(RewardItem, item_id)
@@ -722,6 +722,14 @@ def analytics():
     # Fetch snapshots
     snapshots = DailySnapshot.query.filter_by(player_id=current_user.id).order_by(DailySnapshot.date.asc()).limit(30).all()
     
+    # Heatmap Data (Last 365 Days)
+    one_year_ago = datetime.now(timezone.utc).date() - timedelta(days=365)
+    year_snapshots = DailySnapshot.query.filter(
+        DailySnapshot.player_id == current_user.id,
+        DailySnapshot.date >= one_year_ago
+    ).all()
+    activity_map = {s.date.strftime('%Y-%m-%d'): s.quests_completed for s in year_snapshots}
+    
     # Prepare data for Chart.js
     dates = [s.date.strftime('%Y-%m-%d') for s in snapshots]
     
@@ -738,12 +746,27 @@ def analytics():
         current_total = current_user.strength + current_user.intelligence + current_user.agility + current_user.vitality + current_user.sense
         growth_data = [current_total]
     
-    return render_template('analytics.html', dates=dates, growth_data=growth_data)
+    return render_template('analytics.html', dates=dates, growth_data=growth_data, activity_map=activity_map)
 
 @bp.route('/focus')
 @login_required
 def focus_mode():
     return render_template('focus.html')
+
+
+@bp.route('/update_settings', methods=['POST'])
+@login_required
+def update_settings():
+    audio = request.json.get('audio')
+    music = request.json.get('music')
+    
+    if audio is not None:
+        current_user.settings_audio = audio
+    if music is not None:
+        current_user.settings_music = music
+        
+    db.session.commit()
+    return jsonify({'success': True})
 
 @bp.route('/focus_complete', methods=['POST'])
 @login_required
@@ -832,3 +855,27 @@ def end_vacation_route():
     else:
         flash(msg, "error")
     return redirect(url_for('main.dashboard'))
+
+# --- NOTIFICATION API ---
+
+@bp.route('/api/notifications/unread')
+@login_required
+def get_unread_notifications():
+    # Fetch unread
+    notifs = Notification.query.filter_by(player_id=current_user.id, is_read=False).order_by(Notification.created_at.desc()).all()
+    data = [{
+        'id': n.id,
+        'message': n.message,
+        'category': n.category,
+        'created_at': n.created_at.isoformat()
+    } for n in notifs]
+    return jsonify(data)
+
+@bp.route('/api/notifications/mark_read', methods=['POST'])
+@login_required
+def mark_notifications_read():
+    ids = request.json.get('ids', [])
+    if ids:
+        Notification.query.filter(Notification.id.in_(ids), Notification.player_id == current_user.id).update({Notification.is_read: True}, synchronize_session=False)
+        db.session.commit()
+    return jsonify({'success': True})

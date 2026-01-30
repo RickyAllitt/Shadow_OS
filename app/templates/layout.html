@@ -35,10 +35,16 @@
     {% endwith %}
 
     {% if current_user.is_authenticated %}
-    <a href="{{ url_for('auth.logout') }}"
-        style="position: fixed; top: 20px; right: 20px; color: var(--color-danger); text-decoration: none; border: 1px solid var(--color-danger); padding: 5px 10px; z-index: 100;">
-        LOGOUT
-    </a>
+    <div style="position: fixed; top: 20px; right: 20px; z-index: 100; display: flex; gap: 10px;">
+        <button onclick="document.getElementById('settingsModal').style.display='flex'"
+            style="background: rgba(0,0,0,0.5); border: 1px solid #aaa; color: #ddd; padding: 5px 10px; cursor: pointer; font-family: 'Courier New', monospace; font-weight: bold;">
+            SETTINGS
+        </button>
+        <a href="{{ url_for('auth.logout') }}"
+            style="display: block; background: rgba(0,0,0,0.5); color: var(--color-danger); text-decoration: none; border: 1px solid var(--color-danger); padding: 5px 10px; font-family: 'Courier New', monospace; font-weight: bold;">
+            LOGOUT
+        </a>
+    </div>
     {% endif %}
 
     <div
@@ -46,19 +52,62 @@
         {% block content %}{% endblock %}
     </div>
 
+
+    {% if current_user.is_authenticated %}
+    <div id="settingsModal" class="modal-overlay">
+        <div class="panel modal-content" style="max-width:400px;">
+            <h2 class="u-color-white u-mb-20">SYSTEM SETTINGS</h2>
+
+            <div class="u-flex u-justify-between u-align-center u-mb-20 u-padding-10"
+                style="background:rgba(255,255,255,0.05);">
+                <span>Sound Effects</span>
+                <input type="checkbox" id="settingAudio" {{ 'checked' if current_user.settings_audio else '' }}
+                    onchange="updateSettings()">
+            </div>
+
+            <div class="u-flex u-justify-between u-align-center u-mb-20 u-padding-10"
+                style="background:rgba(255,255,255,0.05);">
+                <span>Music</span>
+                <input type="checkbox" id="settingMusic" {{ 'checked' if current_user.settings_music else '' }}
+                    onchange="updateSettings()">
+            </div>
+
+            <div class="u-text-center">
+                <button onclick="document.getElementById('settingsModal').style.display='none'"
+                    class="btn-complete u-width-100">CLOSE</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function updateSettings() {
+            const audio = document.getElementById('settingAudio').checked;
+            const music = document.getElementById('settingMusic').checked;
+
+            fetch('/update_settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({ audio: audio, music: music })
+            });
+        }
+    </script>
+    {% endif %}
+
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-            // 3. System Notifications
+            // 3. System Notifications (Flash Messages)
             const flashes = document.querySelectorAll('.flash-msg');
             if (flashes.length > 0) {
                 // Audio is handled by page-specific scripts if needed, or we can check global
                 if (window.audioManager) {
-                    // Simple check if major event happened (approximate check relying on class presence)
                     const majorEvent = document.querySelector('.flash-msg.levelup') || document.querySelector('.flash-msg.arise_trigger');
                     if (!majorEvent) window.audioManager.play('notification');
                 }
 
-                // Auto-Dismiss after 2.5 seconds
+                // Auto-Dismiss
                 setTimeout(() => {
                     flashes.forEach(el => {
                         el.style.transition = "opacity 0.5s ease";
@@ -67,6 +116,66 @@
                     });
                 }, 2500);
             }
+
+            // --- NOTIFICATION POLLING SYSTEM ---
+            const POLL_INTERVAL = 60000; // 60 seconds
+
+            async function checkNotifications() {
+                try {
+                    const response = await fetch('/api/notifications/unread');
+                    if (!response.ok) return;
+
+                    const notifications = await response.json();
+                    if (notifications.length > 0) {
+                        showNotifications(notifications);
+                        markAsRead(notifications.map(n => n.id));
+                    }
+                } catch (e) {
+                    console.log("Notification poll failed:", e);
+                }
+            }
+
+            function showNotifications(notifications) {
+                const container = document.querySelector('.flash-container') || createFlashContainer();
+
+                notifications.forEach(n => {
+                    const msgDiv = document.createElement('div');
+                    msgDiv.className = `flash-msg ${n.category}`;
+                    msgDiv.innerText = n.message;
+                    container.appendChild(msgDiv);
+
+                    // Trigger sound
+                    if (window.audioManager) window.audioManager.play('notification');
+
+                    // Auto-Dismiss Logic
+                    setTimeout(() => {
+                        msgDiv.style.transition = "opacity 0.5s ease";
+                        msgDiv.style.opacity = "0";
+                        setTimeout(() => msgDiv.remove(), 500);
+                    }, 4000); // Slightly longer for fresh alerts
+                });
+            }
+
+            function createFlashContainer() {
+                const div = document.createElement('div');
+                div.className = 'flash-container';
+                document.body.appendChild(div);
+                return div;
+            }
+
+            async function markAsRead(ids) {
+                await fetch('/api/notifications/mark_read', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    },
+                    body: JSON.stringify({ ids: ids })
+                });
+            }
+
+            // Start Polling
+            setInterval(checkNotifications, POLL_INTERVAL);
         });
     </script>
 </body>

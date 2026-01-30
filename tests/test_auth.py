@@ -13,13 +13,14 @@ def test_password_hashing(app):
         assert u.check_password("secret")
         assert not u.check_password("wrong")
 
-def test_login_flow(client, app):
+def test_login_flow(client, app, csrf_token):
     """Test registration and login."""
     # Register
     response = client.post('/register', data={
         'username': 'NewHunter',
         'password': 'password123',
-        'confirm': 'password123'
+        'confirm': 'password123',
+        'csrf_token': csrf_token
     }, follow_redirects=True)
     assert response.status_code == 200
     assert b"Registration Complete" in response.data
@@ -27,7 +28,8 @@ def test_login_flow(client, app):
     # Login
     response = client.post('/login', data={
         'username': 'NewHunter',
-        'password': 'password123'
+        'password': 'password123',
+        'csrf_token': csrf_token
     }, follow_redirects=True)
     assert response.status_code == 200
     assert b"System Access Granted" in response.data

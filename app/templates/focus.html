@@ -274,6 +274,11 @@
     function initProtocol() {
         primeAudio(); // Critical for mobile browsers
 
+        // Request Notification Permission
+        if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+            Notification.requestPermission();
+        }
+
         focusMinutes = parseInt(document.getElementById('focusTime').value);
         restMinutes = parseInt(document.getElementById('restTime').value);
         totalRounds = parseInt(document.getElementById('rounds').value);
@@ -330,6 +335,13 @@
             updateTimerDisplay(0); // Ensure it shows 00:00
 
             audioAlarm.play().catch(e => console.log("Audio Play Error: " + e));
+
+            // SYSTEM NOTIFICATION
+            if (Notification.permission === 'granted') {
+                const title = isFocus ? "FOCUS COMPLETE" : "REST COMPLETE";
+                const body = isFocus ? "Good work. Take a break." : "Break over. Return to focus.";
+                new Notification(title, { body: body, icon: "{{ url_for('static', filename='img/icon.png') }}" });
+            }
 
             if (isFocus) {
                 completeFocusSegment();
