@@ -2,36 +2,181 @@
 
 {% block content %}
 <div class="dashboard-grid">
-    <div class="panel" style="grid-column: 1 / -1; max-width: 600px; margin: 0 auto;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
-            <h2 style="margin: 0;">HUNTER PROFILE</h2>
-            <a href="{{ url_for('main.leaderboard') }}" class="btn-small">BACK</a>
-        </div>
+    <div class="panel"
+        style="grid-column: 1 / -1; max-width: 900px; margin: 0 auto; background: rgba(10, 10, 15, 0.95); border: 1px solid var(--color-primary);">
 
-        <div class="profile-header" style="text-align: center; margin-bottom: 40px;">
-            <div style="font-size: 2.5em; font-weight: bold; color: white;">{{ player.name }}</div>
-            <div style="font-size: 1.2em; color: var(--color-purple-light); margin-top: 5px;">{{ player.title_display or
-                'E-Rank Hunter' }}</div>
-            <div class="level-circle"
-                style="margin: 20px auto; width: 80px; height: 80px; font-size: 1.5em; line-height: 80px;">
-                LVL {{ player.level }}
+        <!-- Header / ID Card Top -->
+        <div
+            style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 15px;">
+            <div>
+                <h2 style="margin: 0; color: var(--color-primary); letter-spacing: 2px;">HUNTER PROFILE</h2>
             </div>
+            <a href="{{ url_for('main.leaderboard') }}" class="btn-small">RETURN</a>
         </div>
 
-        <div class="stats-list" style="background: rgba(0,0,0,0.3); padding: 20px; border-radius: 8px;">
-            <h3 style="margin-top: 0; margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 10px;">
-                ATTRIBUTES</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
 
-            <div class="stat-row"><span>STR</span> <b>{{ player.strength }}</b></div>
-            <div class="stat-row"><span>AGI</span> <b>{{ player.agility }}</b></div>
-            <div class="stat-row"><span>SEN</span> <b>{{ player.sense }}</b></div>
-            <div class="stat-row"><span>VIT</span> <b>{{ player.vitality }}</b></div>
-            <div class="stat-row"><span>INT</span> <b>{{ player.intelligence }}</b></div>
+            <!-- LEFT COLUMN: AVATAR & STATS -->
+            <div>
+                <!-- Avatar / Basic Info -->
+                <div style="text-align: center; margin-bottom: 30px;">
+                    <div class="level-circle"
+                        style="margin: 0 auto 15px; width: 100px; height: 100px; font-size: 2em; line-height: 100px; border: 3px solid var(--color-gold); box-shadow: 0 0 15px var(--color-gold);">
+                        {{ player.level }}
+                    </div>
+                    <div
+                        style="font-size: 2em; font-weight: bold; color: white; text-shadow: 0 0 10px rgba(255,255,255,0.3);">
+                        {{ player.name }}</div>
+                    <div
+                        style="font-size: 1.1em; color: var(--color-purple-light); margin-top: 5px; font-weight: bold;">
+                        {{ player.title_display }}
+                    </div>
+                    <div style="color: #888; margin-top: 5px;">
+                        Class: <span style="color: #b19cd9;">{{ player.job_class if player.job_class != 'None' else
+                            'Civilian' }}</span>
+                        | Rank: <span style="color: var(--color-accent);">{{ player.rank }}</span>
+                    </div>
+
+                    {% if player.shadows|length > 0 %}
+                    <div style="margin-top: 10px; color: #aaa; font-size: 0.9em;">
+                        SHADOW SOLDIERS: <span style="color: var(--color-purple); font-weight: bold;">{{
+                            player.shadows|length }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- RADAR CHART (CSS/SVG Implementation) -->
+                <!-- 
+                   Simple SVG Radar Chart
+                   Center is 100,100. Radius 80.
+                   Points: Top, TopRight, BotRight, BotLeft, TopLeft
+                   Max stat for scale: 100 (for visual clamping)
+                -->
+                {% set max_val = 100 %}
+                {% set s_str = (player.strength / max_val * 80) if player.strength < max_val else 80 %} {% set
+                    s_agi=(player.agility / max_val * 80) if player.agility < max_val else 80 %} {% set
+                    s_sns=(player.sense / max_val * 80) if player.sense < max_val else 80 %} {% set
+                    s_vit=(player.vitality / max_val * 80) if player.vitality < max_val else 80 %} {% set
+                    s_int=(player.intelligence / max_val * 80) if player.intelligence < max_val else 80 %} <div
+                    style="position: relative; width: 200px; height: 200px; margin: 0 auto;">
+                    <svg width="200" height="200" viewBox="0 0 200 200">
+                        <!-- Background Grid -->
+                        <polygon points="100,20 176,75 147,165 53,165 24,75" fill="none" stroke="#333"
+                            stroke-width="1" />
+                        <polygon points="100,60 138,87 123,132 77,132 62,87" fill="none" stroke="#333"
+                            stroke-width="1" />
+
+                        <!-- Axis Lines -->
+                        <line x1="100" y1="100" x2="100" y2="20" stroke="#333" />
+                        <line x1="100" y1="100" x2="176" y2="75" stroke="#333" />
+                        <line x1="100" y1="100" x2="147" y2="165" stroke="#333" />
+                        <line x1="100" y1="100" x2="53" y2="165" stroke="#333" />
+                        <line x1="100" y1="100" x2="24" y2="75" stroke="#333" />
+
+                        <!-- Data Polygon -->
+                        <!-- 
+                           Calculations (approx for 5 pts):
+                           Top (STR): 100, 100-val
+                           TR (AGI): 100 + val*0.95, 100 - val*0.31
+                           BR (SNS): 100 + val*0.58, 100 + val*0.81
+                           BL (VIT): 100 - val*0.58, 100 + val*0.81
+                           TL (INT): 100 - val*0.95, 100 - val*0.31
+                        -->
+                        <polygon points="
+                            100,{{ 100 - s_str }} 
+                            {{ 100 + s_agi*0.95 }},{{ 100 - s_agi*0.31 }}
+                            {{ 100 + s_sns*0.58 }},{{ 100 + s_sns*0.81 }}
+                            {{ 100 - s_vit*0.58 }},{{ 100 + s_vit*0.81 }}
+                            {{ 100 - s_int*0.95 }},{{ 100 - s_int*0.31 }}
+                        " fill="rgba(0, 188, 212, 0.4)" stroke="var(--color-primary)" stroke-width="2" />
+
+                        <!-- Labels -->
+                        <text x="100" y="15" fill="#aaa" font-size="10" text-anchor="middle">STR</text>
+                        <text x="185" y="75" fill="#aaa" font-size="10" text-anchor="middle">AGI</text>
+                        <text x="155" y="180" fill="#aaa" font-size="10" text-anchor="middle">SNS</text>
+                        <text x="45" y="180" fill="#aaa" font-size="10" text-anchor="middle">VIT</text>
+                        <text x="15" y="75" fill="#aaa" font-size="10" text-anchor="middle">INT</text>
+                    </svg>
+            </div>
+
+            <!-- Stat Values Breakdown -->
+            <div
+                style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; font-size: 0.9em; color: #ccc;">
+                <div
+                    style="background: rgba(255,255,255,0.05); padding: 5px 10px; border-radius: 4px; display: flex; justify-content: space-between;">
+                    <span>Strength</span> <span style="color: white;">{{ player.strength }}</span>
+                </div>
+                <div
+                    style="background: rgba(255,255,255,0.05); padding: 5px 10px; border-radius: 4px; display: flex; justify-content: space-between;">
+                    <span>Agility</span> <span style="color: white;">{{ player.agility }}</span>
+                </div>
+                <div
+                    style="background: rgba(255,255,255,0.05); padding: 5px 10px; border-radius: 4px; display: flex; justify-content: space-between;">
+                    <span>Sense</span> <span style="color: white;">{{ player.sense }}</span>
+                </div>
+                <div
+                    style="background: rgba(255,255,255,0.05); padding: 5px 10px; border-radius: 4px; display: flex; justify-content: space-between;">
+                    <span>Vitality</span> <span style="color: white;">{{ player.vitality }}</span>
+                </div>
+                <div
+                    style="background: rgba(255,255,255,0.05); padding: 5px 10px; border-radius: 4px; display: flex; justify-content: space-between;">
+                    <span>Intelligence</span> <span style="color: white;">{{ player.intelligence }}</span>
+                </div>
+            </div>
+
         </div>
 
-        <div style="margin-top: 30px; text-align: center; color: #666; font-size: 0.9em; font-style: italic;">
-            "A hunter's worth is proven by their survival."
+        <!-- RIGHT COLUMN: EQUIPMENT -->
+        <div>
+            <h3
+                style="margin-top: 0; border-bottom: 1px solid var(--color-primary); padding-bottom: 10px; color: var(--color-primary);">
+                CURRENT GEAR</h3>
+
+            <div class="equipment-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+
+                {% set slots = ['head', 'body', 'weapon', 'accessory'] %}
+                {% for slot in slots %}
+                {% set ns = namespace(item=None) %}
+                {% for inv in player.inventory %}
+                {% if inv.is_equipped and inv.item.slot == slot %}
+                {% set ns.item = inv.item %}
+                {% endif %}
+                {% endfor %}
+
+                <div
+                    style="background: rgba(0,0,0,0.4); border: 1px solid #444; padding: 15px; border-radius: 6px; position: relative;">
+                    <div style="font-size: 0.7em; color: #888; text-transform: uppercase; margin-bottom: 5px;">{{ slot
+                        }}</div>
+                    {% if ns.item %}
+                    <div style="font-weight: bold; color: white;">
+                        {{ ns.item.name }}
+                    </div>
+                    <div style="font-size: 0.8em; color: var(--color-primary); margin-top: 5px;">
+                        +{{ ns.item.stat_value }} {{ ns.item.stat_bonus }}
+                    </div>
+                    {% else %}
+                    <div style="color: #555; font-style: italic;">Empty</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+
+            </div>
+
+            <!-- Recent Activity / Quote -->
+            <div style="margin-top: 30px;">
+                <h3 style="font-size: 1em; color: #aaa; border-bottom: 1px solid #333; padding-bottom: 5px;">HUNTER
+                    STATUS</h3>
+                <div style="margin-top: 10px; font-size: 0.9em; color: #ccc;">
+                    <div>Condition: <span
+                            style="{{ 'color: var(--color-success)' if player.condition == 'Well Rested' else 'color: #ccc' }}">{{
+                            player.condition }}</span></div>
+                    <div style="margin-top: 5px;">Total Stats: <span style="color: white;">{{ player.strength +
+                            player.agility + player.intelligence + player.vitality + player.sense }}</span></div>
+                </div>
+            </div>
+
         </div>
     </div>
+</div>
 </div>
 {% endblock %}

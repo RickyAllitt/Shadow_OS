@@ -168,65 +168,68 @@ def buy_item(item_id):
                 return jsonify({'success': False, 'message': f"You already own {item.name}."})
             return redirect(url_for('main.dashboard'))
         
-    if player.gold >= item.cost:
-        # Check stock
-        if item.stock != -1:
-            if item.stock <= 0:
-                flash("Out of Stock.", "error")
-                return redirect(url_for('main.dashboard'))
-            else:
-                item.stock -= 1
+    # stock check
+    if item.stock != -1 and item.stock <= 0:
+        flash("Out of Stock.", "error")
+        return redirect(url_for('main.dashboard'))
 
-        # Deduct Cost
-        if item.currency == 'coins':
-            if player.coins < item.cost:
-               flash("Not enough coins.", "error")
-               return redirect(url_for('main.dashboard'))
-            player.coins -= item.cost
-        else:
-            player.gold -= item.cost
+    # Deduct Cost & Check Funds based on Currency
+    if item.currency == 'coins':
+        if player.coins < item.cost:
+            if request.args.get('json'):
+                return jsonify({'success': False, 'message': "Not enough coins."})
+            flash("Not enough coins.", "error")
+            return redirect(url_for('main.dashboard'))
+        player.coins -= item.cost
+    else:
+        # Default to Gold
+        if player.gold < item.cost:
+            if request.args.get('json'):
+                return jsonify({'success': False, 'message': "Insufficient Funds."})
+            flash("Insufficient Funds.", "error")
+            return redirect(url_for('main.dashboard'))
+        player.gold -= item.cost
+    
+    # Decrease Stock if applicable (transaction approved)
+    if item.stock != -1:
+        item.stock -= 1
+
+    if item.item_type == 'equipment':
+        msg_text = f"Purchased {item.name}. Added to Inventory."
+    else:
+        msg_text = f"Purchased {item.name}. Added to Bag."
             
-        if item.item_type == 'equipment':
-            msg_text = f"Purchased {item.name}. Added to Inventory."
-        else:
-             msg_text = f"Purchased {item.name}. Added to Bag."
-             
-        # Always add to inventory
-        new_inv = Inventory(player_id=player.id, item_id=item.id)
-        db.session.add(new_inv)
+    # Always add to inventory
+    new_inv = Inventory(player_id=player.id, item_id=item.id)
+    db.session.add(new_inv)
+    
+    # Log purchase
+    log = PurchaseLog(player_id=player.id, item_name=item.name, cost=item.cost, is_claimed=True, claimed_at=datetime.now(timezone.utc))
         
-        # Log purchase
-        log = PurchaseLog(player_id=player.id, item_name=item.name, cost=item.cost, is_claimed=True, claimed_at=datetime.now(timezone.utc))
-            
-        db.session.add(log)
-        db.session.commit()
+    db.session.add(log)
+    db.session.commit()
+    
+    if request.args.get('json'):
+        response_data = {
+            'success': True, 
+            'message': msg_text,
+            'new_gold': player.gold,
+            'new_coins': player.coins
+        }
         
-        if request.args.get('json'):
-            response_data = {
-                'success': True, 
-                'message': msg_text,
-                'new_gold': player.gold,
-                'new_coins': player.coins
+        # Include details for UI update (All items now create inventory records)
+        if 'new_inv' in locals():
+            response_data['item_details'] = {
+                'name': item.name,
+                'type': item.item_type,
+                'stat_bonus': item.stat_bonus,
+                'stat_value': item.stat_value,
+                'inv_id': new_inv.id
             }
             
-            # Include details for UI update (All items now create inventory records)
-            if 'new_inv' in locals():
-                response_data['item_details'] = {
-                    'name': item.name,
-                    'type': item.item_type,
-                    'stat_bonus': item.stat_bonus,
-                    'stat_value': item.stat_value,
-                    'inv_id': new_inv.id
-                }
-                
-            return jsonify(response_data)
+        return jsonify(response_data)
 
-        flash(msg_text, "success")
-    else:
-        if request.args.get('json'):
-             return jsonify({'success': False, 'message': "Insufficient Funds."})
-        flash("Insufficient Funds.", "error")
-    
+    flash(msg_text, "success")
     return redirect(url_for('main.dashboard'))
 
 import calendar
@@ -664,6 +667,18 @@ def use_item_route(inv_id):
     # Effect Logic
     item_def = item_record.item
     
+    # SPECIAL ITEMS
+    if item_def.name == "Night Out with Friends":
+        from app.services import auto_complete_dailies
+        count, msg = auto_complete_dailies(current_user)
+        flash(msg, "success" if count > 0 else "info")
+        
+        # Consume item
+        db.session.delete(item_record)
+        db.session.commit()
+        
+        return redirect(url_for('main.dashboard'))
+
     # Stat Boosts (Permanent)
     if item_def.stat_bonus and item_def.stat_value > 0:
         stat_map = {
@@ -701,7 +716,11 @@ def shop():
              PurchaseLog.purchased_at >= player.last_weekly_reset
          ).order_by(PurchaseLog.purchased_at.desc()).all()
          
-    return render_template('shop.html', player=player, shop_items=shop_items, purchase_history=purchase_history)
+         
+    # Get IDs of owned items to handle "Sold Out" / "Owned" state
+    owned_item_ids = {inv.item_id for inv in player.inventory}
+         
+    return render_template('shop.html', player=player, shop_items=shop_items, purchase_history=purchase_history, owned_item_ids=owned_item_ids)
 
 @bp.route('/arise/<int:quest_id>', methods=['POST'])
 @login_required

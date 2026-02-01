@@ -93,14 +93,22 @@
                     </div>
 
                     {% if item.currency == 'coins' %}
-                    {% if player.coins >= item.cost %}
+                    {% if item.id in owned_item_ids %}
+                    <button class="btn-small btn-buy-trigger"
+                        style="opacity: 0.5; cursor: not-allowed; border-color: #666; color: #666;"
+                        disabled>OWNED</button>
+                    {% elif player.coins >= item.cost %}
                     <button id="btn-buy-{{ item.id }}" data-id="{{ item.id }}"
                         class="btn-small btn-buy-trigger currency-coins">BUY</button>
                     {% else %}
                     <button class="btn-small btn-buy-trigger" style="opacity: 0.3; cursor: not-allowed;">LOCKED</button>
                     {% endif %}
                     {% else %}
-                    {% if player.gold >= item.cost %}
+                    {% if item.id in owned_item_ids %}
+                    <button class="btn-small btn-buy-trigger"
+                        style="opacity: 0.5; cursor: not-allowed; border-color: #666; color: #666;" disabled>SOLD
+                        OUT</button>
+                    {% elif player.gold >= item.cost %}
                     <button id="btn-buy-{{ item.id }}" data-id="{{ item.id }}"
                         class="btn-small btn-buy-trigger">BUY</button>
                     {% else %}
@@ -150,7 +158,7 @@
         btn.innerText = "...";
         btn.disabled = true;
 
-        fetch('/buy/' + itemId, {
+        fetch('/buy/' + itemId + '?json=true', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -171,17 +179,26 @@
                         document.getElementById('playerCoins').innerText = data.new_coins;
 
                     // Visual Feedback
-                    btn.innerText = "PURCHASED";
-                    btn.classList.add('btn-success');
-                    btn.style.borderColor = "var(--color-success)";
-                    btn.style.color = "var(--color-success)";
+                    // Visual Feedback
+                    if (data.item_details && data.item_details.type == 'equipment') {
+                        btn.innerText = "OWNED";
+                    } else {
+                        // For consumables that are one-time buy logic (which Gold items seem to be implied as)
+                        // If the user request implies they become Sold Out, we set it here.
+                        // But wait, consumables usually can be bought multiple times? 
+                        // The user said: "show as sold out while you have one in the inventory".
+                        // This implies unique ownership.
+                        btn.innerText = "SOLD OUT";
+                    }
 
-                    setTimeout(() => {
-                        btn.innerText = originalText;
-                        btn.style.borderColor = "";
-                        btn.style.color = "";
-                        btn.classList.remove('btn-success');
-                    }, 1500);
+                    btn.classList.add('btn-success');
+                    btn.style.borderColor = "#666";
+                    btn.style.color = "#666";
+                    btn.style.opacity = "0.5";
+                    btn.style.cursor = "not-allowed";
+                    btn.disabled = true;
+
+                    // No timeout revert, effectively locking it.
 
                 } else {
                     alert("Error: " + data.message);

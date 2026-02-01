@@ -38,7 +38,6 @@ def seed_database():
     desired_items = [
         # Gold Rewards (Real Life)
         {'name': "Night Out with Friends", 'cost': 600, 'stock': -1, 'currency': 'gold', 'item_type': 'consumable', 'stat_bonus': None, 'stat_value': 0, 'slot': None},
-        {'name': "Video Game Session (1h)", 'cost': 50, 'stock': -1, 'currency': 'gold', 'item_type': 'consumable', 'stat_bonus': None, 'stat_value': 0, 'slot': None},
         
         # Coin Rewards (System Gear)
         # Weapons
@@ -46,10 +45,10 @@ def seed_database():
         {'name': "Demon's Dagger", 'cost': 1200, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'STR', 'stat_value': 10, 'slot': 'weapon'},
         
         # Armor
-        {'name': "Iron Shield", 'cost': 100, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'VIT', 'stat_value': 2, 'slot': 'offhand'},
+        {'name': "Iron Shield", 'cost': 100, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'VIT', 'stat_value': 2, 'slot': 'accessory'},
         {'name': "Shadow Hood", 'cost': 300, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'AGI', 'stat_value': 3, 'slot': 'head'},
         {'name': "Hunter's Vest", 'cost': 500, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'VIT', 'stat_value': 5, 'slot': 'body'},
-        {'name': "Assassin's Gloves", 'cost': 250, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'SNS', 'stat_value': 3, 'slot': 'hands'},
+        {'name': "Assassin's Gloves", 'cost': 250, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'SNS', 'stat_value': 3, 'slot': 'accessory'},
         
         # Accessories
         {'name': "Apprentice Grimoire", 'cost': 100, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'INT', 'stat_value': 2, 'slot': 'accessory'},
@@ -64,10 +63,10 @@ def seed_database():
         {'name': "Blue Venom Fang", 'cost': 1100, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'STR', 'stat_value': 8, 'slot': 'weapon'},
         
         # New High-Tier Gear (Expansion Phase 2)
-        {'name': "Shadow Boots", 'cost': 600, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'AGI', 'stat_value': 5, 'slot': 'feet'},
+        {'name': "Shadow Boots", 'cost': 600, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'AGI', 'stat_value': 5, 'slot': 'accessory'},
         {'name': "Knight Killer", 'cost': 2500, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'STR', 'stat_value': 15, 'slot': 'weapon'},
         {'name': "Baruka's Dagger", 'cost': 2000, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'AGI', 'stat_value': 10, 'slot': 'weapon'},
-        {'name': "Cloak of Shadows", 'cost': 1500, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'SNS', 'stat_value': 10, 'slot': 'back'},
+        {'name': "Cloak of Shadows", 'cost': 1500, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'SNS', 'stat_value': 10, 'slot': 'accessory'},
         {'name': "Orb of Avarice", 'cost': 3000, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'INT', 'stat_value': 20, 'slot': 'accessory'},
         {'name': "Red Knight's Helmet", 'cost': 1800, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'VIT', 'stat_value': 10, 'slot': 'head'},
     ]
@@ -698,7 +697,9 @@ def equip_item_service(player, inventory_id):
         ).first()
         
         if occupied:
-            return False, f"Slot {target_slot} already occupied by {occupied.item.name}"
+            # Auto-Unequip Logic
+            unequip_item_service(player, occupied.id)
+            # return False, f"Slot {target_slot} already occupied by {occupied.item.name}"
     
     item_record.is_equipped = True
     db.session.commit()
@@ -793,6 +794,26 @@ def calculate_total_stats(player):
             
     return stats
 
+def auto_complete_dailies(player):
+    """
+    Called when 'Night Out with Friends' is used.
+    Completes all active Daily Quests for the player.
+    """
+    dailies = Quest.query.filter_by(player_id=player.id, is_daily=True, is_completed=False).all()
+    count = 0
+    if not dailies:
+        return 0, "No active daily quests to complete."
+        
+    for q in dailies:
+        # We call process_quest_completion to handle rewards, XP, etc.
+        # But wait, does 'Night Out' give rewards? Usually 'skip' mechanics might not, but 'completing daily tasks' implies success.
+        # User said: "make claiming the day out with friends auto complete that days daily tasks"
+        # I will assume full completion logic (XP, etc.) applies, as it's a paid item (600 Gold).
+        process_quest_completion(player, q)
+        count += 1
+        
+    db.session.commit()
+    return count, f"Successfully completed {count} daily quests. Enjoy your night out!"
 def start_vacation(player, days):
     """
     Activates vacation mode for the player.
