@@ -343,7 +343,7 @@ def _check_and_apply_daily_bonus(player):
             
             player.gold += 250 # Was 100
             player.coins += 50 # Was 20
-            player.last_daily_bonus = now
+            player.last_daily_bonus = now_utc
             print(f">> Daily Bonus Granted for {player.name}")
             bonus_granted = True
 
