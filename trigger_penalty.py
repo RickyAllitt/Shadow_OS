@@ -30,6 +30,15 @@ with app.app_context():
             db.session.commit()
             print(">> Deleted existing penalty to apply new settings.")
             
+        import pytz
+        GAME_TIMEZONE = pytz.timezone('Europe/Madrid')
+        now_utc = datetime.now(timezone.utc)
+        now_game = now_utc.astimezone(GAME_TIMEZONE)
+        today_midnight_game = now_game.replace(hour=0, minute=0, second=0, microsecond=0)
+        # Next midnight in Madrid
+        deadline_game = today_midnight_game + timedelta(days=1)
+        deadline_utc = deadline_game.astimezone(timezone.utc)
+
         penalty = Quest(
             title="PENALTY: Survival run (5km)",
             rank="A",
@@ -38,7 +47,7 @@ with app.app_context():
             gold_reward=0,
             stat_reward="VIT",
             is_penalty=True,
-            due_date=(datetime.now(timezone.utc) + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+            due_date=deadline_utc
         )
         db.session.add(penalty)
         print(">> Penalty Quest Created.")

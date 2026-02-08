@@ -91,6 +91,9 @@ def seed_database():
     db.session.commit()
 
 from datetime import datetime, timedelta, timezone
+import pytz
+
+GAME_TIMEZONE = pytz.timezone('Europe/Madrid')
 
 def check_weekly_reset(player):
     """
@@ -106,32 +109,27 @@ def check_weekly_reset(player):
     if player.is_on_vacation:
         return False
 
-    now = datetime.now(timezone.utc)
+    # Convert everything to Game Time for logic
+    now_utc = datetime.now(timezone.utc)
+    now_game = now_utc.astimezone(GAME_TIMEZONE)
     
-    # Find the most recent Sunday at 23:59:59 (or Monday 00:00)
-    # Strategy: Start from 'now' and subtract days until we hit Sunday.
-    # weekday(): Mon=0, Sun=6
-    days_since_sunday = (now.weekday() + 1) % 7
-    # If today is Sunday, we want the PREVIOUS Sunday if we are not yet at night? 
-    # Or simpler: The reset happens at Sunday 23:59.
+    # Reset is Sunday 23:59:59 Game Time
+    # Logic: If last reset was in a previous week?
+    # Simpler: Get start of current week (Monday 00:00) in Game Time.
+    # If last reset < start of current week, trigger reset.
     
-    # Let's say reset time is Monday 00:00:00
-    days_since_monday = now.weekday() # Mon=0
+    today_game = now_game.date()
+    start_of_week = today_game - timedelta(days=today_game.weekday()) # Monday
+    reset_threshold = GAME_TIMEZONE.localize(datetime.combine(start_of_week, datetime.min.time()))
     
-    # Get the most recent Monday 00:00
-    # Note: replace(tzinfo=...) needed if original was unaware, but here 'now' is aware.
-    # Actually, simplistic logic:
-    last_monday = now - timedelta(days=days_since_monday, hours=now.hour, minutes=now.minute, seconds=now.second, microseconds=now.microsecond)
+    # Convert player's last reset (stored as UTC usually or unaware) to Game Time aware
+    last_reset_utc = player.last_weekly_reset
+    if last_reset_utc.tzinfo is None:
+        last_reset_utc = last_reset_utc.replace(tzinfo=timezone.utc)
     
-    # If player's last reset was BEFORE this last Monday, trigger reset.
-    # Ensure comparison is offset-aware vs offset-aware.
-    if player.last_weekly_reset.tzinfo is None:
-        # Fallback for old data: assume UTC
-        player.last_weekly_reset = player.last_weekly_reset.replace(tzinfo=timezone.utc)
-
-    if player.last_weekly_reset < last_monday:
+    if last_reset_utc < reset_threshold:
         player.gold = 0
-        player.last_weekly_reset = now
+        player.last_weekly_reset = now_utc
         db.session.commit()
         return True
         
@@ -322,14 +320,22 @@ def _check_and_apply_daily_bonus(player):
     
     if all_completed:
         # 1. Daily Bonus Logic
-        now = datetime.now(timezone.utc)
-        today_midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        now_utc = datetime.now(timezone.utc)
+        now_game = now_utc.astimezone(GAME_TIMEZONE)
+        
+        # Check against today's midnight in Game Time
+        today_midnight_game = now_game.replace(hour=0, minute=0, second=0, microsecond=0)
         
         last_bonus = player.last_daily_bonus
         if last_bonus and last_bonus.tzinfo is None:
             last_bonus = last_bonus.replace(tzinfo=timezone.utc)
             
-        if not last_bonus or last_bonus < today_midnight:
+        # Optimization: We only care if last_bonus was BEFORE today_midnight.
+        # But last_bonus is UTC. Convert logic.
+        # If last_bonus < today_midnight_game (converted to UTC for comparison)
+        today_midnight_utc = today_midnight_game.astimezone(timezone.utc)
+        
+        if not last_bonus or last_bonus < today_midnight_utc:
             # Scaled Daily Bonus: 15% of Level Cap (Was 3%)
             xp_cap = calculate_xp_required(player.level)
             bonus_xp = int(xp_cap * 0.15)
@@ -407,8 +413,12 @@ def check_daily_reset(player):
             return True, ["VACATION ENDED. WELCOME BACK, HUNTER."] # Reset might occur after vacation ends
         return False, []
 
-    now = datetime.now(timezone.utc)
-    today_midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    now_utc = datetime.now(timezone.utc)
+    now_game = now_utc.astimezone(GAME_TIMEZONE)
+    today_midnight_game = now_game.replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # We compare everything in UTC to be safe with DB, but the "midnight point" is determined by Madrid time.
+    today_midnight_utc = today_midnight_game.astimezone(timezone.utc)
     
     if player.last_daily_reset.tzinfo is None:
          player.last_daily_reset = player.last_daily_reset.replace(tzinfo=timezone.utc)
@@ -418,7 +428,7 @@ def check_daily_reset(player):
     days_processed = 0
     reset_occurred = False
     
-    while player.last_daily_reset < today_midnight:
+    while player.last_daily_reset < today_midnight_utc:
         # Advance last_reset by 1 day
         # We process the day that just ended (last_daily_reset -> last_daily_reset + 1 day)
         # But efficiently, we just check "did we miss yesterday?"
@@ -472,6 +482,12 @@ def check_daily_reset(player):
                 
                 existing_penalty = Quest.query.filter_by(player_id=player.id, is_penalty=True, is_completed=False).first()
                 if not existing_penalty:
+                    # Calculate deadline: Next Midnight in Madrid
+                    # If we are in catch-up loop, we effectively set it relative to "now" since they just logged in?
+                    # Yes, give them until the upcoming midnight to fix it.
+                    deadline_game = today_midnight_game + timedelta(days=1)
+                    deadline_utc = deadline_game.astimezone(timezone.utc)
+
                     penalty = Quest(
                         title=f"PENALTY: {player.penalty_description}", 
                         rank="A", # CHANGED FROM S
@@ -480,7 +496,7 @@ def check_daily_reset(player):
                         gold_reward=0,
                         stat_reward="VIT",
                         is_penalty=True,
-                        due_date=today_midnight + timedelta(days=1) # Deadline is "Midnight" of the current day (i.e., start of next day)
+                        due_date=deadline_utc
                     )
                     db.session.add(penalty)
             elif effective_missed_days > 2:
