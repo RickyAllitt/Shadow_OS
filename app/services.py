@@ -164,7 +164,7 @@ def calculate_rewards(rank, player_level=1):
     
     # 4. Enforce Minimums (Base Values) so low levels don't get 0 XP
     min_xp = {
-        'E': 10, 'D': 25, 'C': 60, 'B': 150, 'A': 500, 'S': 1000
+        'E': 10, 'D': 25, 'C': 60, 'B': 200, 'A': 600, 'S': 1000
     }
     final_xp = max(min_xp.get(rank, 10), scaled_xp)
     
@@ -173,9 +173,9 @@ def calculate_rewards(rank, player_level=1):
         'E': (0, 0),
         'D': (0, 0),
         'C': (0, 0),
-        'B': (150, 10),
-        'A': (300, 25),
-        'S': (600, 50)
+        'B': (250, 15),
+        'A': (500, 30),
+        'S': (1000, 100)
     }
     gold, coins = rewards_flat.get(rank, (0, 0))
     
@@ -225,6 +225,14 @@ def process_quest_completion(player, quest):
     player.gold += base_gold
     player.coins += coin_gain
     
+    # S-RANK REWARD: INSTANT LEVEL UP
+    if quest.rank == 'S' and not quest.is_penalty:
+        # Fill XP bar to max immediately
+        remaining = player.xp_required - player.xp
+        if remaining > 0:
+            player.xp += remaining
+            print(f">> S-RANK BONUS: Instant Level Up for {player.name}")
+
     # 2. Apply Stat Buffs
     _apply_quest_stat_reward(player, quest)
     
@@ -322,13 +330,13 @@ def _check_and_apply_daily_bonus(player):
             last_bonus = last_bonus.replace(tzinfo=timezone.utc)
             
         if not last_bonus or last_bonus < today_midnight:
-            # Scaled Daily Bonus: 3% of Level Cap
+            # Scaled Daily Bonus: 15% of Level Cap (Was 3%)
             xp_cap = calculate_xp_required(player.level)
-            bonus_xp = int(xp_cap * 0.03)
+            bonus_xp = int(xp_cap * 0.15)
             player.xp += bonus_xp
             
-            player.gold += 100
-            player.coins += 20
+            player.gold += 250 # Was 100
+            player.coins += 50 # Was 20
             player.last_daily_bonus = now
             print(f">> Daily Bonus Granted for {player.name}")
             bonus_granted = True
@@ -405,78 +413,86 @@ def check_daily_reset(player):
     if player.last_daily_reset.tzinfo is None:
          player.last_daily_reset = player.last_daily_reset.replace(tzinfo=timezone.utc)
     
-    if player.last_daily_reset < today_midnight:
-        # A new day has dawned. Judgment Time.
-        messages = []
+    # Catch-up Loop: Process EACH missed day
+    messages = []
+    days_processed = 0
+    reset_occurred = False
+    
+    while player.last_daily_reset < today_midnight:
+        # Advance last_reset by 1 day
+        # We process the day that just ended (last_daily_reset -> last_daily_reset + 1 day)
+        # But efficiently, we just check "did we miss yesterday?"
         
-        # 1. Capture Analytics Snapshot (Before reset changes stats or levels down)
+        # Actually, simpler:
+        # If last_reset was 2023-01-01 and today is 2023-01-03.
+        # We need to process failure for 01-01 to 01-02, and 01-02 to 01-03.
+        
+        # Target for this iteration is the end of the "current" recorded day
+        # We will simulate the check happening at midnight of the next day
+        
+        # 1. Capture Analytics Snapshot (for the day being closed)
         _create_daily_snapshot(player)
         
         # 2. Reset Daily Variables
-        player.daily_focus_duration = 0 # Reset Focus Timer
+        player.daily_focus_duration = 0 
         
         dailies = Quest.query.filter_by(player_id=player.id, is_daily=True).all()
-        
-        # Calculate Completion from Yesterday
-        # Since we haven't reset them yet, verify if they are marked complete.
         total_dailies = len(dailies)
         completed_dailies = sum(1 for q in dailies if q.is_completed)
+        
+        # If we are catching up (i.e. this loop is running for a past date), the user definitely didn't log in to complete them
+        # UNLESS they were completed before the user went offline? 
+        # Actually, 'dailies' query gives current state. 
+        # If I completed dailies on Jan 1st, then didn't login Jan 2nd.
+        # Loop 1 (Jan 1->2): Dailies are complete. Success. Reset them.
+        # Loop 2 (Jan 2->3): Dailies are now False (reset in Loop 1). Failure.
         
         success = (total_dailies == 0) or (completed_dailies == total_dailies)
         
         if not success:
             # FAILURE LOGIC
             player.consecutive_missed_days += 1
-            # GLOBAL FAILURE COUNT: Every miss counts as a failure on the leaderboard
             player.penalties_count += 1
             
-            # --- CLASS BONUS: TANK ---
-            # Tanks ignore the first day of failure (Grace Period)
             effective_missed_days = player.consecutive_missed_days
             if player.job_class == 'Tank':
                 effective_missed_days = max(0, effective_missed_days - 1)
             
-            # Stage 1: Debuff (Immediate)
+            # Stage 1: Debuff
             if effective_missed_days == 1:
                 player.has_debuff = True
-                messages.append("SYSTEM ALERT: Daily Quests Failed. Physical Condition degraded (-20% Stats).")
+                messages.append("SYSTEM ALERT: Missed Dailies detected. Physical Condition degraded.")
             elif effective_missed_days > 1:
-                # Ensure debuff stays on
                 player.has_debuff = True
             
-            # Stage 2: Penalty Zone (2 Days Missed -> Tanks: 3 Days)
+            # Stage 2: Penalty Zone
             if effective_missed_days == 2:
                 player.in_penalty_zone = True
-                messages.append("SYSTEM ALERT: PENALTY ZONE ENTERED. A Penalty Quest has been issued.")
+                messages.append("SYSTEM ALERT: PENALTY ZONE ENTERED.")
                 
-                # Check if penalty quest exists, if not create one
                 existing_penalty = Quest.query.filter_by(player_id=player.id, is_penalty=True, is_completed=False).first()
                 if not existing_penalty:
-                    # NEW PENALTY INCIDENT
-                    # Note: We already incremented penalties_count above globally.
-                    
                     penalty = Quest(
                         title=f"PENALTY: {player.penalty_description}", 
-                        rank="S", 
+                        rank="A", # CHANGED FROM S
                         player_id=player.id,
                         xp_reward=0, 
                         gold_reward=0,
                         stat_reward="VIT",
                         is_penalty=True,
-                        due_date=now + timedelta(hours=12)
+                        due_date=today_midnight + timedelta(days=1) # Deadline is "Midnight" of the current day (i.e., start of next day)
                     )
                     db.session.add(penalty)
             elif effective_missed_days > 2:
                  player.in_penalty_zone = True
 
-            # Stage 3: Level Down (3 Days Missed -> Tanks: 4 Days)
+            # Stage 3: Level Down
             if effective_missed_days >= 3:
                 if player.level > 1:
-                    player.level = max(1, player.level - 3) # Lose 3 Levels
-                    player.xp = 0 # Reset XP bar
+                    player.level = max(1, player.level - 3)
+                    player.xp = 0 
                     player.xp_required = calculate_xp_required(player.level)
-                    # Stat Loss (Massive Pain, mitigated by Vitality)
-                    # Base loss is 3. Endurance reduces this by 10% per 10 VIT.
+                    
                     endurance = (player.vitality / 10) * 0.1
                     loss = max(1, int(3 * (1.0 - endurance)))
                     
@@ -486,29 +502,40 @@ def check_daily_reset(player):
                     player.sense = max(1, player.sense - loss)
                     player.vitality = max(1, player.vitality - loss)
                     
-                    messages.append("CRITICAL: FAILURE TO COMPLETE PENALTY. LEVEL DOWN INITIATED. STATS REDUCED.")
+                    messages.append("CRITICAL: PROLONGED ABSENCE. STATS REDUCED.")
                     
-                    # SYSTEM FIX: Clear the lingering Penalty Quest so a new one can be generated next time
+                    # Clear penalty
                     active_penalties = Quest.query.filter_by(player_id=player.id, is_penalty=True, is_completed=False).all()
                     for p_quest in active_penalties:
                         p_quest.is_completed = True
                         p_quest.completed_at = now
-                        # No rewards for expired penalty
                     
-                player.consecutive_missed_days = 0 # The debt is paid in blood
-                player.in_penalty_zone = False # Unlocked, but broken
-                player.has_debuff = False # Removed, but stats are lower permanently
+                player.consecutive_missed_days = 0 
+                player.in_penalty_zone = False 
+                player.has_debuff = False 
         
         else:
             # SUCCESS LOGIC
             player.consecutive_missed_days = 0
             player.has_debuff = False
             
-        # Reset Dailies for Today
+        # Reset Dailies (Prepare for next day iteration)
         for quest in dailies:
             quest.is_completed = False
             
-        player.last_daily_reset = now
+        # Move last_daily_reset forward by 1 day
+        player.last_daily_reset += timedelta(days=1)
+        reset_occurred = True
+        days_processed += 1
+        
+        # Safety Break (max 30 days catchup to prevent infinite loops or timeout)
+        if days_processed > 30:
+            player.last_daily_reset = now
+            messages.append("SYSTEM: Hibernation detected. Time sync protocol engaged.")
+            break
+            
+    if reset_occurred:
+        player.last_daily_reset = now # Align exact time
         db.session.commit()
         return True, messages
         
