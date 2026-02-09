@@ -586,7 +586,15 @@ def get_categorized_quests(player_id):
             
     # Sort Scheduled: First by due_date, then by priority (1=Critical, 4=Low)
     # We use a large date for tasks without due_date to put them at the end.
-    scheduled.sort(key=lambda x: (x.due_date if x.due_date else datetime.max.replace(tzinfo=timezone.utc), x.priority))
+    def get_sort_key(q):
+        dt = q.due_date
+        if dt is None:
+            return datetime.max.replace(tzinfo=timezone.utc)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+
+    scheduled.sort(key=lambda x: (get_sort_key(x), x.priority))
     
     
     return dailies, scheduled, backlog
