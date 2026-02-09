@@ -32,3 +32,11 @@ Thumbs.db
 .env
 
 
+
+# Logs and Debug
+*.log
+test_output.txt
+
+# Local Reproduction Scripts
+reproduce_*.py
+

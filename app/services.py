@@ -414,6 +414,7 @@ def check_daily_reset(player):
         return False, []
 
     now_utc = datetime.now(timezone.utc)
+    now = now_utc
     now_game = now_utc.astimezone(GAME_TIMEZONE)
     today_midnight_game = now_game.replace(hour=0, minute=0, second=0, microsecond=0)
     
