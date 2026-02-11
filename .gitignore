@@ -40,3 +40,5 @@ test_output.txt
 # Local Reproduction Scripts
 reproduce_*.py
 
+migrate_data.py
+verify_db_connection.py
