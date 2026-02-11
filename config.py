@@ -7,9 +7,19 @@ if database_url:
     # Render Postgres fix
     if database_url.startswith("postgres://"):
         database_url = database_url.replace("postgres://", "postgresql://", 1)
+    
     # TiDB / MySQL fix: Ensure we use the pymysql driver
-    elif database_url.startswith("mysql://"):
+    # Handle "mysql://" (default) and "mysql+mysqldb://" (often provided by dashboards)
+    elif "mysql://" in database_url:
         database_url = database_url.replace("mysql://", "mysql+pymysql://", 1)
+    elif "mysql+mysqldb://" in database_url:
+        database_url = database_url.replace("mysql+mysqldb://", "mysql+pymysql://", 1)
+
+    # Clean up unsupported SSL arguments for pymysql
+    if "ssl_mode=" in database_url:
+        import re
+        database_url = re.sub(r'ssl_mode=[^&]+&?', '', database_url)
+        if database_url.endswith('?'): database_url = database_url[:-1]
 
 
 class Config:
