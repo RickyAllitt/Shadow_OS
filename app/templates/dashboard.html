@@ -708,17 +708,37 @@
                         </div>
                     </div>
 
+                    <!-- AVAILABLE POINTS -->
+                    {% if player.attribute_points > 0 %}
+                    <div class="u-mb-20 u-text-center" style="animation: pulse-gold 2s infinite;">
+                        <span class="u-color-gold u-font-bold" style="font-size: 1.1rem; letter-spacing: 2px;">AVAILABLE
+                            POINTS: <span id="available-points">{{ player.attribute_points }}</span></span>
+                        <button onclick="commitPoints()" id="btn-commit-points" class="btn-small u-ml-10"
+                            style="display:none; background:var(--color-gold); color:black; border-color:var(--color-gold); font-weight:bold;">CONFIRM</button>
+                    </div>
+                    {% endif %}
+
                     <!-- Attributes Grid -->
-                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(60px, 1fr)); gap:10px;">
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(70px, 1fr)); gap:10px;">
                         {% for label, val, color in [('STR', stats.strength, '#ff5555'), ('AGI', stats.agility,
-                        '#50fa7b'), ('SEN', stats.sense, '#f1fa8c'), ('VIT', stats.vitality, '#ffb86c'), ('INT',
+                        '#50fa7b'), ('SNS', stats.sense, '#f1fa8c'), ('VIT', stats.vitality, '#ffb86c'), ('INT',
                         stats.intelligence, '#8be9fd')] %}
                         <div
-                            style="background: rgba(255,255,255,0.05); padding: 10px 5px; border-radius: 5px; text-align: center; border-bottom: 2px solid {{ color }};">
+                            style="background: rgba(255,255,255,0.05); padding: 10px 5px; border-radius: 5px; text-align: center; border-bottom: 2px solid {{ color }}; position:relative;">
                             <div class="u-font-small u-color-muted" style="font-size: 0.7em; letter-spacing: 1px;">{{
                                 label }}</div>
-                            <div style="font-size: 1.1rem; font-weight: bold; margin-top: 5px; color: #fff;">{{ val }}
+                            <div style="font-size: 1.1rem; font-weight: bold; margin-top: 5px; color: #fff;">
+                                <span id="val-{{ label }}">{{ val }}</span>
+                                {% if player.attribute_points > 0 %}
+                                <span id="added-{{ label }}" class="u-color-gold u-font-small"
+                                    style="display:none;">+0</span>
+                                {% endif %}
                             </div>
+
+                            {% if player.attribute_points > 0 %}
+                            <button onclick="addPoint('{{ label }}')" class="btn-add-point"
+                                style="position:absolute; top:-5px; right:-5px; background:{{ color }}; color:#000; border:none; border-radius:50%; width:20px; height:20px; font-weight:bold; cursor:pointer; font-size:0.8em;">+</button>
+                            {% endif %}
                         </div>
                         {% endfor %}
                     </div>
@@ -797,12 +817,59 @@
 
 <!-- MODALS -->
 <div id="systemModal" class="modal-overlay">
-    <div class="panel modal-content system-alert">
-        <h2 class="u-color-primary u-mb-10">SYSTEM NOTIFICATION</h2>
-        <div id="systemModalText" class="u-mb-20 u-color-white"></div>
-        <button onclick="document.getElementById('systemModal').style.display='none'"
-            class="btn-complete u-width-100">ACKNOWLEDGE</button>
-    </div>
+    <!-- POINTS ALLOCATION LOGIC -->
+    <script>
+        const csrfToken = "{{ csrf_token() }}";
+        let currentPoints = {{ player.attribute_points }};
+        let allocated = {
+            'STR': 0, 'INT': 0, 'AGI': 0, 'VIT': 0, 'SNS': 0
+        };
+
+        function addPoint(stat) {
+            if (currentPoints > 0) {
+                currentPoints--;
+                allocated[stat]++;
+
+                // Update UI
+                document.getElementById('available-points').innerText = currentPoints;
+
+                // Show added amount
+                const addedEl = document.getElementById(`added-${stat}`);
+                addedEl.style.display = 'inline';
+                addedEl.innerText = `+${allocated[stat]}`;
+
+                // Show Commit Button
+                document.getElementById('btn-commit-points').style.display = 'inline-block';
+            }
+        }
+
+        function commitPoints() {
+            if (confirm("Confirm stat allocation? This cannot be undone.")) {
+                fetch('/allocate_points', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify(allocated)
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            location.reload();
+                        } else {
+                            alert(data.msg);
+                        }
+                    });
+            }
+        }
+    </script>
+    {% endblock %}
+    <h2 class="u-color-primary u-mb-10">SYSTEM NOTIFICATION</h2>
+    <div id="systemModalText" class="u-mb-20 u-color-white"></div>
+    <button onclick="document.getElementById('systemModal').style.display='none'"
+        class="btn-complete u-width-100">ACKNOWLEDGE</button>
+</div>
 </div>
 
 <div id="warningModal" class="modal-overlay">

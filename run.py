@@ -1,10 +1,12 @@
-from app import create_app
-from app.extensions import db
-from app.services import seed_database
 import os
 from dotenv import load_dotenv
 
+# Load environment variables BEFORE importing app to ensure Config gets DATABASE_URL
 load_dotenv()
+
+from app import create_app
+from app.extensions import db
+from app.services import seed_database
 
 app = create_app()
 

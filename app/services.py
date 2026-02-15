@@ -148,23 +148,23 @@ def calculate_rewards(rank, player_level=1):
     
     # 2. Define Percentages (Target: 4 Years to Lvl 100)
     percentages = {
-        'E': 0.005, # 0.5%
-        'D': 0.01,  # 1%
-        'C': 0.02,  # 2%
-        'B': 0.04,  # 4%
-        'A': 0.10,  # 10%
-        'S': 0.20   # 20%
+        'E': 0.01,  # 1%
+        'D': 0.02,  # 2%
+        'C': 0.05,  # 5%
+        'B': 0.10,  # 10%
+        'A': 0.25,  # 25%
+        'S': 0.0    # 0 here, handled via Instant Level Up
     }
     
     # 3. Calculate Scaled XP
-    pct = percentages.get(rank, 0.005)
+    pct = percentages.get(rank, 0.0)
     scaled_xp = int(xp_cap * pct)
     
     # 4. Enforce Minimums (Base Values) so low levels don't get 0 XP
     min_xp = {
-        'E': 10, 'D': 25, 'C': 60, 'B': 200, 'A': 600, 'S': 1000
+        'E': 1, 'D': 2, 'C': 5, 'B': 10, 'A': 25, 'S': 0
     }
-    final_xp = max(min_xp.get(rank, 10), scaled_xp)
+    final_xp = max(min_xp.get(rank, 0), scaled_xp)
     
     # 5. Gold/Coins remain flat (Economy balance separate from Leveling)
     rewards_flat = {
@@ -224,15 +224,16 @@ def process_quest_completion(player, quest):
     player.coins += coin_gain
     
     # S-RANK REWARD: INSTANT LEVEL UP
-    if quest.rank == 'S' and not quest.is_penalty:
+    if quest.rank == 'S' and not quest.is_penalty and not quest.is_daily:
         # Fill XP bar to max immediately
         remaining = player.xp_required - player.xp
         if remaining > 0:
             player.xp += remaining
             print(f">> S-RANK BONUS: Instant Level Up for {player.name}")
 
-    # 2. Apply Stat Buffs
-    _apply_quest_stat_reward(player, quest)
+    # 2. Apply Stat Buffs (Only for Rank B+ and NOT Daily)
+    if quest.rank in ['B', 'A', 'S'] and not quest.is_daily:
+        _apply_quest_stat_reward(player, quest)
     
     # 3. Daily Completion Bonus (+100 Gold + 50 XP)
     daily_bonus = False
@@ -245,6 +246,13 @@ def process_quest_completion(player, quest):
         player.level += 1
         player.xp -= player.xp_required
         player.xp_required = calculate_xp_required(player.level)
+        
+        # Level Up Stat Bonus: +1 Ability Point + Full Recovery
+        player.attribute_points += 1
+        player.condition = "Healthy" # Full Recovery
+        
+        # S-Rank or Special: Unlock Shadow Extraction? (Future)
+
         
         # Check Evolution immediately on level up
         evolved, new_class = check_class_evolution(player)
@@ -304,11 +312,17 @@ def process_quest_completion(player, quest):
 
 def _apply_quest_stat_reward(player, quest):
     """Helper to apply stat rewards from a quest."""
-    if quest.stat_reward == 'STR': player.strength += 1
-    elif quest.stat_reward == 'INT': player.intelligence += 1
-    elif quest.stat_reward == 'AGI': player.agility += 1
-    elif quest.stat_reward == 'VIT': player.vitality += 1
-    elif quest.stat_reward == 'SNS': player.sense += 1
+    amount = 1
+    if quest.rank == 'A':
+        amount = 2
+    elif quest.rank == 'S':
+        amount = 3
+        
+    if quest.stat_reward == 'STR': player.strength += amount
+    elif quest.stat_reward == 'INT': player.intelligence += amount
+    elif quest.stat_reward == 'AGI': player.agility += amount
+    elif quest.stat_reward == 'VIT': player.vitality += amount
+    elif quest.stat_reward == 'SNS': player.sense += amount
 
 def _check_and_apply_daily_bonus(player):
     """Checks if all dailies are done. Applies bonus if eligible. Clears penalty if active."""
@@ -341,8 +355,11 @@ def _check_and_apply_daily_bonus(player):
             bonus_xp = int(xp_cap * 0.15)
             player.xp += bonus_xp
             
-            player.gold += 250 # Was 100
-            player.coins += 50 # Was 20
+            player.gold += 100 
+            player.coins += 50 
+            player.attribute_points += 3 # Daily Ability Points
+            player.condition = "Healthy" # Status Recovery
+            
             player.last_daily_bonus = now_utc
             print(f">> Daily Bonus Granted for {player.name}")
             bonus_granted = True
@@ -783,6 +800,47 @@ def extract_shadow(player, quest_id):
         return False, "Quest must be completed first."
         
     # Check if already extracted? (Unique constraint? Or just allow multiple?)
+    shadow = Shadow.query.filter_by(original_quest_name=quest.title, player_id=player.id).first()
+    if shadow:
+        return False, "Already Arised."
+        
+    new_shadow = Shadow(
+        player_id=player.id,
+        original_quest_name=quest.title,
+        rank=quest.rank, # Usually S
+        buff_type='ALL_STATS', # Default
+        buff_value=1
+    )
+    db.session.add(new_shadow)
+    db.session.commit()
+    
+    return True, f"ARISE! {quest.title} has joined your army."
+
+def allocate_attributes(player, distribution):
+    """
+    Allocates ability points to stats.
+    distribution: dict {'STR': 0, 'INT': 0, ...}
+    Returns: (Success, Message)
+    """
+    total_requested = sum(distribution.values())
+    
+    if total_requested <= 0:
+        return False, "No points selected."
+        
+    if total_requested > player.attribute_points:
+        return False, "Not enough ability points."
+        
+    for stat, amount in distribution.items():
+        if amount > 0:
+            if stat == 'STR': player.strength += amount
+            elif stat == 'INT': player.intelligence += amount
+            elif stat == 'AGI': player.agility += amount
+            elif stat == 'VIT': player.vitality += amount
+            elif stat == 'SNS': player.sense += amount
+            
+    player.attribute_points -= total_requested
+    db.session.commit()
+    return True, "Attributes updated."
     # Let's check duplicate original name to prevent spamming same quest?
     # For now, allow it.
     

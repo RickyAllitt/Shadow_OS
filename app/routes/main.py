@@ -5,7 +5,7 @@ from app.extensions import db
 from app.models import Player, Quest, RewardItem, QuestComment, PurchaseLog, Inventory, DailySnapshot, Notification
 from app.services import (check_weekly_reset, check_daily_reset, get_categorized_quests, 
                           calculate_rewards, process_quest_completion, 
-                          calculate_total_stats, extract_shadow, start_vacation, end_vacation)
+                          calculate_total_stats, extract_shadow, start_vacation, end_vacation, allocate_attributes)
 from datetime import datetime, timedelta, timezone
 
 bp = Blueprint('main', __name__)
@@ -832,12 +832,22 @@ def setup_page():
             return render_template('setup.html')
             
         # Create Quests
-        for title in [q1, q2, q3, q4]:
+        quests_data = [
+            {'title': q1, 'rank': request.form.get('quest1_rank', 'E'), 'stat': request.form.get('quest1_stat', 'STR')},
+            {'title': q2, 'rank': request.form.get('quest2_rank', 'E'), 'stat': request.form.get('quest2_stat', 'STR')},
+            {'title': q3, 'rank': request.form.get('quest3_rank', 'E'), 'stat': request.form.get('quest3_stat', 'STR')},
+            {'title': q4, 'rank': request.form.get('quest4_rank', 'E'), 'stat': request.form.get('quest4_stat', 'STR')},
+        ]
+
+        xp_map = {'E': 10, 'D': 20, 'C': 50, 'B': 100, 'A': 200, 'S': 500}
+
+        for q_data in quests_data:
+            xp_reward = xp_map.get(q_data['rank'], 10)
             quest = Quest(
-                title=title,
-                rank='E',
-                xp_reward=10,
-                stat_reward='STR', # Default, user can edit later
+                title=q_data['title'],
+                rank=q_data['rank'],
+                xp_reward=xp_reward,
+                stat_reward=q_data['stat'],
                 player_id=current_user.id,
                 is_daily=True
             )
@@ -898,3 +908,33 @@ def mark_notifications_read():
         Notification.query.filter(Notification.id.in_(ids), Notification.player_id == current_user.id).update({Notification.is_read: True}, synchronize_session=False)
         db.session.commit()
     return jsonify({'success': True})
+
+@bp.route('/allocate_points', methods=['POST'])
+@login_required
+def allocate_points():
+    try:
+        # Expecting JSON: {"STR": 1, "INT": 2, ...}
+        # Or Form data if simpler? Let's support both but assume JSON for dynamic UI.
+        data = request.json or request.form
+        
+        distribution = {
+            'STR': int(data.get('STR', 0)),
+            'INT': int(data.get('INT', 0)),
+            'AGI': int(data.get('AGI', 0)),
+            'VIT': int(data.get('VIT', 0)),
+            'SNS': int(data.get('SNS', 0))
+        }
+        
+    except (ValueError, TypeError):
+        if request.json:
+            return jsonify({'success': False, 'msg': "Invalid input."})
+        flash("Invalid input.", "error")
+        return redirect(url_for('main.dashboard'))
+        
+    success, msg = allocate_attributes(current_user, distribution)
+    
+    if request.json or request.is_json:
+        return jsonify({'success': success, 'msg': msg})
+        
+    flash(msg, "success" if success else "error")
+    return redirect(url_for('main.dashboard'))

@@ -30,6 +30,7 @@ class Player(UserMixin, db.Model):
     job_class = db.Column(db.String(50), default='None')
     rank = db.Column(db.String(1), default='E') # New Rank System
     xp_required = db.Column(db.Integer, default=100)
+    attribute_points = db.Column(db.Integer, default=0) # Unspent Ability Points
 
     # Replaced simple string with relationship, but keeping string for fallback or efficiency? 
     # Let's map it to the relationship now.
