@@ -25,7 +25,7 @@ def delete_users():
         for p in all_players:
             print(f"- ID: {p.id} | Name: {p.name} | Level: {p.level}")
 
-        target_names = ["Player One", "Ricky", "Ricardo"]
+        target_names = ["Ricky"]
         
         found_any = False
         
