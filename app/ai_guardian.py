@@ -23,10 +23,12 @@ class TheArchitect:
         """Helper to call Gemini API using urllib."""
         api_key = os.environ.get('GEMINI_API_KEY')
         if not api_key:
+            print("AI ERROR: No API Key found.")
             return None
             
         try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemma-3-4b-it:generateContent?key={api_key}"
+            # Switching to gemma-3-27b-it for maximum reasoning capability
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent?key={api_key}"
             headers = {
                 "Content-Type": "application/json"
             }
@@ -80,10 +82,16 @@ class TheArchitect:
                                 return None
                         return content
                     else:
-                        print(f"AI HTTP ERROR: {response.status}")
+                        if response.status == 429:
+                            print("AI WARNING: Quota exceeded (429). Switching to manual heuristics.")
+                        else:
+                            print(f"AI HTTP ERROR: {response.status}")
                         return None
             except urllib.error.HTTPError as e:
-                print(f"AI API ERROR: {e.code} - {e.read().decode('utf-8')}")
+                if e.code == 429:
+                    print("AI WARNING: Quota exceeded (429). Switching to manual heuristics.")
+                else:
+                    print(f"AI API ERROR: {e.code} - {e.read().decode('utf-8')}")
                 return None
                     
         except Exception as e:
