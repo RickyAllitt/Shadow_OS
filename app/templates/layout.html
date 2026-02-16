@@ -75,6 +75,39 @@
             <div class="u-text-center">
                 <button onclick="document.getElementById('settingsModal').style.display='none'"
                     class="btn-complete u-width-100">CLOSE</button>
+
+                <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); margin: 20px 0;">
+
+                <button onclick="document.getElementById('deleteAccountModal').style.display='flex'"
+                    class="btn-danger u-width-100"
+                    style="background-color: #ff4444; color: white; border: none; padding: 10px; font-weight: bold; cursor: pointer;">
+                    DELETE ACCOUNT
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DELETE ACCOUNT CONFIRMATION MODAL -->
+    <div id="deleteAccountModal" class="modal-overlay">
+        <div class="panel modal-content" style="max-width:400px; border: 2px solid #ff4444;">
+            <h2 class="u-color-danger u-mb-20" style="color: #ff4444;">⚠ WARNING ⚠</h2>
+            <p class="u-mb-20">
+                Are you sure you want to delete your account? <br><br>
+                <strong>This action is irreversible.</strong><br>
+                All progress, stats, and items will be lost forever.
+            </p>
+
+            <div class="u-flex u-justify-between u-gap-10">
+                <button onclick="document.getElementById('deleteAccountModal').style.display='none'"
+                    class="btn-complete u-width-50">CANCEL</button>
+
+                <form action="{{ url_for('auth.delete_account') }}" method="POST" class="u-width-50">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn-danger u-width-100"
+                        style="background-color: #ff4444; color: white; border: none; padding: 10px; font-weight: bold; cursor: pointer;">
+                        CONFIRM DELETE
+                    </button>
+                </form>
             </div>
         </div>
     </div>

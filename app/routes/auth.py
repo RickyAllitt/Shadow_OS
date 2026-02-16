@@ -67,3 +67,13 @@ def logout():
     logout_user()
     flash('System Access Terminated.', 'success')
     return redirect(url_for('auth.login'))
+
+@bp.route('/delete_account', methods=['POST'])
+@login_required
+def delete_account():
+    user = current_user
+    db.session.delete(user)
+    db.session.commit()
+    logout_user() # Ensure session is cleared
+    flash('Account Deleted. Goodbye, Hunter.', 'success')
+    return redirect(url_for('auth.login'))

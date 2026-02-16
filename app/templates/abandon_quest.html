@@ -14,9 +14,17 @@
 
         <div
             style="background: rgba(255, 0, 0, 0.1); padding: 15px; border: 1px solid var(--color-danger); margin-bottom: 30px;">
-            <p style="color: var(--color-danger); font-weight: bold; font-size: 1.2em; margin: 0;">PENALTY: -{{ penalty
-                }} G</p>
-            <p style="font-size: 0.8em; color: #888; margin-top: 5px;">Your Current Gold: {{ current_user.gold }} G</p>
+            {% if cost > 0 %}
+            <p style="color: var(--color-danger); font-weight: bold; font-size: 1.2em; margin: 0;">PENALTY: -{{ cost }}
+                {% if currency == 'coins' %}Coins{% else %}Gold{% endif %}
+            </p>
+            <p style="font-size: 0.8em; color: #888; margin-top: 5px;">Your Current Balance:
+                {% if currency == 'coins' %}{{ current_user.coins }} Coins{% else %}{{ current_user.gold }} G{% endif %}
+            </p>
+            {% else %}
+            <p style="color: var(--color-success); font-weight: bold; font-size: 1.2em; margin: 0;">NO PENALTY</p>
+            <p style="font-size: 0.8em; color: #888; margin-top: 5px;">You can abandon this quest freely.</p>
+            {% endif %}
         </div>
 
         <form action="/delete_quest/{{ quest.id }}" method="POST">
