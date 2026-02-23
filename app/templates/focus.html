@@ -193,11 +193,7 @@
     let blurTime = null;
     let hasFailed = false;
 
-    // AUDIO
-    const audioAlarm = new Audio("{{ url_for('static', filename='sounds/timer_alarm.mp3') }}");
-    audioAlarm.volume = 0.6;
-    const audioFail = new Audio("{{ url_for('static', filename='sounds/glitch_error.mp3') }}");
-    audioFail.volume = 0.6;
+    // AUDIO (Now handled globally by window.audioManager)
 
     // PERSISTENCE
     const STORAGE_KEY = 'SL_FOCUS_STATE';
@@ -260,15 +256,10 @@
 
     // Prime audio on user interaction to allow autoplay later
     function primeAudio() {
-        audioAlarm.play().then(() => {
-            audioAlarm.pause();
-            audioAlarm.currentTime = 0;
-        }).catch(e => console.log("Audio Prime Blocked"));
-
-        audioFail.play().then(() => {
-            audioFail.pause();
-            audioFail.currentTime = 0;
-        }).catch(e => console.log("Audio Prime Blocked"));
+        if (window.audioManager) {
+            window.audioManager.prime('timer_alarm');
+            window.audioManager.prime('glitch_error');
+        }
     }
 
     function initProtocol() {
@@ -334,7 +325,7 @@
             timerId = null;
             updateTimerDisplay(0); // Ensure it shows 00:00
 
-            audioAlarm.play().catch(e => console.log("Audio Play Error: " + e));
+            if (window.audioManager) window.audioManager.play('timer_alarm');
 
             // SYSTEM NOTIFICATION
             if (Notification.permission === 'granted') {
@@ -403,7 +394,7 @@
         hasFailed = true;
         clearState();
         if (timerId) clearInterval(timerId);
-        audioFail.play().catch(e => console.log("Audio Error"));
+        if (window.audioManager) window.audioManager.play('glitch_error');
         document.getElementById('timer').style.display = 'none';
         document.getElementById('status').style.display = 'none';
         document.getElementById('failMsg').style.display = 'block';

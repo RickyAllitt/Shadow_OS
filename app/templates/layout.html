@@ -72,6 +72,16 @@
                     onchange="updateSettings()">
             </div>
 
+            <div class="u-flex u-justify-between u-align-center u-mb-20 u-padding-10"
+                style="background:rgba(255,255,255,0.05);">
+                <span>Volume</span>
+                {% set js_vol = current_user.settings_volume if current_user.settings_volume is not none else 0.5 %}
+                <input type="range" id="settingVolume" min="0" max="1" step="0.05" value="{{ js_vol }}"
+                    onchange="updateSettings(); if(window.audioManager) window.audioManager.play('notification');"
+                    oninput="updateVolumeLabel(this.value)" style="width: 100px;">
+                <span id="volumeLabel" style="width: 30px; text-align: right;">{{ (js_vol * 100) | int }}%</span>
+            </div>
+
             <div class="u-text-center">
                 <button onclick="document.getElementById('settingsModal').style.display='none'"
                     class="btn-complete u-width-100">CLOSE</button>
@@ -113,9 +123,27 @@
     </div>
 
     <script>
+        {% set js_vol = current_user.settings_volume if current_user.settings_volume is not none else 0.5 %}
+        // Init volume from server state
+        if (window.audioManager) {
+            window.audioManager.setVolume({{ js_vol }});
+        // Init audio enabled state
+        window.audioManager.enabled = {{ 'true' if current_user.settings_audio else 'false' }};
+        }
+
+        function updateVolumeLabel(val) {
+            document.getElementById('volumeLabel').innerText = Math.round(val * 100) + '%';
+            if (window.audioManager) window.audioManager.setVolume(val);
+        }
+
         function updateSettings() {
             const audio = document.getElementById('settingAudio').checked;
             const music = document.getElementById('settingMusic').checked;
+            const volume = document.getElementById('settingVolume').value;
+
+            if (window.audioManager) {
+                window.audioManager.enabled = audio;
+            }
 
             fetch('/update_settings', {
                 method: 'POST',
@@ -123,7 +151,7 @@
                     'Content-Type': 'application/json',
                     'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                 },
-                body: JSON.stringify({ audio: audio, music: music })
+                body: JSON.stringify({ audio: audio, music: music, volume: volume })
             });
         }
     </script>

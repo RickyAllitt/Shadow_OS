@@ -803,11 +803,14 @@ def focus_mode():
 def update_settings():
     audio = request.json.get('audio')
     music = request.json.get('music')
+    volume = request.json.get('volume')
     
     if audio is not None:
         current_user.settings_audio = audio
     if music is not None:
         current_user.settings_music = music
+    if volume is not None:
+        current_user.settings_volume = float(volume)
         
     db.session.commit()
     return jsonify({'success': True})

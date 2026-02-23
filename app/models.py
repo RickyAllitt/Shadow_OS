@@ -93,6 +93,7 @@ class Player(UserMixin, db.Model):
     # --- SETTINGS ---
     settings_audio = db.Column(db.Boolean, default=True)
     settings_music = db.Column(db.Boolean, default=True)
+    settings_volume = db.Column(db.Float, default=0.5)
 
 class Quest(db.Model):
     id = db.Column(db.Integer, primary_key=True)

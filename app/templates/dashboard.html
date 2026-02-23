@@ -844,24 +844,30 @@
         }
 
         function commitPoints() {
-            if (confirm("Confirm stat allocation? This cannot be undone.")) {
-                fetch('/allocate_points', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': csrfToken
-                    },
-                    body: JSON.stringify(allocated)
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            location.reload();
-                        } else {
-                            alert(data.msg);
-                        }
-                    });
-            }
+            document.getElementById('statAllocationModal').style.display = 'flex';
+        }
+
+        function executeStatAllocation() {
+            // Close modal natively upon clicking to visually confirm
+            document.getElementById('statAllocationModal').style.display = 'none';
+
+            fetch('/allocate_points', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify(allocated)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        if (window.audioManager) window.audioManager.play('quest_complete');
+                        setTimeout(() => location.reload(), 500); // Allow sound to play before reload
+                    } else {
+                        alert(data.msg);
+                    }
+                });
         }
     </script>
 
@@ -870,6 +876,18 @@
         <div id="systemModalText" class="u-mb-20 u-color-white"></div>
         <button onclick="document.getElementById('systemModal').style.display='none'"
             class="btn-complete u-width-100">ACKNOWLEDGE</button>
+    </div>
+</div>
+
+<div id="statAllocationModal" class="modal-overlay">
+    <div class="panel modal-content" style="max-width:500px;">
+        <h2 class="u-mb-20 u-text-center">CONFIRM ALLOCATION</h2>
+        <p class="u-mb-20 u-text-center">Confirm stat allocation? This cannot be undone.</p>
+        <div class="u-flex u-gap-10 u-mt-20">
+            <button type="button" class="btn-cancel"
+                onclick="document.getElementById('statAllocationModal').style.display='none'">CANCEL</button>
+            <button type="button" class="btn-complete u-width-100" onclick="executeStatAllocation()">CONFIRM</button>
+        </div>
     </div>
 </div>
 
@@ -985,24 +1003,7 @@
 {% include 'components/add_quest_modal.html' %}
 
 <script>
-    const SoundManager = {
-        sounds: {
-            'levelup': new Audio("{{ url_for('static', filename='sounds/levelup.mp3') }}"),
-            'popup': new Audio("{{ url_for('static', filename='sounds/popup.mp3') }}"),
-            'complete': new Audio("{{ url_for('static', filename='sounds/quest_complete.mp3') }}"),
-            'arise': new Audio("{{ url_for('static', filename='sounds/arise.mp3') }}")
-        },
-        play: function (name) {
-            const audioEnabled = document.getElementById('settingAudio') ? document.getElementById('settingAudio').checked : true;
-            if (!audioEnabled) return;
 
-            if (this.sounds[name]) {
-                this.sounds[name].volume = 0.5;
-                this.sounds[name].currentTime = 0;
-                this.sounds[name].play().catch(() => { });
-            }
-        }
-    };
 
     document.addEventListener("DOMContentLoaded", function () {
         // Flash Messages
@@ -1021,13 +1022,13 @@
             });
             document.getElementById('systemModalText').innerHTML = html;
             document.getElementById('systemModal').style.display = 'flex';
-            SoundManager.play('popup');
+            if (window.audioManager) window.audioManager.play('notification');
         }
 
         const lvlFlashes = document.querySelectorAll('.flash-msg.levelup');
         if (lvlFlashes.length > 0) {
             document.getElementById('levelUpOverlay').style.display = 'flex';
-            SoundManager.play('levelup');
+            if (window.audioManager) window.audioManager.play('level_up');
             setTimeout(() => { document.getElementById('levelUpOverlay').style.display = 'none'; }, 4000);
         }
 

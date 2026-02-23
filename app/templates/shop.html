@@ -129,19 +129,7 @@
 {% include 'components/shop_history_modal.html' %}
 
 <script>
-    const SoundManager = {
-        sounds: {
-            'buy': new Audio("{{ url_for('static', filename='sounds/buy_item.mp3') }}"),
-            'popup': new Audio("{{ url_for('static', filename='sounds/popup.mp3') }}")
-        },
-        play: function (name) {
-            if (this.sounds[name]) {
-                this.sounds[name].volume = 0.5;
-                this.sounds[name].currentTime = 0;
-                this.sounds[name].play().catch(e => console.log("Audio play blocked/missing: " + name));
-            }
-        }
-    };
+    // Removed local sound manager to use global
 
     document.addEventListener('click', function (e) {
         if (e.target && e.target.classList.contains('btn-buy-trigger')) {
@@ -171,7 +159,7 @@
                 btn.innerText = originalText;
 
                 if (data.success) {
-                    SoundManager.play('buy');
+                    if (window.audioManager) window.audioManager.play('buy_item');
                     // Update Balance
                     if (document.getElementById('playerGold'))
                         document.getElementById('playerGold').innerText = data.new_gold;
