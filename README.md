@@ -29,35 +29,42 @@ The command center of your growth. It visually represents your current status wi
 - **Task Decomposition**: Use the **"⚡" (Breakdown)** feature to let the AI shatter a large S-Rank goal into actionable sub-tasks.
 - **History Log**: A comprehensive audit trail of every quest completed, timestamped for accountability.
 
-### 3. Analytics & Heatmap
+### 3. Analytics, Rejuvenation & Heatmap
 - **Activity Heatmap**: A GitHub-style contribution grid visualizing your consistency over the last 365 days. Darker cells indicate higher productivity.
-- **Growth Charts**: Interactive Chart.js graphs tracking your Level and XP growth over time.
-- **Sleep Log**: Track sleep duration to maintain the "WELL RESTED" status (+10% XP Bonus).
+- **Sleep Log & The Elixir of Life**: 
+    - Track sleep duration to maintain the "WELL RESTED" status (+10% XP Bonus).
+    - If you fall into the "TIRED" condition from poor sleep, you can manually purchase the **Elixir of Life** from the Shop to immediately cure your fatigue and restore your Sleep Streak.
 
-### 4. Gamification & Progression
+### 4. The Void Focus (Study Timer)
+- **Pomodoro Progression**: Enter the Void Focus mode and set a custom timer to concentrate on deep work.
+- **Void Tasks & Interruption**: Utilize the built-in Void Task scratchpad to log distracting thoughts or secondary objectives without breaking focus.
+- **Dynamic Paced Rewards**: The Void natively hooks into the game's economy engine. 1 Hour of focus guarantees **~2.5%** of your current level's XP requirement, ensuring study time is forever viable at all levels. It also generates 10 Coins per hour.
+- **Skip Rest**: A dedicated button to seamlessly skip the mandatory recovery phase if you hit flow state.
+
+### 5. Gamification, Progression, & 2-Year Economy
+- **Hyper-Scaled Economy**: Leveling up is balanced for immense long-term retention. Reaching Level 100 as an active player will take **approximately 2 years** of active play (Dailies + Quests + Focus Time). There is no hard cap.
 - **Class Evolution**: Unlock specialized classes at Level 10, 25, and 50.
     - **Assassin**: Coin Bonus.
     - **Mage**: XP Bonus.
     - **Tank**: Grace period against penalties.
 - **Shadow Army**: "Extract" completed S-Rank quests to turn them into Shadows. Shadows provide passive permanent buffs to your stats.
-- **Titles**: Unlock titles (e.g., "The Awakened", "Wolf Slayer") based on achievements like streaks or total gold. Titles provide unique stat multipliers.
-- **Inventory & Shop**: Purchase and equip items (Helmets, Armor, Weapons) that visually appear in your inventory and boost specific stats.
-- **Leaderboard**: Compete with other 'Hunters' to see who has leveled up the most or taken the most vacations.
+- **Titles**: Unlock titles (e.g., "The Awakened", "Wolf Slayer") based on achievements. Titles provide unique stat multipliers.
+- **Inventory & Shop**: Purchase standard and S-Rank endgame equipment (costing up to 15,000 Coins) requiring months of consistent effort.
+- **Leaderboard**: Compete with other 'Hunters'.
 
-### 5. Penalty System
+### 6. Penalty System
 Failure is not without consequence. The System demands consistency.
-- **Daily Protocols**: 4 Mandatory Dailies that reset every 24 hours.
+- **Daily Protocols**: Mandatory Dailies that reset every 24 hours.
 - **The Penalty Zone**: Failing to complete Dailies by midnight triggers:
     1.  **Debuff**: -20% to all stats (System Glitching).
     2.  **Shop Lockdown**: Inability to purchase recovery items.
     3.  **Level Regression**: Loss of levels if penalties accumulate.
 - **Penalty Quest**: A generated "Survival Quest" (e.g., 50 Pushups) to clear the penalty status.
 
-### 6. Vacation Mode (System Freeze) 🌴
+### 7. Vacation Mode (System Freeze) 🌴
 - **Emergency Suspension**: Freeze the system to stop daily quest timers and avoid penalties while away.
 - **The Price of Peace**: Every full week spent on vacation reduces all stats by **1 point** upon return.
 - **Monthly Limit**: Highly restricted usage—only one vacation activation permitted per calendar month.
-- **Visual Overlay**: A full-screen "FROZEN" effect with a persistent bottom control bar for termination.
 
 ---
 

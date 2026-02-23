@@ -55,7 +55,7 @@ def seed_database():
         {'name': "Ring of Clarity", 'cost': 400, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'INT', 'stat_value': 5, 'slot': 'accessory'},
         
         # Coin Consumables
-        {'name': "Elixir of Vitality", 'cost': 100, 'stock': 5, 'currency': 'coins', 'item_type': 'consumable', 'stat_bonus': 'VIT', 'stat_value': 1, 'slot': None},
+        {'name': "Elixir of Life", 'cost': 100, 'stock': -1, 'currency': 'coins', 'item_type': 'consumable', 'stat_bonus': None, 'stat_value': 0, 'slot': None},
         
         # Mid-Tier Gear (800-1200 Range)
         {'name': "High Orc's Helm", 'cost': 900, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'VIT', 'stat_value': 6, 'slot': 'head'},
@@ -69,6 +69,14 @@ def seed_database():
         {'name': "Cloak of Shadows", 'cost': 1500, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'SNS', 'stat_value': 10, 'slot': 'accessory'},
         {'name': "Orb of Avarice", 'cost': 3000, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'INT', 'stat_value': 20, 'slot': 'accessory'},
         {'name': "Red Knight's Helmet", 'cost': 1800, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'VIT', 'stat_value': 10, 'slot': 'head'},
+        
+        # S-Rank Endgame Gear (Years 1-2 Targets)
+        {'name': "Demon King's Longsword", 'cost': 7500, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'STR', 'stat_value': 40, 'slot': 'weapon'},
+        {'name': "Monarch's Domain", 'cost': 8500, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'INT', 'stat_value': 50, 'slot': 'accessory'},
+        {'name': "Armor of the Sun", 'cost': 6000, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'VIT', 'stat_value': 35, 'slot': 'body'},
+        {'name': "Kamish's Wrath", 'cost': 15000, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'STR', 'stat_value': 60, 'slot': 'weapon'},
+        {'name': "Eyes of the Ruler", 'cost': 7000, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'SNS', 'stat_value': 45, 'slot': 'head'},
+        {'name': "Wings of the Void", 'cost': 10000, 'stock': 1, 'currency': 'coins', 'item_type': 'equipment', 'stat_bonus': 'AGI', 'stat_value': 50, 'slot': 'accessory'},
     ]
 
     for item_data in desired_items:
@@ -146,13 +154,13 @@ def calculate_rewards(rank, player_level=1):
     # 1. Calculate XP Requirement for current level
     xp_cap = calculate_xp_required(player_level)
     
-    # 2. Define Percentages (Target: 4 Years to Lvl 100)
+    # 2. Define Percentages (Target: 2 Years to Lvl 100)
     percentages = {
         'E': 0.01,  # 1%
         'D': 0.02,  # 2%
-        'C': 0.05,  # 5%
-        'B': 0.10,  # 10%
-        'A': 0.25,  # 25%
+        'C': 0.03,  # 3%
+        'B': 0.05,  # 5%
+        'A': 0.12,  # 12%
         'S': 0.0    # 0 here, handled via Instant Level Up
     }
     
@@ -178,6 +186,35 @@ def calculate_rewards(rank, player_level=1):
     gold, coins = rewards_flat.get(rank, (0, 0))
     
     return final_xp, gold, coins
+
+def process_level_up(player):
+    """ Handles level up logic, stats, class evolution, rank up, and titles. """
+    initial_level = player.level
+    while player.xp >= player.xp_required:
+        player.level += 1
+        player.xp -= player.xp_required
+        player.xp_required = calculate_xp_required(player.level)
+        
+        # Level Up Stat Bonus: +1 Ability Point + Full Recovery
+        player.attribute_points += 1
+        player.condition = "Healthy" # Full Recovery
+        
+        # Check Evolution immediately on level up
+        evolved, new_class = check_class_evolution(player)
+        if evolved:
+             print(f">> CLASS EVOLUTION: {player.name} became {new_class}!")
+             player.just_evolved = new_class
+             
+        # Check Rank Up
+        ranked_up, new_rank = check_player_rank_up(player)
+        if ranked_up:
+             print(f">> RANK UP: {player.name} is now Rank {new_rank}!")
+             player.just_ranked_up = new_rank
+             
+    # Check titles on every completion (level up or streak)
+    check_title_unlocks(player)
+    
+    return player.level > initial_level
 
 def process_quest_completion(player, quest):
     """ Handles all rewards, stats, and level up logic. """
@@ -242,32 +279,7 @@ def process_quest_completion(player, quest):
 
     # 4. Level Up Logic (Moved after all XP gains)
     initial_level = player.level
-    while player.xp >= player.xp_required:
-        player.level += 1
-        player.xp -= player.xp_required
-        player.xp_required = calculate_xp_required(player.level)
-        
-        # Level Up Stat Bonus: +1 Ability Point + Full Recovery
-        player.attribute_points += 1
-        player.condition = "Healthy" # Full Recovery
-        
-        # S-Rank or Special: Unlock Shadow Extraction? (Future)
-
-        
-        # Check Evolution immediately on level up
-        evolved, new_class = check_class_evolution(player)
-        if evolved:
-             print(f">> CLASS EVOLUTION: {player.name} became {new_class}!")
-             player.just_evolved = new_class
-             
-        # Check Rank Up
-        ranked_up, new_rank = check_player_rank_up(player)
-        if ranked_up:
-             print(f">> RANK UP: {player.name} is now Rank {new_rank}!")
-             player.just_ranked_up = new_rank
-             
-    # Check titles on every completion (level up or streak)
-    check_title_unlocks(player)
+    process_level_up(player)
 
     # 5. Penalty Clearance
     if quest.is_penalty:
@@ -350,9 +362,9 @@ def _check_and_apply_daily_bonus(player):
         today_midnight_utc = today_midnight_game.astimezone(timezone.utc)
         
         if not last_bonus or last_bonus < today_midnight_utc:
-            # Scaled Daily Bonus: 15% of Level Cap (Was 3%)
+            # Scaled Daily Bonus: 10% of Level Cap
             xp_cap = calculate_xp_required(player.level)
-            bonus_xp = int(xp_cap * 0.15)
+            bonus_xp = int(xp_cap * 0.10)
             player.xp += bonus_xp
             
             player.gold += 100 

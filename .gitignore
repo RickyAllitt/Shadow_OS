@@ -9,11 +9,12 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
+# Flask / Database
+instance/
+instance/*.db
+app.db
 *.db
 *.sqlite3
-
-# Flask
-instance/
 .webassets-cache
 
 # Testing

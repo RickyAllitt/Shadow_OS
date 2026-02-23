@@ -693,6 +693,21 @@ def use_item_route(inv_id):
     item_def = item_record.item
     
     # SPECIAL ITEMS
+    if item_def.name == "Elixir of Life":
+        if current_user.condition == "WELL RESTED":
+            flash("You are already fully rested. Save the Elixir.", "error")
+            return redirect(url_for('main.inventory'))
+            
+        current_user.condition = "WELL RESTED"
+        current_user.last_sleep_duration = max(8.0, current_user.last_sleep_duration or 0)
+        current_user.sleep_streak += 1
+        
+        db.session.delete(item_record)
+        db.session.commit()
+        
+        flash("ELIXIR OF LIFE CONSUMED: Fatigue cured. Condition restored to BEST.", "system_popup")
+        return redirect(url_for('main.inventory'))
+        
     if item_def.name == "Night Out with Friends":
         from app.services import auto_complete_dailies
         count, msg = auto_complete_dailies(current_user)
@@ -826,15 +841,30 @@ def focus_complete():
     if minutes < 1:
         return jsonify({'success': False, 'msg': "Too short."})
         
-    # Rewards: 1 Coin/min, 2 XP/min (Conservative)
-    coins = minutes * 1
-    xp = minutes * 2
+    # Rewards: Coins scale to 1 per 6 mins (10/hr). XP scales to ~2.5% of level cap per hour.
+    coins = int(minutes / 6.0)
+    
+    xp_scaling_factor = 0.025
+    xp_cap = current_user.xp_required if current_user.xp_required > 0 else 100
+    xp = max(1, int((minutes / 60.0) * (xp_scaling_factor * xp_cap)))
     
     current_user.coins += coins
     current_user.xp += xp
     current_user.daily_focus_duration += minutes
     
+    from app.services import process_level_up
+    level_up = process_level_up(current_user)
+    
     db.session.commit()
+    
+    if level_up:
+        flash("LEVEL UP!", "levelup")
+        
+    if hasattr(current_user, 'just_evolved') and current_user.just_evolved:
+        flash(f"CLASS EVOLVED: You are now a {current_user.just_evolved}!", "system_popup")
+        
+    if hasattr(current_user, 'just_ranked_up') and current_user.just_ranked_up:
+        flash(f"RANK UP: You have reached {current_user.just_ranked_up}-Rank!", "system_popup")
     
     msg = f"FOCUS COMPLETE: {minutes}m. +{coins} Coins, +{xp} XP."
     return jsonify({'success': True, 'msg': msg})

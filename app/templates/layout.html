@@ -36,6 +36,10 @@
 
     {% if current_user.is_authenticated %}
     <div style="position: fixed; top: 20px; right: 20px; z-index: 100; display: flex; gap: 10px;">
+        <button onclick="document.getElementById('guideModal').style.display='flex'"
+            style="background: rgba(0,0,0,0.5); border: 1px solid #aaa; color: cyan; padding: 5px 10px; cursor: pointer; font-family: 'Courier New', monospace; font-weight: bold; margin-right: 5px;">
+            GUIDE
+        </button>
         <button onclick="document.getElementById('settingsModal').style.display='flex'"
             style="background: rgba(0,0,0,0.5); border: 1px solid #aaa; color: #ddd; padding: 5px 10px; cursor: pointer; font-family: 'Courier New', monospace; font-weight: bold;">
             SETTINGS
@@ -118,6 +122,45 @@
                         CONFIRM DELETE
                     </button>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- GUIDE MODAL -->
+    <div id="guideModal" class="modal-overlay">
+        <div class="panel modal-content" style="max-width:500px; padding: 30px;">
+            <h2 class="u-color-white u-mb-20"
+                style="color: cyan !important; border-bottom: 1px solid #333; padding-bottom: 10px;">SYSTEM GUIDE:
+                ECONOMY</h2>
+            <div style="text-align: left; font-size: 0.9rem; line-height: 1.5; color: #ddd;">
+                <p style="color: cyan; font-weight: bold; margin-top: 15px;">XP & PROGRESSION</p>
+                <p>• The XP requirement curve is exponential. However, all rewards mathematically scale to your current
+                    level so progression speed remains completely static.</p>
+                <p>• Earning Level 100 will take an active player roughly <strong>2 Years</strong> of consistency.</p>
+                <ul style="margin-bottom: 15px; padding-left: 20px; color: #aaa;">
+                    <li><strong>Dailies:</strong> 10% Level Cap / day</li>
+                    <li><strong>A-Rank Quest:</strong> 12% Level Cap</li>
+                    <li><strong>Void Focus:</strong> 2.5% Level Cap / hour</li>
+                </ul>
+
+                <p style="color: gold; font-weight: bold; margin-top: 15px;">CURRENCIES</p>
+                <ul style="margin-bottom: 15px; padding-left: 20px; color: #aaa;">
+                    <li><strong>Coins (C):</strong> Used exclusively for System Shop artifacts. Earned via Void Focus
+                        (10/hr) and B+ Rank Quests. Endgame gear costs up to 15,000 C (10+ Months of saving).</li>
+                    <li><strong>Gold (G):</strong> Earned exclusively via completing all sequence dailies (100/day).
+                        Used for real-world rewards like a "Night Out" (600G).</li>
+                </ul>
+
+                <p style="color: var(--color-danger); font-weight: bold; margin-top: 15px;">PENALTIES</p>
+                <div style="color: #aaa;">
+                    <p>• Missing dailies triggers a -20% Stat Debuff. Clear it via Survival Quests.</p>
+                    <p>• Sleeping less than 6 hours breaks your Streak and ruins your conditioning (-XP). Use the
+                        <em>Elixir of Life</em> to rescue it.</p>
+                </div>
+            </div>
+            <div style="margin-top: 25px;">
+                <button onclick="document.getElementById('guideModal').style.display='none'"
+                    class="btn-complete u-width-100">CLOSE GUIDE</button>
             </div>
         </div>
     </div>

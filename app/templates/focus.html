@@ -108,6 +108,138 @@
             opacity: 0.5;
         }
     }
+
+    /* VOID TASKS STYLING */
+    .void-tasks-container {
+        margin-top: 30px;
+        width: 100%;
+        max-width: 400px;
+        text-align: left;
+        border-top: 1px solid #333;
+        padding-top: 20px;
+    }
+
+    .void-tasks-header {
+        font-size: 1.2rem;
+        color: cyan;
+        margin-bottom: 15px;
+        text-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .void-task-input-group {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+
+    .void-task-input-group input {
+        flex-grow: 1;
+        background: rgba(0, 0, 0, 0.5);
+        border: 1px solid #444;
+        color: #fff;
+        padding: 8px 12px;
+        font-family: inherit;
+        pointer-events: auto;
+        user-select: auto;
+        position: relative;
+        z-index: 50;
+    }
+
+    .void-task-input-group input:focus {
+        outline: none;
+        border-color: cyan;
+    }
+
+    .void-task-input-group button {
+        background: transparent;
+        border: 1px solid cyan;
+        color: cyan;
+        padding: 8px 15px;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.3s;
+    }
+
+    .void-task-input-group button:hover {
+        background: rgba(0, 255, 255, 0.1);
+        box-shadow: 0 0 10px cyan;
+    }
+
+    .void-tasks-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        max-height: 200px;
+        overflow-y: auto;
+    }
+
+    .void-task-item {
+        display: flex;
+        align-items: center;
+        padding: 10px;
+        border: 1px solid #222;
+        margin-bottom: 8px;
+        background: rgba(0, 0, 0, 0.3);
+        transition: all 0.3s;
+    }
+
+    .void-task-item:hover {
+        border-color: #444;
+    }
+
+    .void-task-item.completed {
+        opacity: 0.5;
+        border-color: #111;
+    }
+
+    .void-task-item.completed .task-text {
+        text-decoration: line-through;
+        color: #888;
+    }
+
+    .checkbox-custom {
+        width: 18px;
+        height: 18px;
+        border: 1px solid cyan;
+        margin-right: 15px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+
+    .void-task-item.completed .checkbox-custom {
+        background: cyan;
+        color: #000;
+    }
+
+    .void-task-item.completed .checkbox-custom::after {
+        content: "✓";
+        font-size: 12px;
+        font-weight: bold;
+    }
+
+    .task-text {
+        flex-grow: 1;
+        cursor: pointer;
+        word-break: break-word;
+    }
+
+    .task-delete {
+        color: #ff4444;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.3s;
+        padding: 5px;
+    }
+
+    .void-task-item:hover .task-delete {
+        opacity: 1;
+    }
 </style>
 
 <div class="void-container" id="menu">
@@ -147,7 +279,8 @@
 </div>
 
 <div class="void-container" id="session" style="display: none;">
-    <div style="color: #444; letter-spacing: 2px;" id="roundDisplay">ROUND 1 / 4</div>
+    <div style="color: #ccc; letter-spacing: 2px; font-weight: bold; text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);"
+        id="roundDisplay">ROUND 1 / 4</div>
     <div class="timer-display" id="timer">00:00</div>
     <div class="status-msg" id="status">SYSTEM ACTIVE</div>
     <div class="fail-msg" id="failMsg">CONNECTION LOST.<br>PROTOCOL FAILED.</div>
@@ -159,12 +292,34 @@
             onmouseout="this.style.backgroundColor='transparent'; this.style.boxShadow='none';">
             PAUSE
         </button>
+        <button id="skipRestBtn" onclick="showSkipRestModal()"
+            style="display: none; background: transparent; border: 1px solid #4caf50; color: #4caf50; padding: 8px 20px; cursor: pointer; transition: all 0.3s;"
+            onmouseover="this.style.backgroundColor='rgba(76, 175, 80, 0.1)'; this.style.boxShadow='0 0 10px #4caf50';"
+            onmouseout="this.style.backgroundColor='transparent'; this.style.boxShadow='none';">
+            SKIP REST
+        </button>
         <button onclick="showAbortModal()"
             style="background: transparent; border: 1px solid #333; color: #666; padding: 8px 20px; cursor: pointer; transition: all 0.3s;"
             onmouseover="this.style.borderColor='red'; this.style.color='red';"
             onmouseout="this.style.borderColor='#333'; this.style.color='#666';">
             ABORT
         </button>
+    </div>
+
+    <!-- VOID TASKS UI -->
+    <div class="void-tasks-container">
+        <div class="void-tasks-header">
+            <span>VOID TASKS</span>
+            <span style="font-size: 0.8rem; color: #666;">[NO REWARDS]</span>
+        </div>
+        <div class="void-task-input-group">
+            <input type="text" id="voidTaskInput" placeholder="Add a task for the void..."
+                onkeypress="handleTaskKeyPress(event)">
+            <button onclick="addVoidTask()">ADD</button>
+        </div>
+        <ul class="void-tasks-list" id="voidTasksList">
+            <!-- Tasks rendered via JS -->
+        </ul>
     </div>
 </div>
 
@@ -208,6 +363,26 @@
     </button>
 </div>
 
+<!-- SKIP REST MODAL -->
+<div id="skipRestModal"
+    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 999; align-items: center; justify-content: center; flex-direction: column;">
+    <h2 style="color: #4caf50; text-shadow: 0 0 10px #4caf50; margin-bottom: 20px;">SKIP RECOVERY</h2>
+    <p
+        style="color: #ccc; font-family: monospace; text-align: center; max-width: 400px; line-height: 1.5; margin-bottom: 40px;">
+        ARE YOU SURE YOU WANT TO SKIP YOUR RECOVERY PERIOD AND RETURN IMMEDIATEY TO FOCUS?
+    </p>
+    <div style="display: flex; gap: 20px;">
+        <button onclick="confirmSkipRest()"
+            style="background: transparent; border: 1px solid #4caf50; color: #4caf50; padding: 10px 30px; cursor: pointer;">
+            CONFIRM SKIP
+        </button>
+        <button onclick="closeSkipRestModal()"
+            style="background: transparent; border: 1px solid #666; color: #666; padding: 10px 30px; cursor: pointer;">
+            CANCEL
+        </button>
+    </div>
+</div>
+
 <script>
     let focusMinutes = 25;
     let restMinutes = 5;
@@ -228,6 +403,10 @@
     const MAX_PAUSE_MINUTES = 5;
 
     // AUDIO (Now handled globally by window.audioManager)
+
+    // VOID TASKS STATE
+    let voidTasks = [];
+    const TASKS_STORAGE_KEY = 'SL_VOID_TASKS';
 
     // PERSISTENCE
     const STORAGE_KEY = 'SL_FOCUS_STATE';
@@ -284,8 +463,16 @@
             document.getElementById('menu').style.display = 'none';
             document.getElementById('session').style.display = 'flex';
 
-            if (isFocus) updateUI("FOCUS PHASE", "cyan");
-            else updateUI("RECOVERY PHASE", "#4caf50");
+            if (isFocus) {
+                updateUI("FOCUS PHASE", "cyan");
+                document.getElementById('skipRestBtn').style.display = 'none';
+            } else {
+                updateUI("RECOVERY PHASE", "#4caf50");
+                document.getElementById('skipRestBtn').style.display = 'block';
+            }
+
+            // Load void tasks
+            loadVoidTasks();
 
             // Restart Timer or Pause State
             if (isPaused) {
@@ -342,6 +529,8 @@
         saveState();
 
         updateUI("FOCUS PHASE", "cyan");
+        document.getElementById('skipRestBtn').style.display = 'none';
+
         // Update more frequently to catch end time accurately, but logic handles drift
         if (timerId) clearInterval(timerId);
         timerId = setInterval(tick, 1000);
@@ -356,6 +545,8 @@
         saveState();
 
         updateUI("RECOVERY PHASE", "#4caf50"); // Green for rest
+        document.getElementById('skipRestBtn').style.display = 'block';
+
         if (timerId) clearInterval(timerId);
         timerId = setInterval(tick, 1000);
         tick();
@@ -425,11 +616,7 @@
             console.log("Reward granted.");
         });
 
-        if (currentRound >= totalRounds) {
-            finishProtocol();
-        } else {
-            startRest();
-        }
+        startRest();
     }
 
     function finishProtocol() {
@@ -437,10 +624,15 @@
         document.getElementById('status').innerText = "PROTOCOL COMPLETE";
         document.getElementById('status').style.color = "gold";
         document.getElementById('timer').innerText = "DONE";
+        document.getElementById('skipRestBtn').style.display = 'none';
+
+        // Also clear out void tasks since session is totally over
+        localStorage.removeItem(TASKS_STORAGE_KEY);
+
         setTimeout(() => {
             alert("Session Complete. Rewards Granted.");
             window.location.reload();
-        }, 1000);
+        }, 2000);
     }
 
     function failSession() {
@@ -602,6 +794,107 @@
         window.location.href = "{{ url_for('main.dashboard') }}";
     }
 
+    // SKIP REST LOGIC
+    function showSkipRestModal() {
+        document.getElementById('skipRestModal').style.display = 'flex';
+    }
+
+    function closeSkipRestModal() {
+        document.getElementById('skipRestModal').style.display = 'none';
+    }
+
+    function confirmSkipRest() {
+        closeSkipRestModal();
+        if (isFocus) return; // Paranoia check
+
+        if (timerId) clearInterval(timerId);
+
+        currentRound++;
+        if (currentRound > totalRounds) {
+            finishProtocol();
+        } else {
+            startRound();
+        }
+    }
+
+    // VOID TASKS LOGIC
+    function loadVoidTasks() {
+        try {
+            const raw = localStorage.getItem(TASKS_STORAGE_KEY);
+            if (raw) {
+                voidTasks = JSON.parse(raw);
+            }
+        } catch (e) {
+            voidTasks = [];
+        }
+        renderVoidTasks();
+    }
+
+    function saveVoidTasks() {
+        localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(voidTasks));
+    }
+
+    function renderVoidTasks() {
+        const list = document.getElementById('voidTasksList');
+        list.innerHTML = '';
+
+        voidTasks.forEach((task, index) => {
+            const li = document.createElement('li');
+            li.className = `void-task-item ${task.completed ? 'completed' : ''}`;
+
+            li.innerHTML = `
+                <div class="checkbox-custom" onclick="toggleVoidTask(${index})"></div>
+                <span class="task-text" onclick="toggleVoidTask(${index})">${escapeHtml(task.text)}</span>
+                <span class="task-delete" onclick="deleteVoidTask(${index})">✕</span>
+            `;
+
+            list.appendChild(li);
+        });
+    }
+
+    function addVoidTask() {
+        const input = document.getElementById('voidTaskInput');
+        const text = input.value.trim();
+
+        if (text) {
+            voidTasks.push({ text: text, completed: false });
+            saveVoidTasks();
+            renderVoidTasks();
+            input.value = '';
+        }
+    }
+
+    function handleTaskKeyPress(e) {
+        if (e.key === 'Enter') {
+            addVoidTask();
+        }
+    }
+
+    function toggleVoidTask(index) {
+        if (voidTasks[index]) {
+            voidTasks[index].completed = !voidTasks[index].completed;
+            saveVoidTasks();
+            renderVoidTasks();
+        }
+    }
+
+    function deleteVoidTask(index) {
+        if (voidTasks[index]) {
+            voidTasks.splice(index, 1);
+            saveVoidTasks();
+            renderVoidTasks();
+        }
+    }
+
+    function escapeHtml(unsafe) {
+        return unsafe
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
     // VISIBILITY CHECK
     document.addEventListener("visibilitychange", () => {
         if (hasFailed) return;
@@ -647,7 +940,9 @@
 
     // Auto-Restore
     document.addEventListener("DOMContentLoaded", () => {
-        restoreState();
+        if (!restoreState()) {
+            loadVoidTasks(); // Load even if state wasn't restored yet (shows nothing, but primes array)
+        }
     });
 </script>
 {% endblock %}
