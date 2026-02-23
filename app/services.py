@@ -179,9 +179,9 @@ def calculate_rewards(rank, player_level=1):
         'E': (0, 0),
         'D': (0, 0),
         'C': (0, 0),
-        'B': (250, 15),
-        'A': (500, 30),
-        'S': (1000, 100)
+        'B': (50, 15),
+        'A': (100, 30),
+        'S': (250, 100)
     }
     gold, coins = rewards_flat.get(rank, (0, 0))
     
@@ -195,8 +195,12 @@ def process_level_up(player):
         player.xp -= player.xp_required
         player.xp_required = calculate_xp_required(player.level)
         
-        # Level Up Stat Bonus: +1 Ability Point + Full Recovery
-        player.attribute_points += 1
+        # Level Up Stat Bonus: +1 All Stats + Full Recovery
+        player.strength += 1
+        player.intelligence += 1
+        player.agility += 1
+        player.vitality += 1
+        player.sense += 1
         player.condition = "Healthy" # Full Recovery
         
         # Check Evolution immediately on level up
@@ -259,14 +263,12 @@ def process_quest_completion(player, quest):
     player.xp += xp_gain
     player.gold += base_gold
     player.coins += coin_gain
-    
     # S-RANK REWARD: INSTANT LEVEL UP
     if quest.rank == 'S' and not quest.is_penalty and not quest.is_daily:
-        # Fill XP bar to max immediately
-        remaining = player.xp_required - player.xp
-        if remaining > 0:
-            player.xp += remaining
-            print(f">> S-RANK BONUS: Instant Level Up for {player.name}")
+        # Fill XP bar to max immediately so that they just level up ONE time
+        # Do not add remaining to xp_gain, otherwise it counts as excess
+        player.xp = player.xp_required
+        print(f">> S-RANK BONUS: Instant Level Up for {player.name}")
 
     # 2. Apply Stat Buffs (Only for Rank B+ and NOT Daily)
     if quest.rank in ['B', 'A', 'S'] and not quest.is_daily:

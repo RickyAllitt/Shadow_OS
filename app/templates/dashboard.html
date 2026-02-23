@@ -736,6 +736,8 @@
                             </div>
 
                             {% if player.attribute_points > 0 %}
+                            <button onclick="removePoint('{{ label }}')" id="btn-sub-{{ label }}" class="btn-sub-point"
+                                style="position:absolute; top:-5px; left:-5px; background:rgba(255,85,85,0.8); color:#fff; border:none; border-radius:50%; width:20px; height:20px; font-weight:bold; cursor:pointer; font-size:0.8em; display:none;">-</button>
                             <button onclick="addPoint('{{ label }}')" class="btn-add-point"
                                 style="position:absolute; top:-5px; right:-5px; background:{{ color }}; color:#000; border:none; border-radius:50%; width:20px; height:20px; font-weight:bold; cursor:pointer; font-size:0.8em;">+</button>
                             {% endif %}
@@ -838,8 +840,39 @@
                 addedEl.style.display = 'inline';
                 addedEl.innerText = `+${allocated[stat]}`;
 
+                // Show Sub button
+                const subBtn = document.getElementById(`btn-sub-${stat}`);
+                if (subBtn) subBtn.style.display = 'inline-block';
+
                 // Show Commit Button
                 document.getElementById('btn-commit-points').style.display = 'inline-block';
+            }
+        }
+
+        function removePoint(stat) {
+            if (allocated[stat] > 0) {
+                currentPoints++;
+                allocated[stat]--;
+
+                // Update UI
+                document.getElementById('available-points').innerText = currentPoints;
+
+                // Update added amount
+                const addedEl = document.getElementById(`added-${stat}`);
+                if (allocated[stat] > 0) {
+                    addedEl.innerText = `+${allocated[stat]}`;
+                } else {
+                    addedEl.style.display = 'none';
+                    // Hide sub button if no points allocated to this stat
+                    const subBtn = document.getElementById(`btn-sub-${stat}`);
+                    if (subBtn) subBtn.style.display = 'none';
+                }
+
+                // Hide Commit Button if no points allocated at all
+                const totalAllocated = Object.values(allocated).reduce((a, b) => a + b, 0);
+                if (totalAllocated === 0) {
+                    document.getElementById('btn-commit-points').style.display = 'none';
+                }
             }
         }
 
