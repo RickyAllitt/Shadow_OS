@@ -152,12 +152,20 @@
     <div class="status-msg" id="status">SYSTEM ACTIVE</div>
     <div class="fail-msg" id="failMsg">CONNECTION LOST.<br>PROTOCOL FAILED.</div>
 
-    <button onclick="showAbortModal()"
-        style="background: transparent; border: 1px solid #333; color: #666; margin-top: 40px; padding: 8px 20px; cursor: pointer; transition: all 0.3s;"
-        onmouseover="this.style.borderColor='red'; this.style.color='red';"
-        onmouseout="this.style.borderColor='#333'; this.style.color='#666';">
-        ABORT
-    </button>
+    <div style="display: flex; gap: 20px; margin-top: 40px; justify-content: center;">
+        <button onclick="pauseSession()"
+            style="background: transparent; border: 1px solid #ffd700; color: #ffd700; padding: 8px 20px; cursor: pointer; transition: all 0.3s;"
+            onmouseover="this.style.backgroundColor='rgba(255, 215, 0, 0.1)'; this.style.boxShadow='0 0 10px #ffd700';"
+            onmouseout="this.style.backgroundColor='transparent'; this.style.boxShadow='none';">
+            PAUSE
+        </button>
+        <button onclick="showAbortModal()"
+            style="background: transparent; border: 1px solid #333; color: #666; padding: 8px 20px; cursor: pointer; transition: all 0.3s;"
+            onmouseover="this.style.borderColor='red'; this.style.color='red';"
+            onmouseout="this.style.borderColor='#333'; this.style.color='#666';">
+            ABORT
+        </button>
+    </div>
 </div>
 
 <!-- ABORT MODAL -->
@@ -181,6 +189,25 @@
     </div>
 </div>
 
+<!-- PAUSE MODAL -->
+<div id="pauseModal"
+    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 999; align-items: center; justify-content: center; flex-direction: column;">
+    <h2 style="color: #ffd700; text-shadow: 0 0 10px #ffd700; margin-bottom: 20px;">SESSION PAUSED</h2>
+    <p
+        style="color: #ccc; font-family: monospace; text-align: center; max-width: 400px; line-height: 1.5; margin-bottom: 20px;">
+        WARNING: SESSIONS ABORT AUTOMATICALLY AFTER 5 MINUTES OF INACTIVITY. PARTIAL DATA WILL BE SALVAGED.
+    </p>
+    <div class="timer-display" id="pauseTimerDisplay"
+        style="color: #ffd700; text-shadow: 0 0 20px rgba(255, 215, 0, 0.5); font-size: 4rem; margin-bottom: 40px;">
+        05:00</div>
+    <button onclick="resumeSession()"
+        style="background: transparent; border: 1px solid cyan; color: cyan; padding: 10px 30px; cursor: pointer; transition: all 0.3s;"
+        onmouseover="this.style.backgroundColor='rgba(0, 255, 255, 0.1)'; this.style.boxShadow='0 0 10px cyan';"
+        onmouseout="this.style.backgroundColor='transparent'; this.style.boxShadow='none';">
+        RESUME PROTOCOL
+    </button>
+</div>
+
 <script>
     let focusMinutes = 25;
     let restMinutes = 5;
@@ -193,6 +220,13 @@
     let blurTime = null;
     let hasFailed = false;
 
+    // PAUSE STATE
+    let isPaused = false;
+    let pausedRemainingMs = 0;
+    let pauseEndTime = 0;
+    let pauseTimerId = null;
+    const MAX_PAUSE_MINUTES = 5;
+
     // AUDIO (Now handled globally by window.audioManager)
 
     // PERSISTENCE
@@ -203,6 +237,7 @@
         const state = {
             focusMinutes, restMinutes, totalRounds, currentRound,
             isFocus, endTime,
+            isPaused, pausedRemainingMs, pauseEndTime,
             timestamp: Date.now()
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -226,12 +261,23 @@
             currentRound = state.currentRound;
             isFocus = state.isFocus;
             endTime = state.endTime;
+            isPaused = state.isPaused || false;
+            pausedRemainingMs = state.pausedRemainingMs || 0;
+            pauseEndTime = state.pauseEndTime || 0;
 
             const now = Date.now();
-            // If the session ended while we were away
-            if (endTime < now) {
-                // Technically we could fast forward rounds, but for simplicity
-                // let's just let the next tick() handle the transition or finish.
+
+            if (isPaused) {
+                // If the paused timer expired while we were away
+                if (pauseEndTime > 0 && pauseEndTime <= now) {
+                    autoAbortFromPause();
+                    return true;
+                }
+            } else {
+                // If the session ended while we were away (and not paused)
+                if (endTime > 0 && endTime <= now) {
+                    // Let the next tick() handle the transition or finish.
+                }
             }
 
             // Resume UI
@@ -241,10 +287,17 @@
             if (isFocus) updateUI("FOCUS PHASE", "cyan");
             else updateUI("RECOVERY PHASE", "#4caf50");
 
-            // Restart Timer
-            if (timerId) clearInterval(timerId);
-            timerId = setInterval(tick, 1000);
-            tick();
+            // Restart Timer or Pause State
+            if (isPaused) {
+                document.getElementById('pauseModal').style.display = 'flex';
+                if (pauseTimerId) clearInterval(pauseTimerId);
+                pauseTimerId = setInterval(pauseTick, 1000);
+                pauseTick(); // Immediate update
+            } else {
+                if (timerId) clearInterval(timerId);
+                timerId = setInterval(tick, 1000);
+                tick();
+            }
 
             return true;
         } catch (e) {
@@ -454,6 +507,101 @@
         window.location.href = "{{ url_for('main.dashboard') }}";
     }
 
+    // PAUSE LOGIC
+    function pauseSession() {
+        if (hasFailed || isPaused) return;
+
+        isPaused = true;
+        document.getElementById('pauseModal').style.display = 'flex';
+
+        if (timerId) {
+            clearInterval(timerId);
+            timerId = null;
+        }
+
+        const now = Date.now();
+        pausedRemainingMs = Math.max(0, endTime - now);
+        pauseEndTime = now + (MAX_PAUSE_MINUTES * 60 * 1000);
+
+        saveState();
+
+        if (pauseTimerId) clearInterval(pauseTimerId);
+        pauseTimerId = setInterval(pauseTick, 1000);
+        pauseTick();
+    }
+
+    function pauseTick() {
+        if (!isPaused) return;
+
+        const now = Date.now();
+        const diff = pauseEndTime - now;
+
+        if (!document.hidden) {
+            const secondsLeft = Math.max(0, Math.ceil(diff / 1000));
+            const m = Math.floor(secondsLeft / 60);
+            const s = secondsLeft % 60;
+            document.getElementById('pauseTimerDisplay').innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+
+        if (diff <= 0) {
+            clearInterval(pauseTimerId);
+            pauseTimerId = null;
+            autoAbortFromPause();
+        }
+    }
+
+    function resumeSession() {
+        if (!isPaused) return;
+
+        isPaused = false;
+        document.getElementById('pauseModal').style.display = 'none';
+
+        if (pauseTimerId) {
+            clearInterval(pauseTimerId);
+            pauseTimerId = null;
+        }
+
+        endTime = Date.now() + pausedRemainingMs;
+        pausedRemainingMs = 0;
+        pauseEndTime = 0;
+
+        saveState();
+
+        if (timerId) clearInterval(timerId);
+        timerId = setInterval(tick, 1000);
+        tick();
+    }
+
+    async function autoAbortFromPause() {
+        clearState();
+        if (pauseTimerId) clearInterval(pauseTimerId);
+
+        let salvagedMinutes = 0;
+        if (isFocus && pausedRemainingMs > 0) {
+            const durationMs = focusMinutes * 60 * 1000;
+            const elapsedMs = durationMs - pausedRemainingMs;
+            salvagedMinutes = Math.floor(elapsedMs / 1000 / 60);
+        }
+
+        if (salvagedMinutes > 0) {
+            try {
+                await fetch('/focus_complete', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    },
+                    body: JSON.stringify({ minutes: salvagedMinutes })
+                });
+            } catch (e) {
+                console.error("Failed to save partial progress on auto-abort:", e);
+            }
+        }
+
+        alert("Session paused for more than 5 minutes. Session aborted. Data salvaged: " + salvagedMinutes + " minutes.");
+        window.location.href = "{{ url_for('main.dashboard') }}";
+    }
+
     // VISIBILITY CHECK
     document.addEventListener("visibilitychange", () => {
         if (hasFailed) return;
@@ -469,12 +617,20 @@
         } else {
             // Returned to view
             // Update display immediately with correct time
-            if (endTime > 0) {
+            if (isPaused) {
+                if (pauseEndTime > 0) {
+                    const diff = pauseEndTime - Date.now();
+                    const secondsLeft = Math.max(0, Math.ceil(diff / 1000));
+                    const m = Math.floor(secondsLeft / 60);
+                    const s = secondsLeft % 60;
+                    document.getElementById('pauseTimerDisplay').innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                }
+            } else if (endTime > 0) {
                 const diff = endTime - Date.now();
                 updateTimerDisplay(Math.max(0, Math.ceil(diff / 1000)));
             }
 
-            if (isFocus && blurTime) {
+            if (isFocus && blurTime && !isPaused) {
                 const timeAway = (Date.now() - blurTime) / 1000;
 
                 // We allow screen-off now, so we removed the auto-fail.
