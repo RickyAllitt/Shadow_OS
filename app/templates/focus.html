@@ -394,6 +394,7 @@
     let timerId = null;
     let blurTime = null;
     let hasFailed = false;
+    let completedMinutesInSession = 0;
 
     // PAUSE STATE
     let isPaused = false;
@@ -417,6 +418,7 @@
             focusMinutes, restMinutes, totalRounds, currentRound,
             isFocus, endTime,
             isPaused, pausedRemainingMs, pauseEndTime,
+            completedMinutesInSession,
             timestamp: Date.now()
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -424,6 +426,7 @@
 
     function clearState() {
         localStorage.removeItem(STORAGE_KEY);
+        completedMinutesInSession = 0;
     }
 
     function restoreState() {
@@ -443,6 +446,7 @@
             isPaused = state.isPaused || false;
             pausedRemainingMs = state.pausedRemainingMs || 0;
             pauseEndTime = state.pauseEndTime || 0;
+            completedMinutesInSession = state.completedMinutesInSession || 0;
 
             const now = Date.now();
 
@@ -614,7 +618,19 @@
             body: JSON.stringify({ minutes: focusMinutes })
         }).then(res => res.json()).then(data => {
             console.log("Reward granted.");
+            const statusEl = document.getElementById('status');
+            statusEl.innerText = data.msg || "REWARDS SECURED";
+            statusEl.style.color = "gold";
+            setTimeout(() => {
+                if (!isFocus) {
+                    statusEl.innerText = "RECOVERY PHASE";
+                    statusEl.style.color = "#4caf50";
+                }
+            }, 3000);
         });
+
+        completedMinutesInSession += focusMinutes;
+        saveState();
 
         startRest();
     }
@@ -664,11 +680,22 @@
         }
 
         const msgElement = document.getElementById('abortMsg');
-        if (partialMinutesToSave > 0) {
-            msgElement.innerHTML = `TERMINATING SESSION.<br><br>DATA SALVAGE: <span style="color:cyan">${partialMinutesToSave} MINUTES</span> WILL BE SAVED.`;
-        } else {
-            msgElement.innerHTML = `TERMINATING SESSION.<br><br><span style="color:red">WARNING: NO DATA WILL BE SAVED.</span>`;
+        let htmlMsg = "TERMINATING SESSION.<br><br>";
+
+        if (completedMinutesInSession > 0) {
+            htmlMsg += `PREVIOUS ROUNDS SALVAGED: <span style="color:#4caf50">${completedMinutesInSession} MINUTES</span>.<br>`;
         }
+
+        if (partialMinutesToSave > 0) {
+            htmlMsg += `CURRENT ROUND SALVAGE: <span style="color:cyan">${partialMinutesToSave} MINUTES</span> WILL BE SAVED.`;
+        } else {
+            if (completedMinutesInSession > 0) {
+                htmlMsg += `<span style="color:#ccc">CURRENT ROUND (REST) CANCELLED.</span>`;
+            } else {
+                htmlMsg += `<span style="color:red">WARNING: NO DATA WILL BE SAVED.</span>`;
+            }
+        }
+        msgElement.innerHTML = htmlMsg;
 
         document.getElementById('abortModal').style.display = 'flex';
     }
@@ -790,7 +817,8 @@
             }
         }
 
-        alert("Session paused for more than 5 minutes. Session aborted. Data salvaged: " + salvagedMinutes + " minutes.");
+        let totalSalvaged = salvagedMinutes + completedMinutesInSession;
+        alert("Session paused for more than 5 minutes. Session aborted. Data salvaged: " + totalSalvaged + " minutes.");
         window.location.href = "{{ url_for('main.dashboard') }}";
     }
 
