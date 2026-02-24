@@ -797,6 +797,11 @@
                         <span class="quest-title {{ 'completed' if quest.is_completed }}"
                             style="font-weight:bold; word-wrap: break-word;">{{
                             quest.title }}</span>
+                        {% if category == 'SCHEDULED' and quest.due_date %}
+                        <span style="color: #00bcd4; font-size: 0.8em; margin-left: 10px; font-weight: normal;">📅 {{
+                            quest.due_date.strftime('%Y-%m-%d %H:%M') if quest.due_date.hour != 0 else
+                            quest.due_date.strftime('%Y-%m-%d') }}</span>
+                        {% endif %}
                         {% if quest.description %}
                         <button
                             onclick="const d=document.getElementById('desc-{{quest.id}}'); d.style.display=d.style.display==='none'?'block':'none'; this.innerText=d.style.display==='none'?'SHOW MORE':'SHOW LESS';"
