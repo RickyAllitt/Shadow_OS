@@ -383,6 +383,22 @@
     </div>
 </div>
 
+<!-- AUTO ABORT MODAL -->
+<div id="autoAbortModal"
+    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 999; align-items: center; justify-content: center; flex-direction: column;">
+    <h2 style="color: var(--color-danger); text-shadow: 0 0 10px var(--color-danger); margin-bottom: 20px;">SESSION ABORTED</h2>
+    <p id="autoAbortMsg"
+        style="color: #ccc; font-family: monospace; text-align: center; max-width: 400px; line-height: 1.5; margin-bottom: 40px;">
+        SESSION PAUSED FOR MORE THAN 5 MINUTES.
+    </p>
+    <button onclick="confirmAutoAbort()"
+        style="background: transparent; border: 1px solid cyan; color: cyan; padding: 10px 30px; cursor: pointer; transition: all 0.3s;"
+        onmouseover="this.style.backgroundColor='rgba(0, 255, 255, 0.1)'; this.style.boxShadow='0 0 10px cyan';"
+        onmouseout="this.style.backgroundColor='transparent'; this.style.boxShadow='none';">
+        ACKNOWLEDGE
+    </button>
+</div>
+
 <script>
     let focusMinutes = 25;
     let restMinutes = 5;
@@ -818,7 +834,12 @@
         }
 
         let totalSalvaged = salvagedMinutes + completedMinutesInSession;
-        alert("Session paused for more than 5 minutes. Session aborted. Data salvaged: " + totalSalvaged + " minutes.");
+        document.getElementById('autoAbortMsg').innerHTML = `SESSION PAUSED FOR MORE THAN 5 MINUTES.<br>SESSION ABORTED.<br><br>DATA SALVAGED: <span style="color:cyan">${totalSalvaged} MINUTES</span>.`;
+        document.getElementById('pauseModal').style.display = 'none';
+        document.getElementById('autoAbortModal').style.display = 'flex';
+    }
+
+    function confirmAutoAbort() {
         window.location.href = "{{ url_for('main.dashboard') }}";
     }
 
