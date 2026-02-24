@@ -788,27 +788,42 @@
             {% else %}
             {% for quest in items %}
             <div class="quest-card priority-{{ quest.priority }} {{ 'completed' if quest.is_completed }}"
-                style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.03); padding:15px; margin-bottom:10px; border-radius:5px;">
-                <div class="u-flex-grow-1">
-                    <span class="rank-badge rank-{{ quest.rank.lower() }}"
-                        style="background:rgba(255,255,255,0.1); padding:2px 8px; border-radius:3px; font-weight:bold; font-size:0.8em; margin-right:10px;">{{
-                        quest.rank }}</span>
-                    <span class="quest-title {{ 'completed' if quest.is_completed }}" style="font-weight:bold;">{{
-                        quest.title }}</span>
-                    <div class="u-flex u-align-center u-gap-5 u-mt-5">
-                        <div style="flex-grow:1; height:4px; background:#333; border-radius:2px;">
-                            <div class="js-prog-fill" data-width="{{ quest.progress }}"
-                                style="height:100%; background:var(--color-primary); width:0;"></div>
+                style="display:flex; flex-direction:column; background:rgba(255,255,255,0.03); padding:15px; margin-bottom:10px; border-radius:5px;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; width: 100%;">
+                    <div class="u-flex-grow-1" style="min-width: 0; padding-right: 15px;">
+                        <span class="rank-badge rank-{{ quest.rank.lower() }}"
+                            style="background:rgba(255,255,255,0.1); padding:2px 8px; border-radius:3px; font-weight:bold; font-size:0.8em; margin-right:10px;">{{
+                            quest.rank }}</span>
+                        <span class="quest-title {{ 'completed' if quest.is_completed }}"
+                            style="font-weight:bold; word-wrap: break-word;">{{
+                            quest.title }}</span>
+                        {% if quest.description %}
+                        <button
+                            onclick="const d=document.getElementById('desc-{{quest.id}}'); d.style.display=d.style.display==='none'?'block':'none'; this.innerText=d.style.display==='none'?'SHOW MORE':'SHOW LESS';"
+                            style="background:transparent; border:1px solid #555; border-radius:3px; color:#aaa; margin-left:10px; padding:2px 6px; font-size:0.7em; cursor:pointer; vertical-align: middle;">SHOW
+                            MORE</button>
+                        {% endif %}
+                        <div class="u-flex u-align-center u-gap-5 u-mt-10">
+                            <div style="flex-grow:1; height:4px; background:#333; border-radius:2px;">
+                                <div class="js-prog-fill" data-width="{{ quest.progress }}"
+                                    style="height:100%; background:var(--color-primary); width:0;"></div>
+                            </div>
+                            <span class="u-font-small u-color-muted" style="min-width: 35px; text-align: right;">{{
+                                quest.progress }}%</span>
                         </div>
-                        <span class="u-font-small u-color-muted">{{ quest.progress }}%</span>
+                    </div>
+                    <div class="u-flex u-gap-10 u-align-center" style="white-space: nowrap;">
+                        <a href="/edit_quest/{{ quest.id }}" class="u-color-muted u-text-decoration-none">✎</a>
+                        <a href="/delete_quest/{{ quest.id }}" class="u-color-danger u-text-decoration-none">✖</a>
+                        {% if not quest.is_completed %}<a href="/complete/{{ quest.id }}" class="btn-complete">✓</a>{%
+                        endif %}
                     </div>
                 </div>
-                <div class="u-flex u-gap-10 u-align-center">
-                    <a href="/edit_quest/{{ quest.id }}" class="u-color-muted u-text-decoration-none">✎</a>
-                    <a href="/delete_quest/{{ quest.id }}" class="u-color-danger u-text-decoration-none">✖</a>
-                    {% if not quest.is_completed %}<a href="/complete/{{ quest.id }}" class="btn-complete">✓</a>{% endif
-                    %}
-                </div>
+                {% if quest.description %}
+                <div id="desc-{{quest.id}}"
+                    style="display:none; margin-top:10px; padding:10px 15px; background:rgba(0,0,0,0.5); border-left:2px solid var(--color-primary); border-radius:0 4px 4px 0; color:#ddd; font-size:0.9em; white-space:pre-wrap; text-align: left; width: 100%; box-sizing: border-box; line-height: 1.4;">
+                    {{- quest.description.strip() }}</div>
+                {% endif %}
             </div>
             {% endfor %}
             {% endif %}
