@@ -237,8 +237,8 @@ def process_quest_completion(player, quest):
     if quest.gold_reward and quest.gold_reward > 0:
         base_gold = quest.gold_reward
         
-    # User Rule: Dailies give NO Gold and NO XP (individually).
-    if quest.is_daily:
+    # User Rule: Dailies and Penalties give NO rewards.
+    if quest.is_daily or quest.is_penalty:
         base_gold = 0
         base_xp = 0
         base_coins = 0
@@ -270,8 +270,8 @@ def process_quest_completion(player, quest):
         player.xp = player.xp_required
         print(f">> S-RANK BONUS: Instant Level Up for {player.name}")
 
-    # 2. Apply Stat Buffs (Only for Rank B+ and NOT Daily)
-    if quest.rank in ['B', 'A', 'S'] and not quest.is_daily:
+    # 2. Apply Stat Buffs (Only for Rank B+ and NOT Daily/Penalty)
+    if quest.rank in ['B', 'A', 'S'] and not quest.is_daily and not quest.is_penalty:
         _apply_quest_stat_reward(player, quest)
     
     # 3. Daily Completion Bonus (+100 Gold + 50 XP)
