@@ -891,10 +891,10 @@ def setup_page():
             
         # Create Quests
         quests_data = [
-            {'title': q1, 'rank': request.form.get('quest1_rank', 'E'), 'stat': request.form.get('quest1_stat', 'STR')},
-            {'title': q2, 'rank': request.form.get('quest2_rank', 'E'), 'stat': request.form.get('quest2_stat', 'STR')},
-            {'title': q3, 'rank': request.form.get('quest3_rank', 'E'), 'stat': request.form.get('quest3_stat', 'STR')},
-            {'title': q4, 'rank': request.form.get('quest4_rank', 'E'), 'stat': request.form.get('quest4_stat', 'STR')},
+            {'title': q1, 'rank': request.form.get('quest1_rank', 'E'), 'stat': request.form.get('quest1_stat', 'STR'), 'desc': request.form.get('quest1_description')},
+            {'title': q2, 'rank': request.form.get('quest2_rank', 'E'), 'stat': request.form.get('quest2_stat', 'STR'), 'desc': request.form.get('quest2_description')},
+            {'title': q3, 'rank': request.form.get('quest3_rank', 'E'), 'stat': request.form.get('quest3_stat', 'STR'), 'desc': request.form.get('quest3_description')},
+            {'title': q4, 'rank': request.form.get('quest4_rank', 'E'), 'stat': request.form.get('quest4_stat', 'STR'), 'desc': request.form.get('quest4_description')},
         ]
 
         xp_map = {'E': 10, 'D': 20, 'C': 50, 'B': 100, 'A': 200, 'S': 500}
@@ -903,6 +903,7 @@ def setup_page():
             xp_reward = xp_map.get(q_data['rank'], 10)
             quest = Quest(
                 title=q_data['title'],
+                description=q_data['desc'],
                 rank=q_data['rank'],
                 xp_reward=xp_reward,
                 stat_reward=q_data['stat'],
@@ -913,6 +914,7 @@ def setup_page():
             
         # Update Player
         current_user.penalty_description = penalty
+        current_user.penalty_detail = request.form.get('penalty_detail')
         current_user.setup_complete = True
         
         db.session.commit()

@@ -41,6 +41,7 @@ with app.app_context():
 
         penalty = Quest(
             title="PENALTY: Survival run (5km)",
+            description=player.penalty_detail,
             rank="A",
             player_id=player.id,
             xp_reward=0,

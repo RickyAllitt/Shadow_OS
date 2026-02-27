@@ -61,7 +61,9 @@ class Player(UserMixin, db.Model):
     # --- ONBOARDING & CORE ---
     setup_complete = db.Column(db.Boolean, default=False)
     penalty_description = db.Column(db.String(255), default="Survival") # Custom punishment
+    penalty_detail = db.Column(db.Text, nullable=True) # Long-form description
     penalties_count = db.Column(db.Integer, default=0) # Track number of times in Penalty Zone
+
     
     # Condition affects XP gain. 
     # "Healthy" (100% XP), "Well Rested" (110% XP), "Exhausted" (50% XP)

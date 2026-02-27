@@ -523,6 +523,7 @@ def check_daily_reset(player):
 
                     penalty = Quest(
                         title=f"PENALTY: {player.penalty_description}", 
+                        description=player.penalty_detail,
                         rank="A", # CHANGED FROM S
                         player_id=player.id,
                         xp_reward=0, 
