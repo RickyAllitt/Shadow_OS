@@ -11,6 +11,7 @@ def load_user(user_id):
 class Player(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     quests = db.relationship('Quest', backref='player', lazy=True, cascade="all, delete-orphan")
     
     # --- AUTHENTICATION ---
@@ -80,6 +81,8 @@ class Player(UserMixin, db.Model):
     last_daily_bonus = db.Column(db.DateTime, nullable=True) # Track if +100g prompt claimed today
     consecutive_missed_days = db.Column(db.Integer, default=0)
     has_debuff = db.Column(db.Boolean, default=False)
+    current_streak = db.Column(db.Integer, default=0)
+    highest_streak = db.Column(db.Integer, default=0)
     # If set, this is the deadline for the "System" penalty quest.
     penalty_deadline = db.Column(db.DateTime, nullable=True) 
 

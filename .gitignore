@@ -44,3 +44,4 @@ reproduce_*.py
 migrate_data.py
 verify_db_connection.py
 fix_db.py
+update_db.py

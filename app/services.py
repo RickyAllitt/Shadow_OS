@@ -493,6 +493,7 @@ def check_daily_reset(player):
         
         if not success:
             # FAILURE LOGIC
+            player.current_streak = 0
             player.consecutive_missed_days += 1
             player.penalties_count += 1
             
@@ -566,6 +567,10 @@ def check_daily_reset(player):
             # SUCCESS LOGIC
             player.consecutive_missed_days = 0
             player.has_debuff = False
+            
+            player.current_streak += 1
+            if player.current_streak > player.highest_streak:
+                player.highest_streak = player.current_streak
             
         # Reset Dailies (Prepare for next day iteration)
         for quest in dailies:

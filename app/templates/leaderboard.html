@@ -16,8 +16,11 @@
                     <th style="text-align: left; padding: 10px;">TITLE</th>
                     <th style="text-align: right; padding: 10px;">LEVEL</th>
                     <th style="text-align: left; padding: 10px;">CLASS</th>
+                    <th style="text-align: center; padding: 10px;">STREAK</th>
+                    <th style="text-align: center; padding: 10px;">BEST</th>
                     <th style="text-align: left; padding: 10px;">FAILURES</th>
                     <th style="text-align: left; padding: 10px;">VACATIONS</th>
+                    <th style="text-align: right; padding: 10px;">JOINED</th>
                 </tr>
             </thead>
             <tbody>
@@ -46,11 +49,20 @@
                     <td style="padding: 15px; color: #b19cd9;">
                         {{ player.job_class if player.job_class != 'None' else '-' }}
                     </td>
+                    <td style="padding: 15px; color: #4CAF50; font-weight: bold; text-align: center;">
+                        {{ player.current_streak }} 🔥
+                    </td>
+                    <td style="padding: 15px; color: #FFD700; font-weight: bold; text-align: center;">
+                        {{ player.highest_streak }} 🏆
+                    </td>
                     <td style="padding: 15px; color: red; font-weight: bold; text-align: center;">
                         {{ player.penalties_count }}
                     </td>
                     <td style="padding: 15px; color: cyan; font-weight: bold; text-align: center;">
                         {{ player.vacation_count }}
+                    </td>
+                    <td style="padding: 15px; color: #aaa; text-align: right; font-size: 0.9em;">
+                        {{ player.created_at.strftime('%Y-%m-%d') if player.created_at else '-' }}
                     </td>
                 </tr>
                 {% endfor %}
