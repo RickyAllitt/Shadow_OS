@@ -64,7 +64,7 @@
             flex-direction: column !important;
             text-align: center !important;
             gap: 20px;
-            margin-top: 40px;
+            margin-top: 80px;
             /* Clear fixed buttons */
         }
 
@@ -791,23 +791,25 @@
                 style="display:flex; flex-direction:column; background:rgba(255,255,255,0.03); padding:15px; margin-bottom:10px; border-radius:5px;">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; width: 100%;">
                     <div class="u-flex-grow-1" style="min-width: 0; padding-right: 15px;">
-                        <span class="rank-badge rank-{{ quest.rank.lower() }}"
-                            style="background:rgba(255,255,255,0.1); padding:2px 8px; border-radius:3px; font-weight:bold; font-size:0.8em; margin-right:10px;">{{
-                            quest.rank }}</span>
-                        <span class="quest-title {{ 'completed' if quest.is_completed }}"
-                            style="font-weight:bold; word-wrap: break-word;">{{
-                            quest.title }}</span>
-                        {% if category == 'SCHEDULED' and quest.due_date %}
-                        <span style="color: #00bcd4; font-size: 0.8em; margin-left: 10px; font-weight: normal;">📅 {{
-                            quest.due_date.strftime('%Y-%m-%d %H:%M') if quest.due_date.hour != 0 else
-                            quest.due_date.strftime('%Y-%m-%d') }}</span>
-                        {% endif %}
-                        {% if quest.description %}
-                        <button
-                            onclick="const d=document.getElementById('desc-{{quest.id}}'); d.style.display=d.style.display==='none'?'block':'none'; this.innerText=d.style.display==='none'?'SHOW MORE':'SHOW LESS';"
-                            style="background:transparent; border:1px solid #555; border-radius:3px; color:#aaa; margin-left:10px; padding:2px 6px; font-size:0.7em; cursor:pointer; vertical-align: middle;">SHOW
-                            MORE</button>
-                        {% endif %}
+                        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
+                            <span class="rank-badge rank-{{ quest.rank.lower() }}"
+                                style="background:rgba(255,255,255,0.1); padding:2px 8px; border-radius:3px; font-weight:bold; font-size:0.8em; margin: 0;">{{
+                                quest.rank }}</span>
+                            <span class="quest-title {{ 'completed' if quest.is_completed }}"
+                                style="font-weight:bold; word-wrap: break-word; margin: 0;">{{
+                                quest.title }}</span>
+                            {% if category == 'SCHEDULED' and quest.due_date %}
+                            <span style="color: #00bcd4; font-size: 0.8em; font-weight: normal; margin: 0;">📅 {{
+                                quest.due_date.strftime('%Y-%m-%d %H:%M') if quest.due_date.hour != 0 else
+                                quest.due_date.strftime('%Y-%m-%d') }}</span>
+                            {% endif %}
+                            {% if quest.description %}
+                            <button
+                                onclick="const d=document.getElementById('desc-{{quest.id}}'); d.style.display=d.style.display==='none'?'block':'none'; this.innerText=d.style.display==='none'?'SHOW MORE':'SHOW LESS';"
+                                style="background:transparent; border:1px solid #555; border-radius:3px; color:#aaa; padding:2px 6px; font-size:0.7em; cursor:pointer; margin: 0; min-width: fit-content;">SHOW
+                                MORE</button>
+                            {% endif %}
+                        </div>
                         <div class="u-flex u-align-center u-gap-5 u-mt-10">
                             <div style="flex-grow:1; height:4px; background:#333; border-radius:2px;">
                                 <div class="js-prog-fill" data-width="{{ quest.progress }}"
@@ -817,7 +819,7 @@
                                 quest.progress }}%</span>
                         </div>
                     </div>
-                    <div class="u-flex u-gap-10 u-align-center" style="white-space: nowrap;">
+                    <div class="u-flex u-gap-10 u-align-center" style="white-space: nowrap; flex-shrink: 0;">
                         <a href="/edit_quest/{{ quest.id }}" class="u-color-muted u-text-decoration-none">✎</a>
                         <a href="/delete_quest/{{ quest.id }}" class="u-color-danger u-text-decoration-none">✖</a>
                         {% if not quest.is_completed %}<a href="/complete/{{ quest.id }}" class="btn-complete">✓</a>{%
