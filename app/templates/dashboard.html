@@ -850,12 +850,14 @@
                                 MORE</button>
                             {% endif %}
                         </div>
+                        {% if quest.progress > 0 %}
                         <div class="quest-progress-wrapper u-flex u-align-center u-gap-10 u-mt-15" style="width: 100%;">
                             <div class="quest-progress-container">
                                 <div class="quest-progress-fill" data-width="{{ quest.progress }}"></div>
                             </div>
                             <span class="quest-progress-text">{{ quest.progress }}%</span>
                         </div>
+                        {% endif %}
                     </div>
                     <div class="u-flex u-gap-10 u-align-center" style="white-space: nowrap; flex-shrink: 0;">
                         <a href="/edit_quest/{{ quest.id }}" class="u-color-muted u-text-decoration-none">✎</a>

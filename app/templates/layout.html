@@ -14,7 +14,8 @@
     <script src="{{ url_for('static', filename='js/audio_manager.js') }}"></script>
 </head>
 
-<body class="{% if current_user.is_authenticated and current_user.has_debuff %}glitch-theme{% endif %}">
+<body
+    class="{% if current_user.is_authenticated and current_user.has_debuff and request.endpoint == 'main.dashboard' %}glitch-theme{% endif %}">
 
     {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
