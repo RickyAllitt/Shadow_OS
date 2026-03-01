@@ -280,6 +280,9 @@ def process_quest_completion(player, quest):
     quest.is_completed = True
     quest.completed_at = datetime.now(timezone.utc)
     
+    if quest.is_daily:
+        quest.progress = 0
+    
     # 1. Calculate Rewards
     # 1. Calculate Rewards (Pass Level for Scaling)
     base_xp, base_gold, base_coins = calculate_rewards(quest.rank, player.level)
