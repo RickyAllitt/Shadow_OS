@@ -26,19 +26,21 @@
 
 <div class="dashboard-grid">
     <div class="panel" style="grid-column: 1 / -1; max-width: 1600px; margin: 0 auto; width: 95%;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <div class="shop-header u-flex-column-mobile"
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <div>
                 <h2 style="margin: 0;">SYSTEM SHOP</h2>
-                <div style="font-size: 0.9em; margin-top: 5px; color: var(--color-gold);">
+                <div class="balance-display" style="font-size: 0.9em; margin-top: 5px; color: var(--color-gold);">
                     <span id="playerGold">{{ player.gold }}</span> G
                     <span style="color: #666;">|</span>
                     <span id="playerCoins" style="color: var(--color-purple-light);">{{ player.coins }}</span> C
                 </div>
             </div>
-            <div style="display: flex; gap: 10px;">
+            <div class="shop-header-actions" style="display: flex; gap: 10px;">
                 <button onclick="document.getElementById('shopHistoryModal').style.display='flex'" class="btn-small"
                     style="background: transparent; border: 1px solid #444;">HISTORY</button>
-                <a href="{{ url_for('main.dashboard') }}" class="btn-small">BACK TO DASHBOARD</a>
+                <a href="{{ url_for('main.dashboard') }}" class="btn-small" style="text-align: center;">BACK TO
+                    DASHBOARD</a>
             </div>
         </div>
 
@@ -61,7 +63,7 @@
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px;">
                 {% for item in type_group %}
                 <div class="shop-item"
-                    style="border: 1px solid #333; padding: 15px; background: rgba(255,255,255,0.05); display: flex; flex-direction: column; justify-content: space-between;">
+                    style="border: 1px solid #333; padding: 15px; background: rgba(255,255,255,0.05); display: flex; flex-direction: column; justify-content: space-between; height: 100%;">
                     <div style="margin-bottom: 10px;">
                         <div class="item-name" style="font-weight: bold; color: #fff;">{{ item.name }}</div>
                         {% if item.description %}

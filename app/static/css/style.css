@@ -127,9 +127,61 @@ a {
     align-items: start;
 }
 
+/* RESPONSIVENESS */
 @media (max-width: 900px) {
     .dashboard-grid {
         grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+
+    /* Top Nav specific wrapping for Mobile */
+    .top-nav-bar {
+        position: static !important;
+        justify-content: center;
+        flex-wrap: wrap;
+        width: 100%;
+        margin-bottom: 20px;
+        padding: 10px 0;
+        border-bottom: 1px solid #333;
+        background: rgba(0, 0, 0, 0.8) !important;
+    }
+
+    .top-nav-bar button,
+    .top-nav-bar a {
+        font-size: 0.8em;
+        padding: 5px 8px !important;
+    }
+
+    /* Wrap the flex rows natively */
+    .u-flex-column-mobile {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 15px !important;
+    }
+
+    .shop-header h2 {
+        text-align: center;
+    }
+
+    .shop-header .balance-display {
+        text-align: center;
+        margin-bottom: 10px;
+    }
+
+    /* Make Shop Buttons Full Width */
+    .shop-header-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        width: 100%;
+    }
+
+    .shop-header-actions button,
+    .shop-header-actions a {
+        width: 100%;
+        text-align: center;
     }
 }
 

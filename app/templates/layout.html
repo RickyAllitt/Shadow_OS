@@ -36,7 +36,7 @@
     {% endwith %}
 
     {% if current_user.is_authenticated %}
-    <div style="position: fixed; top: 20px; right: 20px; z-index: 100; display: flex; gap: 10px;">
+    <div class="top-nav-bar" style="position: fixed; top: 20px; right: 20px; z-index: 100; display: flex; gap: 10px;">
         <!-- NOTIFICATIONS BELL -->
         <button onclick="openNotificationInbox()"
             style="position: relative; background: rgba(0,0,0,0.5); border: 1px solid #aaa; color: #ffeb3b; padding: 5px 10px; cursor: pointer; font-family: 'Courier New', monospace; font-weight: bold; margin-right: 5px;">
@@ -230,9 +230,11 @@
         {% set js_vol = current_user.settings_volume if current_user.settings_volume is not none else 0.5 %}
         // Init volume from server state
         if (window.audioManager) {
-            window.audioManager.setVolume({{ js_vol }});
-        // Init audio enabled state
-        window.audioManager.enabled = {{ 'true' if current_user.settings_audio else 'false' }};
+            var jsVol = parseFloat("{{ current_user.settings_volume if current_user.settings_volume is not none else 0.5 }}");
+            window.audioManager.setVolume(jsVol);
+            // Init audio enabled state
+            var isAudioEnabled = "{{ 'true' if current_user.settings_audio else 'false' }}" === "true";
+            window.audioManager.enabled = isAudioEnabled;
         }
 
         function updateVolumeLabel(val) {
