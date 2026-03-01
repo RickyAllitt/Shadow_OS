@@ -152,9 +152,7 @@ def buy_item(item_id):
     player = current_user
     
     # PENALTY CHECK
-    if player.in_penalty_zone:
-        flash("SYSTEM LOCK: Cannot access shop in Penalty Zone.", "error")
-        return redirect(url_for('main.dashboard'))
+    # Removed: Shop is no longer locked during a penalty
     
     if not item:
         return redirect(url_for('main.dashboard'))
@@ -421,56 +419,66 @@ def edit_quest(id):
         return redirect(url_for('main.dashboard'))
         
     if request.method == 'POST':
-        # Restriction Check for Dailies
-        if quest.is_daily:
-            # Check if this is a "rewrite reality" attempt (editing restricted fields)
-            # Simplified: Use a specific button or parameter, OR just check if fields are present in form
-            # The form submits everything.
-            
-            # Check if user explicitly authorized the cost via a checkbox or button? 
-            # Ideally yes, but for now we can rely on flash warning if they fail, or just do it.
-            # But wait, the form fields are DISABLED in the template for dailies.
-            # We need to UNLOCK them in the template or handle the logic here?
-            # The plan said "Modify edit_quest route... Charge Flat Fee".
-            
-            # If the user is submitting changes to title/desc/rank etc, they must have bypassed the HTML disabled check
-            # OR we need to update the template to allow editing but warn about cost.
-            
-            # Let's assume we updating the template to enable fields and show verify message.
-            # For this step, let's implement the backend logic assuming fields are sent.
-            
-            # If we want to allow editing dailies now, we must process the standard logic BUT add a cost check.
-            
-            cost = 250
-            if current_user.coins < cost:
-                flash(f"Insufficient Coins. Modifying a Daily Quest requires {cost} Coins.", "error")
-                return redirect(url_for('main.dashboard'))
-                
-            current_user.coins -= cost
-            flash(f"Reality Rewritten. -{cost} Coins.", "system_popup")
-            
-            # Fall through to Normal Quest Logic (Validation/Update)
-            pass 
-
-
-        # Normal Quest Logic
-        quest.title = request.form.get('title')
-        quest.description = request.form.get('description')
-        quest.rank = request.form.get('rank')
-        quest.stat_reward = request.form.get('stat')
+        new_title = request.form.get('title')
+        new_description = request.form.get('description')
+        new_rank = request.form.get('rank')
+        new_stat = request.form.get('stat')
         
         start_str = request.form.get('start_date')
         due_str = request.form.get('due_date')
+        new_priority_str = request.form.get('priority')
         
-        quest.start_date = datetime.strptime(start_str, '%Y-%m-%d') if start_str else None
-        quest.due_date = datetime.strptime(due_str, '%Y-%m-%d') if due_str else None
+        # Restriction Check for Dailies
+        restricted_modified = False
+        can_rewrite_reality = False
         
-        quest.is_daily = True if request.form.get('is_daily') else False
-        quest.priority = int(request.form.get('priority', 4))
-        
-        # Progress
+        if quest.is_daily:
+            if new_title is not None and new_title != quest.title: restricted_modified = True
+            if new_rank is not None and new_rank != quest.rank: restricted_modified = True
+            if new_stat is not None and new_stat != quest.stat_reward: restricted_modified = True
+            if new_priority_str is not None and int(new_priority_str) != quest.priority: restricted_modified = True
+            
+            if start_str is not None:
+                new_start = datetime.strptime(start_str, '%Y-%m-%d') if start_str else None
+                if new_start != quest.start_date: restricted_modified = True
+            if due_str is not None:
+                new_due = datetime.strptime(due_str, '%Y-%m-%d') if due_str else None
+                if new_due != quest.due_date: restricted_modified = True
+                
+            if restricted_modified:
+                cost = 250
+                if current_user.coins >= cost:
+                    current_user.coins -= cost
+                    flash(f"Reality Rewritten. -{cost} Coins.", "system_popup")
+                    can_rewrite_reality = True
+                else:
+                    flash(f"Insufficient Coins. Modifying a Daily Quest's core attributes requires {cost} Coins.", "error")
+            
+            # Apply restricted fields ONLY IF they weren't modified OR they paid for it
+            if not restricted_modified or can_rewrite_reality:
+                if new_title is not None: quest.title = new_title
+                if new_rank is not None: quest.rank = new_rank
+                if new_stat is not None: quest.stat_reward = new_stat
+                if new_priority_str is not None: quest.priority = int(new_priority_str)
+                if start_str is not None: quest.start_date = datetime.strptime(start_str, '%Y-%m-%d') if start_str else None
+                if due_str is not None: quest.due_date = datetime.strptime(due_str, '%Y-%m-%d') if due_str else None
+        else:
+            # Normal Quest Logic
+            if new_title is not None: quest.title = new_title
+            if new_rank is not None: quest.rank = new_rank
+            if new_stat is not None: quest.stat_reward = new_stat
+            if new_priority_str is not None: quest.priority = int(new_priority_str)
+            if start_str is not None: quest.start_date = datetime.strptime(start_str, '%Y-%m-%d') if start_str else None
+            if due_str is not None: quest.due_date = datetime.strptime(due_str, '%Y-%m-%d') if due_str else None
+            quest.is_daily = True if request.form.get('is_daily') else False
+
+        # Non-restricted updates (ALWAYS updated)
+        if new_description is not None:
+            quest.description = new_description
+
         try:
-             quest.progress = int(request.form.get('progress', 0))
+             # Default to current progress if not provided
+             quest.progress = int(request.form.get('progress', quest.progress))
         except ValueError:
              pass
              
@@ -480,12 +488,14 @@ def edit_quest(id):
             comment = QuestComment(content=new_comment_text.strip(), quest_id=quest.id)
             db.session.add(comment)
         
-        # Recalculate XP if rank changes? Yes.
+        # Recalculate XP if rank changes
         xp_map = {'E': 10, 'D': 20, 'C': 50, 'B': 100, 'A': 200, 'S': 500}
         quest.xp_reward = xp_map.get(quest.rank, 10)
         
         db.session.commit()
-        flash("Quest updated.", "system_popup")
+        if not (quest.is_daily and restricted_modified and not can_rewrite_reality):
+            flash("Quest updated.", "system_popup")
+            
         return redirect(url_for('main.dashboard'))
         
     # Reuse dashboard? Or render a specific edit page?

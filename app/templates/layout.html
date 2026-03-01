@@ -52,7 +52,7 @@
     {% endif %}
 
     <div
-        class="system-container {% if current_user.is_authenticated and current_user.in_penalty_zone %}penalty-mode{% endif %}">
+        class="system-container {% if current_user.is_authenticated and current_user.in_penalty_zone and request.endpoint == 'main.dashboard' %}penalty-mode{% endif %}">
         {% block content %}{% endblock %}
     </div>
 

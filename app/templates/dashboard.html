@@ -373,6 +373,46 @@
         width: 0;
     }
 
+    .quest-progress-container {
+        flex-grow: 1;
+        height: 10px;
+        background: rgba(0, 0, 0, 0.4);
+        border: 1px solid #333;
+        border-radius: 5px;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .quest-progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--color-primary-dim), var(--color-primary));
+        box-shadow: 0 0 10px var(--color-primary-glow);
+        width: 0;
+        transition: width 0.8s ease-in-out;
+    }
+
+    .quest-progress-text {
+        min-width: 45px;
+        text-align: right;
+        font-weight: bold;
+        color: var(--color-primary);
+        font-size: 0.85em;
+        text-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
+    }
+
+    @media (max-width: 600px) {
+        .quest-progress-wrapper {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 8px !important;
+        }
+
+        .quest-progress-text {
+            text-align: right;
+            width: 100%;
+        }
+    }
+
     /* EQUIPMENT SLOTS */
     .slot-box {
         background: rgba(0, 0, 0, 0.3);
@@ -810,13 +850,11 @@
                                 MORE</button>
                             {% endif %}
                         </div>
-                        <div class="u-flex u-align-center u-gap-5 u-mt-10">
-                            <div style="flex-grow:1; height:4px; background:#333; border-radius:2px;">
-                                <div class="js-prog-fill" data-width="{{ quest.progress }}"
-                                    style="height:100%; background:var(--color-primary); width:0;"></div>
+                        <div class="quest-progress-wrapper u-flex u-align-center u-gap-10 u-mt-15" style="width: 100%;">
+                            <div class="quest-progress-container">
+                                <div class="quest-progress-fill" data-width="{{ quest.progress }}"></div>
                             </div>
-                            <span class="u-font-small u-color-muted" style="min-width: 35px; text-align: right;">{{
-                                quest.progress }}%</span>
+                            <span class="quest-progress-text">{{ quest.progress }}%</span>
                         </div>
                     </div>
                     <div class="u-flex u-gap-10 u-align-center" style="white-space: nowrap; flex-shrink: 0;">
@@ -1088,7 +1126,7 @@
         }
 
         // Progress Bars
-        document.querySelectorAll('.js-fill, .js-prog-fill').forEach(el => {
+        document.querySelectorAll('.js-fill, .js-prog-fill, .quest-progress-fill').forEach(el => {
             const w = el.getAttribute('data-width');
             if (w) el.style.width = w + '%';
         });

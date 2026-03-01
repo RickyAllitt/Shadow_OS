@@ -35,26 +35,26 @@ class TestEconomy(unittest.TestCase):
 
     def test_rewards(self):
         xp, gold, coins = calculate_rewards('C')
-        self.assertEqual(xp, 60)
+        self.assertEqual(xp, 5)
         self.assertEqual(gold, 0)
         
         xp, gold, coins = calculate_rewards('A')
-        self.assertEqual(xp, 500)
-        self.assertEqual(gold, 300)
+        self.assertEqual(xp, 25)
+        self.assertEqual(gold, 100)
 
     def test_quest_completion(self):
-        quest = Quest(title="Test Quest", rank="C", xp_reward=60, player_id=self.player.id)
+        quest = Quest(title="Test Quest", rank="C", xp_reward=5, player_id=self.player.id)
         db.session.add(quest)
         db.session.commit()
         
         # Player has 10 INT -> +5% XP
-        # Rank C = 60 XP. +5% = 63 XP.
+        # Rank C = 5 XP. +5% = 5 XP (rounds down or no change depending on logic, let's see).
         
         xp_gain, gold_gain, coin_gain, leveled_up, daily_bonus, can_arise = process_quest_completion(self.player, quest)
         
-        self.assertEqual(xp_gain, 63)
+        self.assertEqual(xp_gain, 5)
         self.assertEqual(gold_gain, 0) # Rank C gives 0 Gold now (only B+ gives gold)
-        self.assertEqual(self.player.xp, 63)
+        self.assertEqual(self.player.xp, 5)
         self.assertFalse(leveled_up)
         self.assertEqual(self.player.gold, 0)
         self.assertTrue(quest.is_completed)

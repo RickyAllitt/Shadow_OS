@@ -43,14 +43,6 @@
         </div>
 
         <div id="shopContent">
-            {% if player.in_penalty_zone %}
-            <div style="text-align: center; padding: 20px; color: var(--color-danger);">
-                <span class="material-icons" style="font-size: 3em;">lock</span>
-                <p>LOCKED: PENALTY ACTIVE</p>
-                <p style="font-size: 0.8em;">Complete your Penalty Quest to restore access.</p>
-            </div>
-            {% else %}
-
             {% for currency, currency_group in shop_items|groupby('currency') %}
 
             <div style="margin-top: 30px; margin-bottom: 10px; border-bottom: 1px solid #444; padding-bottom: 5px;">
@@ -120,8 +112,6 @@
             </div>
             {% endfor %}
             {% endfor %}
-
-            {% endif %}
         </div>
     </div>
 </div>
