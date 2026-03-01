@@ -28,7 +28,7 @@ class AudioManager {
         if (sound) {
             sound.currentTime = 0;
             // Human hearing is logarithmic, so an exponential curve makes the linear slider feel correct
-            const MASTER_VOLUME_CAP = 0.2; // 20%
+            const MASTER_VOLUME_CAP = 1.0; // 100%
             sound.volume = Math.pow(this.volume, 2) * MASTER_VOLUME_CAP;
 
             // Play and catch potential "user interaction required" errors silently
