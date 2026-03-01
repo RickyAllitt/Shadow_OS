@@ -970,15 +970,16 @@ def end_vacation_route():
 
 # --- NOTIFICATION API ---
 
-@bp.route('/api/notifications/unread')
+@bp.route('/api/notifications/all')
 @login_required
-def get_unread_notifications():
-    # Fetch unread
-    notifs = Notification.query.filter_by(player_id=current_user.id, is_read=False).order_by(Notification.created_at.desc()).all()
+def get_all_notifications():
+    # Fetch all recent notifications for the Inbox
+    notifs = Notification.query.filter_by(player_id=current_user.id).order_by(Notification.created_at.desc()).limit(50).all()
     data = [{
         'id': n.id,
         'message': n.message,
         'category': n.category,
+        'is_read': n.is_read,
         'created_at': n.created_at.isoformat()
     } for n in notifs]
     return jsonify(data)
@@ -990,6 +991,64 @@ def mark_notifications_read():
     if ids:
         Notification.query.filter(Notification.id.in_(ids), Notification.player_id == current_user.id).update({Notification.is_read: True}, synchronize_session=False)
         db.session.commit()
+    return jsonify({'success': True})
+
+@bp.route('/api/notifications/mark_read_all', methods=['POST'])
+@login_required
+def mark_all_notifications_read():
+    Notification.query.filter_by(player_id=current_user.id, is_read=False).update({Notification.is_read: True}, synchronize_session=False)
+    db.session.commit()
+    return jsonify({'success': True})
+
+@bp.route('/api/notifications/clear', methods=['POST'])
+@login_required
+def clear_notifications():
+    Notification.query.filter_by(player_id=current_user.id).delete()
+    db.session.commit()
+    return jsonify({'success': True})
+
+# --- WEB PUSH API ---
+
+import os
+
+@bp.route('/service-worker.js')
+def service_worker():
+    # Service worker needs to be at the root scope
+    return send_from_directory('static', 'service-worker.js', mimetype='application/javascript')
+
+@bp.route('/api/vapid_public_key')
+def vapid_public_key():
+    return jsonify({'public_key': os.getenv('VAPID_PUBLIC_KEY')})
+
+@bp.route('/api/notifications/subscribe', methods=['POST'])
+@login_required
+def subscribe_push():
+    sub_data = request.json
+    if not sub_data or 'endpoint' not in sub_data or 'keys' not in sub_data:
+        return jsonify({'error': 'Invalid subscription data'}), 400
+
+    endpoint = sub_data['endpoint']
+    p256dh = sub_data['keys'].get('p256dh')
+    auth = sub_data['keys'].get('auth')
+
+    # Check if this endpoint is already registered
+    existing_sub = PushSubscription.query.filter_by(endpoint=endpoint).first()
+    
+    if existing_sub:
+        # Update user binding if device transferred
+        if existing_sub.player_id != current_user.id:
+            existing_sub.player_id = current_user.id
+            db.session.commit()
+    else:
+        new_sub = PushSubscription(
+            player_id=current_user.id,
+            endpoint=endpoint,
+            p256dh=p256dh,
+            auth=auth
+        )
+        db.session.add(new_sub)
+        db.session.commit()
+
     return jsonify({'success': True})
 
 @bp.route('/allocate_points', methods=['POST'])

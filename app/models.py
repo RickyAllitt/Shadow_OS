@@ -244,3 +244,16 @@ class Notification(db.Model):
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     player = db.relationship('Player', backref=db.backref('notifications', lazy='dynamic', cascade="all, delete-orphan"))
+
+class PushSubscription(db.Model):
+    """
+    Stores browser Web Push subscription data for sending background notifications.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
+    endpoint = db.Column(db.Text, nullable=False, unique=True)
+    p256dh = db.Column(db.String(255), nullable=False)
+    auth = db.Column(db.String(255), nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    player = db.relationship('Player', backref=db.backref('push_subscriptions', lazy='dynamic', cascade="all, delete-orphan"))

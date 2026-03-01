@@ -143,6 +143,58 @@ def check_weekly_reset(player):
         
     return False
 
+import os
+import json
+from pywebpush import webpush, WebPushException
+from app.models import PushSubscription
+
+def trigger_push_notification(player_id, title, message, url="/"):
+    """
+    Sends a Web Push Notification to all devices registered by the player.
+    """
+    vapid_private_key = os.getenv("VAPID_PRIVATE_KEY")
+    vapid_claims = {
+        "sub": "mailto:admin@system.local" # Required by spec
+    }
+
+    if not vapid_private_key:
+        print(">> Web Push Error: VAPID_PRIVATE_KEY not configured.")
+        return
+
+    subscriptions = PushSubscription.query.filter_by(player_id=player_id).all()
+    if not subscriptions:
+        return
+
+    payload = json.dumps({
+        "title": title,
+        "message": message,
+        "url": url
+    })
+
+    for sub in subscriptions:
+        try:
+            webpush(
+                subscription_info={
+                    "endpoint": sub.endpoint,
+                    "keys": {
+                        "p256dh": sub.p256dh,
+                        "auth": sub.auth
+                    }
+                },
+                data=payload,
+                vapid_private_key=vapid_private_key,
+                vapid_claims=vapid_claims
+            )
+        except WebPushException as ex:
+            print(">> Web Push Failed!", ex)
+            # Optional: if ex.response and ex.response.status_code == 410 -> Delete expired subscription
+            if ex.response and getattr(ex.response, 'status_code', None) == 410:
+                print(f">> Removing expired subscription endpoint: {sub.endpoint}")
+                db.session.delete(sub)
+                db.session.commit()
+        except Exception as e:
+            print(">> Unexpected Web Push Error:", e)
+
 def calculate_xp_required(level):
     """ Exponential Curve: Next Level = Previous * 1.25 """
     # Base is 100 for Level 1 -> 2
@@ -321,6 +373,13 @@ def process_quest_completion(player, quest):
         
     db.session.commit()
     
+    # Notify high-value achievements via Web Push
+    if quest.rank in ['S', 'A'] and not quest.is_daily and not quest.is_penalty:
+        msg = f"Quest '{quest.title}' Completed!"
+        if player.level > initial_level:
+             msg += " LEVEL UP!"
+        trigger_push_notification(player.id, "High Rank Quest Cleared", msg)
+        
     can_arise = (quest.rank == 'S')
     return xp_gain, base_gold, coin_gain, (player.level > initial_level), daily_bonus, can_arise
 
@@ -533,6 +592,11 @@ def check_daily_reset(player):
                         due_date=deadline_utc
                     )
                     db.session.add(penalty)
+                    trigger_push_notification(
+                        player.id,
+                        "SYSTEM ALERT",
+                        "PENALTY ZONE ENTERED. Complete the Survival Quest immediately."
+                    )
             elif effective_missed_days > 2:
                  player.in_penalty_zone = True
 
