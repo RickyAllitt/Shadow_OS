@@ -622,10 +622,10 @@ def get_categorized_quests(player_id):
         else:
             backlog.append(q)
             
-    # Sort Scheduled: First by due_date, then by priority (1=Critical, 4=Low)
-    # We use a large date for tasks without due_date to put them at the end.
+    # Sort Scheduled: First by start_date/due_date, then by priority (1=Critical, 4=Low)
+    # We use a large date for tasks without dates to put them at the end.
     def get_sort_key(q):
-        dt = q.due_date
+        dt = q.start_date or q.due_date
         if dt is None:
             return datetime.max.replace(tzinfo=timezone.utc)
         if dt.tzinfo is None:

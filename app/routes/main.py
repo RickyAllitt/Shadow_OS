@@ -8,6 +8,19 @@ from app.services import (check_weekly_reset, check_daily_reset, get_categorized
                           calculate_total_stats, extract_shadow, start_vacation, end_vacation, allocate_attributes)
 from datetime import datetime, timedelta, timezone
 
+def parse_datetime_input(dt_str):
+    if not dt_str:
+        return None
+    try:
+        # Try datetime-local format ('2023-10-25T14:30')
+        return datetime.strptime(dt_str, '%Y-%m-%dT%H:%M')
+    except ValueError:
+        try:
+            # Fallback to pure date format ('2023-10-25')
+            return datetime.strptime(dt_str, '%Y-%m-%d')
+        except ValueError:
+            return None
+
 bp = Blueprint('main', __name__)
 
 @bp.route('/')
@@ -57,9 +70,9 @@ def add_quest():
     start_date = None
     due_date = None
     if request.form.get('start_date'):
-        start_date = datetime.strptime(request.form.get('start_date'), '%Y-%m-%d')
+        start_date = parse_datetime_input(request.form.get('start_date'))
     if request.form.get('due_date'):
-        due_date = datetime.strptime(request.form.get('due_date'), '%Y-%m-%d')
+        due_date = parse_datetime_input(request.form.get('due_date'))
 
     # Auto-Evaluation Logic
     if rank == 'Auto':
@@ -439,10 +452,10 @@ def edit_quest(id):
             if new_priority_str is not None and int(new_priority_str) != quest.priority: restricted_modified = True
             
             if start_str is not None:
-                new_start = datetime.strptime(start_str, '%Y-%m-%d') if start_str else None
+                new_start = parse_datetime_input(start_str)
                 if new_start != quest.start_date: restricted_modified = True
             if due_str is not None:
-                new_due = datetime.strptime(due_str, '%Y-%m-%d') if due_str else None
+                new_due = parse_datetime_input(due_str)
                 if new_due != quest.due_date: restricted_modified = True
                 
             if restricted_modified:
@@ -460,16 +473,16 @@ def edit_quest(id):
                 if new_rank is not None: quest.rank = new_rank
                 if new_stat is not None: quest.stat_reward = new_stat
                 if new_priority_str is not None: quest.priority = int(new_priority_str)
-                if start_str is not None: quest.start_date = datetime.strptime(start_str, '%Y-%m-%d') if start_str else None
-                if due_str is not None: quest.due_date = datetime.strptime(due_str, '%Y-%m-%d') if due_str else None
+                if start_str is not None: quest.start_date = parse_datetime_input(start_str)
+                if due_str is not None: quest.due_date = parse_datetime_input(due_str)
         else:
             # Normal Quest Logic
             if new_title is not None: quest.title = new_title
             if new_rank is not None: quest.rank = new_rank
             if new_stat is not None: quest.stat_reward = new_stat
             if new_priority_str is not None: quest.priority = int(new_priority_str)
-            if start_str is not None: quest.start_date = datetime.strptime(start_str, '%Y-%m-%d') if start_str else None
-            if due_str is not None: quest.due_date = datetime.strptime(due_str, '%Y-%m-%d') if due_str else None
+            if start_str is not None: quest.start_date = parse_datetime_input(start_str)
+            if due_str is not None: quest.due_date = parse_datetime_input(due_str)
             quest.is_daily = True if request.form.get('is_daily') else False
 
         # Non-restricted updates (ALWAYS updated)

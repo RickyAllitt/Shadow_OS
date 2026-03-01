@@ -68,14 +68,14 @@
                 <div style="flex: 1;">
                     <label style="color: var(--color-text-muted); display: block; margin-bottom: 5px;">Start
                         Date</label>
-                    <input type="date" name="start_date"
-                        value="{{ quest.start_date.strftime('%Y-%m-%d') if quest.start_date else '' }}"
+                    <input type="datetime-local" name="start_date"
+                        value="{{ quest.start_date.strftime('%Y-%m-%dT%H:%M') if quest.start_date else '' }}"
                         style="width: 100%; padding: 10px; background: #000; color: white; border: 1px solid #333;">
                 </div>
                 <div style="flex: 1;">
                     <label style="color: var(--color-text-muted); display: block; margin-bottom: 5px;">Due Date</label>
-                    <input type="date" name="due_date"
-                        value="{{ quest.due_date.strftime('%Y-%m-%d') if quest.due_date else '' }}"
+                    <input type="datetime-local" name="due_date"
+                        value="{{ quest.due_date.strftime('%Y-%m-%dT%H:%M') if quest.due_date else '' }}"
                         style="width: 100%; padding: 10px; background: #000; color: white; border: 1px solid #333;">
                 </div>
             </div>

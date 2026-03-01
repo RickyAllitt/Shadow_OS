@@ -127,7 +127,7 @@ def test_abandon_success(auth_client, app, csrf_token):
         db.session.expire_all()
         assert db.session.get(Quest, quest_id) is None
         user = Player.query.filter_by(name="AuthUser").first()
-        assert user.gold == 90 # 100 - 10
+        assert user.gold == 100 # Normal quests are free
 
 def test_abandon_prescreen_rich(auth_client, app):
     """Test accessing abandon page WITH enough gold."""
@@ -148,10 +148,10 @@ def test_abandon_prescreen_poor(client, app, csrf_token):
     with app.app_context():
         user = Player(name="PoorUserPrescreen", setup_complete=True)
         user.set_password("pass")
-        user.gold = 10 
+        user.coins = 10 
         db.session.add(user)
         
-        quest = Quest(title="To Keep", rank="C", player=user)
+        quest = Quest(title="To Keep", rank="C", is_daily=True, player=user)
         db.session.add(quest)
         db.session.commit()
         quest_id = quest.id
@@ -163,16 +163,16 @@ def test_abandon_prescreen_poor(client, app, csrf_token):
     # Should be back on dashboard
     assert b"SYSTEM INTERFACE" in response.data
     # Should see the error flash/modal message
-    assert b"INSUFFICIENT FUNDS" in response.data
+    assert b"INSUFFICIENT FUNDS: You need 500 Coins" in response.data
 
 def test_abandon_insufficient_funds(client, app, csrf_token):
-    """Test POSTing to delete without enough gold (Hacking attempt)."""
     with app.app_context():
         user = Player(name="PoorHacker", gold=0, setup_complete=True)
         user.set_password("pass")
+        user.coins = 0
         db.session.add(user)
         
-        quest = Quest(title="To Keep", rank="E", player=user)
+        quest = Quest(title="To Keep", rank="E", is_daily=True, player=user)
         db.session.add(quest)
         db.session.commit()
         quest_id = quest.id
@@ -185,7 +185,7 @@ def test_abandon_insufficient_funds(client, app, csrf_token):
     
     response = client.post(f'/delete_quest/{quest_id}', data={'csrf_token': new_token}, follow_redirects=True)
     assert response.status_code == 200
-    assert b"You cannot afford" in response.data
+    assert b"Insufficient Coins" in response.data
     
     with app.app_context():
         assert db.session.get(Quest, quest_id) is not None
