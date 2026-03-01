@@ -103,7 +103,7 @@
                     {% for comment in quest.comments %}
                     <div style="margin-bottom: 10px; border-bottom: 1px solid #222; padding-bottom: 5px;">
                         <p style="color: #ccc; margin: 0; font-size: 0.9em;">{{ comment.content }}</p>
-                        <span style="color: #666; font-size: 0.7em;">{{ comment.created_at.strftime('%Y-%m-%d %H:%M')
+                        <span style="color: #666; font-size: 0.7em;">{{ comment.created_at.strftime('%d/%m/%Y %H:%M')
                             }}</span>
                     </div>
                     {% endfor %}

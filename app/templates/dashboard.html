@@ -841,23 +841,23 @@
                             {% if quest.start_date and quest.due_date %}
                             <span
                                 style="color: #00bcd4; font-size: 0.8em; font-weight: normal; margin: 0; white-space: nowrap;">
-                                📅 {{ quest.start_date.strftime('%m-%d %H:%M') if quest.start_date.hour != 0 else
-                                quest.start_date.strftime('%m-%d') }}
+                                📅 {{ quest.start_date.strftime('%d/%m %H:%M') if quest.start_date.hour != 0 else
+                                quest.start_date.strftime('%d/%m') }}
                                 <span style="color: #666;">to</span>
-                                {{ quest.due_date.strftime('%m-%d %H:%M') if quest.due_date.hour != 0 else
-                                quest.due_date.strftime('%m-%d') }}
+                                {{ quest.due_date.strftime('%d/%m %H:%M') if quest.due_date.hour != 0 else
+                                quest.due_date.strftime('%d/%m') }}
                             </span>
                             {% elif quest.start_date %}
                             <span
                                 style="color: #00bcd4; font-size: 0.8em; font-weight: normal; margin: 0; white-space: nowrap;">
-                                📅 Starts: {{ quest.start_date.strftime('%Y-%m-%d %H:%M') if quest.start_date.hour != 0
-                                else quest.start_date.strftime('%Y-%m-%d') }}
+                                📅 Starts: {{ quest.start_date.strftime('%d/%m/%Y %H:%M') if quest.start_date.hour != 0
+                                else quest.start_date.strftime('%d/%m/%Y') }}
                             </span>
                             {% elif quest.due_date %}
                             <span
                                 style="color: #00bcd4; font-size: 0.8em; font-weight: normal; margin: 0; white-space: nowrap;">
-                                📅 Due: {{ quest.due_date.strftime('%Y-%m-%d %H:%M') if quest.due_date.hour != 0 else
-                                quest.due_date.strftime('%Y-%m-%d') }}
+                                📅 Due: {{ quest.due_date.strftime('%d/%m/%Y %H:%M') if quest.due_date.hour != 0 else
+                                quest.due_date.strftime('%d/%m/%Y') }}
                             </span>
                             {% endif %}
                             {% if quest.description %}
@@ -1049,7 +1049,7 @@
                 <div class="shadow-name">{{ shadow.original_quest_name }}</div>
                 <div class="shadow-rank">RANK {{ shadow.rank }}</div>
                 <div class="shadow-bonus">{{ shadow.buff_type.replace('_', ' ') }} +{{ shadow.buff_value }}%</div>
-                <div class="shadow-date">{{ shadow.extracted_at.strftime('%Y-%m-%d') }}</div>
+                <div class="shadow-date">{{ shadow.extracted_at.strftime('%d/%m/%Y') }}</div>
             </div>
             {% endfor %}
         </div>

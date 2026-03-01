@@ -54,8 +54,9 @@
             <tr class="log-row">
                 <td style="padding: 10px; font-size: 0.9em; color: #888;">
                     {% if quest.completed_at %}
-                    {{ quest.completed_at.strftime('%b %d, %H:%M') }}
-                    {% else %}
+                    <div class="log-timestamp u-font-small u-color-muted u-text-right">
+                        {{ quest.completed_at.strftime('%d %b, %H:%M') }}
+                    </div> {% else %}
                     -
                     {% endif %}
                 </td>
