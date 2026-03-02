@@ -157,7 +157,7 @@ def trigger_push_notification(player_id, title, message, url="/"):
     
     vapid_private_key = os.getenv("VAPID_PRIVATE_KEY")
     vapid_claims = {
-        "sub": "mailto:admin@system.local" # Required by spec
+        "sub": "https://shadow-os.onrender.com" # Required by spec, must be valid URL or mailto
     }
 
     if not vapid_private_key:
