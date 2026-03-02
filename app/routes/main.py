@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from sqlalchemy import or_
 from app.extensions import db
-from app.models import Player, Quest, RewardItem, QuestComment, PurchaseLog, Inventory, DailySnapshot, Notification
+from app.models import Player, Quest, RewardItem, QuestComment, PurchaseLog, Inventory, DailySnapshot, Notification, PushSubscription
 from app.services import (check_weekly_reset, check_daily_reset, get_categorized_quests, 
                           calculate_rewards, process_quest_completion, 
                           calculate_total_stats, extract_shadow, start_vacation, end_vacation, allocate_attributes)
