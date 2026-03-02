@@ -151,7 +151,7 @@ from app.models import PushSubscription
 def trigger_push_notification(player_id, title, message, url="/"):
     """
     Sends a Web Push Notification to all devices registered by the player.
-    Logs successes and failures to the Notification table for live debugging.
+    Logs failures to the Notification table for live debugging.
     """
     from app.models import PushSubscription, Notification
     
@@ -189,7 +189,7 @@ def trigger_push_notification(player_id, title, message, url="/"):
                 vapid_private_key=vapid_private_key,
                 vapid_claims=vapid_claims
             )
-            log_msgs.append(f"Push SUCCESS to endpoint: ...{sub.endpoint[-20:]}")
+            # Success - intentionally not logging to avoid user spam
         except WebPushException as ex:
             error_status = getattr(ex.response, 'status_code', 'Unknown')
             log_msgs.append(f"Push FAILED [{error_status}]: {str(ex)}")
