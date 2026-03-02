@@ -1020,34 +1020,6 @@ def service_worker():
 def vapid_public_key():
     return jsonify({'public_key': os.getenv('VAPID_PUBLIC_KEY')})
 
-@bp.route('/api/debug_vapid')
-def debug_vapid():
-    import base64
-    from cryptography.hazmat.primitives.asymmetric import ec
-    from cryptography.hazmat.primitives import serialization
-    priv = os.getenv("VAPID_PRIVATE_KEY")
-    pub = os.getenv("VAPID_PUBLIC_KEY")
-    if not priv or not pub:
-        return jsonify({"error": "Missing keys"})
-    
-    def pad_base64(data):
-        return data + '=' * (-len(data) % 4)
-
-    try:
-        raw_priv = base64.urlsafe_b64decode(pad_base64(priv))
-        priv_key = ec.derive_private_key(int.from_bytes(raw_priv, byteorder='big'), ec.SECP256R1())
-        pub_key = priv_key.public_key()
-        raw_pub = pub_key.public_bytes(encoding=serialization.Encoding.X962, format=serialization.PublicFormat.UncompressedPoint)
-        derived_pub = base64.urlsafe_b64encode(raw_pub).decode('utf-8').rstrip('=')
-        
-        return jsonify({
-            "env_public_key": pub,
-            "derived_public_key": derived_pub,
-            "lengths": {"priv": len(priv), "pub": len(pub)},
-            "matches": pub == derived_pub
-        })
-    except Exception as e:
-        return jsonify({"error": str(e), "lengths": {"priv": len(priv), "pub": len(pub)}})
 
 @bp.route('/api/notifications/subscribe', methods=['POST'])
 @login_required
