@@ -589,23 +589,19 @@
                     return;
                 }
 
-                alert("Attempting to fetch VAPID key...");
                 return fetch('/api/vapid_public_key')
                     .then(r => {
                         if (!r.ok) throw new Error("VAPID fetch failed: " + r.status);
                         return r.json();
                     })
                     .then(data => {
-                        alert("VAPID Key received. Converting...");
                         const applicationServerKey = urlB64ToUint8Array(data.public_key);
-                        alert("VAPID Key converted. Calling pushManager.subscribe...");
                         return swRegistration.pushManager.subscribe({
                             userVisibleOnly: true,
                             applicationServerKey: applicationServerKey
                         });
                     })
                     .then(function (subscription) {
-                        alert("Subscription generated. Sending to server...");
                         const subData = subscription.toJSON();
                         // Send subscription to backend
                         return fetch('/api/notifications/subscribe', {
@@ -618,10 +614,8 @@
                         });
                     })
                     .then(r => {
-                        if (!r.ok) {
-                            alert("Server rejected subscription: " + r.status);
-                        } else {
-                            alert("Push subscription complete and saved!");
+                        if (r.ok) {
+                            console.log("Push subscription complete and saved!");
                         }
                     })
                     .catch(function (err) {
