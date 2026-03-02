@@ -49,3 +49,4 @@ purge_subs.py
 test_push_delivery.py
 test_render_keys.py
 *.py
+VAPID_KEYS.txt
