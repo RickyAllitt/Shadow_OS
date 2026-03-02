@@ -151,7 +151,10 @@ from app.models import PushSubscription
 def trigger_push_notification(player_id, title, message, url="/"):
     """
     Sends a Web Push Notification to all devices registered by the player.
+    Logs successes and failures to the Notification table for live debugging.
     """
+    from app.models import PushSubscription, Notification
+    
     vapid_private_key = os.getenv("VAPID_PRIVATE_KEY")
     vapid_claims = {
         "sub": "mailto:admin@system.local" # Required by spec
@@ -171,6 +174,7 @@ def trigger_push_notification(player_id, title, message, url="/"):
         "url": url
     })
 
+    log_msgs = []
     for sub in subscriptions:
         try:
             webpush(
@@ -185,15 +189,29 @@ def trigger_push_notification(player_id, title, message, url="/"):
                 vapid_private_key=vapid_private_key,
                 vapid_claims=vapid_claims
             )
+            log_msgs.append(f"Push SUCCESS to endpoint: ...{sub.endpoint[-20:]}")
         except WebPushException as ex:
+            error_status = getattr(ex.response, 'status_code', 'Unknown')
+            log_msgs.append(f"Push FAILED [{error_status}]: {str(ex)}")
             print(">> Web Push Failed!", ex)
             # Remove expired subscription if the service reports it no longer valid (410 Gone or 404 Not Found)
-            if ex.response is not None and getattr(ex.response, 'status_code', None) in [410, 404]:
-                print(f">> Removing expired subscription endpoint: {sub.endpoint}")
+            if error_status in [410, 404]:
                 db.session.delete(sub)
                 db.session.commit()
         except Exception as e:
+            log_msgs.append(f"Push UNEXPECTED ERROR: {str(e)}")
             print(">> Unexpected Web Push Error:", e)
+
+    # Save all push attempts as a direct system log for the user to debug on mobile
+    if log_msgs:
+        debug_msg = " | ".join(log_msgs)
+        new_log = Notification(
+            player_id=player_id,
+            message=f"PUSH DEBUG: {debug_msg} -- Payload: {title}",
+            category="system_popup"
+        )
+        db.session.add(new_log)
+        db.session.commit()
 
 def calculate_xp_required(level):
     """ Exponential Curve: Next Level = Previous * 1.25 """
