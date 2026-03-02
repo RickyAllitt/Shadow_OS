@@ -95,6 +95,13 @@
                 <span id="volumeLabel" style="width: 30px; text-align: right;">{{ (js_vol * 100) | int }}%</span>
             </div>
 
+            <div class="u-flex u-justify-between u-align-center u-mb-20 u-padding-10"
+                style="background:rgba(255,255,255,0.05);">
+                <span>System Notifications</span>
+                <button id="btnEnableNotifications" onclick="requestNotificationPermission()" class="btn-small"
+                    style="font-family: 'Courier New', monospace; border-color: #00acc1; color: #00acc1;">ENABLE</button>
+            </div>
+
             <div class="u-text-center">
                 <button onclick="document.getElementById('settingsModal').style.display='none'"
                     class="btn-complete u-width-100">CLOSE</button>
@@ -154,6 +161,23 @@
             <div style="margin-top: 20px; text-align: center;">
                 <button onclick="document.getElementById('notificationInboxModal').style.display='none'"
                     class="btn-complete u-width-100">CLOSE</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CLEAR LOGS CONFIRMATION MODAL -->
+    <div id="clearLogsModal" class="modal-overlay" style="z-index: 2000;">
+        <div class="panel modal-content" style="max-width:350px; border: 1px solid #00acc1;">
+            <h2 class="u-mb-20" style="color: #00acc1;">ERASE LOGS</h2>
+            <p class="u-mb-20 u-text-center" style="color: #ddd;">
+                Erase all system logs?
+            </p>
+            <div class="u-flex u-justify-between u-gap-10">
+                <button onclick="document.getElementById('clearLogsModal').style.display='none'"
+                    class="btn-complete u-width-50"
+                    style="background-color: #333; border-color: #555; color: white;">CANCEL</button>
+                <button onclick="executeClearNotifications()" class="btn-complete u-width-50"
+                    style="background-color: #00acc1; color: #000; border: none; font-weight: bold;">OK</button>
             </div>
         </div>
     </div>
@@ -405,16 +429,19 @@
             };
 
             window.clearNotifications = async function () {
-                if (confirm("Erase all system logs?")) {
-                    await fetch('/api/notifications/clear', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                        }
-                    });
-                    checkNotifications();
-                }
+                document.getElementById('clearLogsModal').style.display = 'flex';
+            };
+
+            window.executeClearNotifications = async function () {
+                document.getElementById('clearLogsModal').style.display = 'none';
+                await fetch('/api/notifications/clear', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    }
+                });
+                checkNotifications();
             };
 
             // Initial Fetch & Start Polling
@@ -422,21 +449,63 @@
             setInterval(checkNotifications, POLL_INTERVAL);
 
             // --- WEB PUSH REGISTRATION ---
+            window.requestNotificationPermission = function () {
+                if (!('Notification' in window)) {
+                    alert("This browser does not support system notifications.");
+                    return;
+                }
+
+                Notification.requestPermission().then(function (permission) {
+                    if (permission === 'granted') {
+                        if ('serviceWorker' in navigator) {
+                            navigator.serviceWorker.ready.then(function (swReg) {
+                                subscribeUser(swReg).then(() => {
+                                    updateNotificationButton();
+                                });
+                            });
+                        }
+                    } else {
+                        updateNotificationButton();
+                    }
+                });
+            };
+
+            window.updateNotificationButton = function () {
+                const btn = document.getElementById('btnEnableNotifications');
+                if (btn) {
+                    if (!('Notification' in window)) {
+                        btn.innerText = "UNSUPPORTED";
+                        btn.disabled = true;
+                        btn.style.opacity = 0.5;
+                        return;
+                    }
+                    if (Notification.permission === 'granted') {
+                        btn.innerText = "ENABLED";
+                        btn.disabled = true;
+                        btn.style.borderColor = "#4CAF50";
+                        btn.style.color = "#4CAF50";
+                    } else if (Notification.permission === 'denied') {
+                        btn.innerText = "DENIED";
+                        btn.disabled = true;
+                        btn.style.borderColor = "#ff4444";
+                        btn.style.color = "#ff4444";
+                    } else {
+                        btn.innerText = "ENABLE";
+                        btn.disabled = false;
+                        btn.style.borderColor = "#00acc1";
+                        btn.style.color = "#00acc1";
+                    }
+                }
+            };
+
+            // Initial call to set button state
+            window.updateNotificationButton();
+
             if ('serviceWorker' in navigator && 'PushManager' in window) {
-                // We securely inject the public VAPID key. Wait until user interacts to request permission
-                // or just request it passively if not already granted/denied.
                 navigator.serviceWorker.register('/service-worker.js')
                     .then(function (swReg) {
                         console.log('Service Worker is registered', swReg);
-
-                        // Optional: Request permission immediately on load (or tie it to a button for better UX)
-                        if (Notification.permission === 'default') {
-                            Notification.requestPermission().then(function (permission) {
-                                if (permission === 'granted') {
-                                    subscribeUser(swReg);
-                                }
-                            });
-                        } else if (Notification.permission === 'granted') {
+                        if (Notification.permission === 'granted') {
                             subscribeUser(swReg);
                         }
                     })
@@ -465,7 +534,7 @@
             function subscribeUser(swRegistration) {
                 // Must fetch the public key from the backend securely, or inject via template.
                 // Assuming it's injected via Jinja or fetched. Let's create an endpoint to get the public key.
-                fetch('/api/vapid_public_key')
+                return fetch('/api/vapid_public_key')
                     .then(r => r.json())
                     .then(data => {
                         const applicationServerKey = urlB64ToUint8Array(data.public_key);
