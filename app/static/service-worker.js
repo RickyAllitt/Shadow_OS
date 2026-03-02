@@ -9,7 +9,8 @@ self.addEventListener('push', function (event) {
                 body: data.message,
                 icon: '/static/icons/sys-icon-192.png', // Fallback, assuming generic icon
                 badge: '/static/icons/sys-icon-192.png',
-                vibrate: [200, 100, 200], // Double vibration
+                vibrate: [300, 100, 300, 100, 300], // Tripe distinct vibration for mobile
+                requireInteraction: true, // Crucial for mobile: keep in tray until interacted
                 data: {
                     url: data.url || '/'
                 }

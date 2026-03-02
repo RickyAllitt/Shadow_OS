@@ -535,6 +535,9 @@
             function subscribeUser(swRegistration) {
                 // Must fetch the public key from the backend securely, or inject via template.
                 // Assuming it's injected via Jinja or fetched. Let's create an endpoint to get the public key.
+                if (!window.isSecureContext) {
+                    alert("System Interface requires a secure HTTPS connection for Push Notifications. They will not function on this protocol.");
+                }
                 return fetch('/api/vapid_public_key')
                     .then(r => r.json())
                     .then(data => {
@@ -558,6 +561,7 @@
                     })
                     .catch(function (err) {
                         console.log('Failed to subscribe the user: ', err);
+                        alert("Push Subscription Failed: " + err.message + "\nEnsure your browser permits background notifications for this site.");
                     });
             }
         });

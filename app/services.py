@@ -187,8 +187,8 @@ def trigger_push_notification(player_id, title, message, url="/"):
             )
         except WebPushException as ex:
             print(">> Web Push Failed!", ex)
-            # Optional: if ex.response and ex.response.status_code == 410 -> Delete expired subscription
-            if ex.response and getattr(ex.response, 'status_code', None) == 410:
+            # Remove expired subscription if the service reports it no longer valid (410 Gone or 404 Not Found)
+            if ex.response is not None and getattr(ex.response, 'status_code', None) in [410, 404]:
                 print(f">> Removing expired subscription endpoint: {sub.endpoint}")
                 db.session.delete(sub)
                 db.session.commit()
