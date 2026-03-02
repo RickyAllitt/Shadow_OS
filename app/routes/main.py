@@ -1051,6 +1051,24 @@ def subscribe_push():
 
     return jsonify({'success': True})
 
+@bp.route('/api/notifications/unsubscribe', methods=['POST'])
+@login_required
+def unsubscribe_push():
+    sub_data = request.json
+    if not sub_data or 'endpoint' not in sub_data:
+        return jsonify({'error': 'Invalid unsubscribe data'}), 400
+
+    endpoint = sub_data['endpoint']
+    
+    # Check if this endpoint is registered and delete it
+    existing_sub = PushSubscription.query.filter_by(endpoint=endpoint).first()
+    if existing_sub:
+        db.session.delete(existing_sub)
+        db.session.commit()
+        return jsonify({'success': True, 'msg': 'Subscription removed'})
+        
+    return jsonify({'success': False, 'msg': 'Subscription not found'}), 404
+
 @bp.route('/allocate_points', methods=['POST'])
 @login_required
 def allocate_points():

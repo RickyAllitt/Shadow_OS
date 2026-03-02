@@ -471,6 +471,36 @@
                 });
             };
 
+            window.disableNotificationPermission = function () {
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.ready.then(function (swReg) {
+                        swReg.pushManager.getSubscription().then(function (subscription) {
+                            if (subscription) {
+                                subscription.unsubscribe().then(function (successful) {
+                                    alert("Push Subscription disabled locally.");
+                                    updateNotificationButton();
+
+                                    // Inform backend to drop endpoint
+                                    fetch('/api/notifications/unsubscribe', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                                        },
+                                        body: JSON.stringify({ endpoint: subscription.endpoint })
+                                    });
+                                }).catch(function (e) {
+                                    alert("Unsubscription failed: " + e);
+                                })
+                            } else {
+                                alert("No active subscription found.");
+                                updateNotificationButton();
+                            }
+                        })
+                    })
+                }
+            };
+
             window.updateNotificationButton = function () {
                 const btn = document.getElementById('btnEnableNotifications');
                 if (btn) {
@@ -480,18 +510,37 @@
                         btn.style.opacity = 0.5;
                         return;
                     }
+
                     if (Notification.permission === 'granted') {
-                        btn.innerText = "ENABLED";
-                        btn.disabled = true;
-                        btn.style.borderColor = "#4CAF50";
-                        btn.style.color = "#4CAF50";
+                        if ('serviceWorker' in navigator) {
+                            navigator.serviceWorker.ready.then(function (swReg) {
+                                swReg.pushManager.getSubscription().then(function (sub) {
+                                    if (sub) {
+                                        btn.innerText = "DISABLE NOTIFICATIONS (ENABLED)";
+                                        btn.style.borderColor = "cyan";
+                                        btn.style.color = "cyan";
+                                        btn.onclick = window.disableNotificationPermission;
+                                        btn.disabled = false; // Enable button for disabling
+                                    } else {
+                                        btn.innerText = "ENABLE NOTIFICATIONS (MISSING SUB)";
+                                        btn.onclick = window.requestNotificationPermission;
+                                        btn.disabled = false; // Enable button for enabling
+                                        btn.style.borderColor = "#00acc1";
+                                        btn.style.color = "#00acc1";
+                                    }
+                                });
+                            });
+                        }
                     } else if (Notification.permission === 'denied') {
-                        btn.innerText = "DENIED";
+                        btn.innerText = "NOTIFICATIONS BLOCKED BY BROWSER";
                         btn.disabled = true;
                         btn.style.borderColor = "#ff4444";
                         btn.style.color = "#ff4444";
-                    } else {
-                        btn.innerText = "ENABLE";
+                        btn.style.opacity = 0.7;
+                        btn.onclick = null; // Remove any click handler
+                    } else { // 'default' permission
+                        btn.innerText = "ENABLE NOTIFICATIONS";
+                        btn.onclick = window.requestNotificationPermission;
                         btn.disabled = false;
                         btn.style.borderColor = "#00acc1";
                         btn.style.color = "#00acc1";
@@ -537,17 +586,26 @@
                 // Assuming it's injected via Jinja or fetched. Let's create an endpoint to get the public key.
                 if (!window.isSecureContext) {
                     alert("System Interface requires a secure HTTPS connection for Push Notifications. They will not function on this protocol.");
+                    return;
                 }
+
+                alert("Attempting to fetch VAPID key...");
                 return fetch('/api/vapid_public_key')
-                    .then(r => r.json())
+                    .then(r => {
+                        if (!r.ok) throw new Error("VAPID fetch failed: " + r.status);
+                        return r.json();
+                    })
                     .then(data => {
+                        alert("VAPID Key received. Converting...");
                         const applicationServerKey = urlB64ToUint8Array(data.public_key);
+                        alert("VAPID Key converted. Calling pushManager.subscribe...");
                         return swRegistration.pushManager.subscribe({
                             userVisibleOnly: true,
                             applicationServerKey: applicationServerKey
                         });
                     })
                     .then(function (subscription) {
+                        alert("Subscription generated. Sending to server...");
                         const subData = subscription.toJSON();
                         // Send subscription to backend
                         return fetch('/api/notifications/subscribe', {
@@ -558,6 +616,13 @@
                             },
                             body: JSON.stringify(subData)
                         });
+                    })
+                    .then(r => {
+                        if (!r.ok) {
+                            alert("Server rejected subscription: " + r.status);
+                        } else {
+                            alert("Push subscription complete and saved!");
+                        }
                     })
                     .catch(function (err) {
                         console.log('Failed to subscribe the user: ', err);
