@@ -45,3 +45,7 @@ migrate_data.py
 verify_db_connection.py
 fix_db.py
 update_db.py
+purge_subs.py
+test_push_delivery.py
+test_render_keys.py
+*.py
