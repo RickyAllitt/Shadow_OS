@@ -174,7 +174,8 @@
                 Erase all system logs?
             </p>
             <div class="u-flex u-justify-between u-gap-20" style="margin-top: 20px;">
-                <button onclick="document.getElementById('clearLogsModal').style.display='none'"
+                <button
+                    onclick="document.getElementById('clearLogsModal').style.display='none'; document.getElementById('notificationInboxModal').style.display='flex';"
                     class="btn-complete u-width-50"
                     style="background-color: #333; border-color: #555; color: white;">CANCEL</button>
                 <button onclick="executeClearNotifications()" class="btn-complete u-width-50"
@@ -430,6 +431,7 @@
             };
 
             window.clearNotifications = async function () {
+                document.getElementById('notificationInboxModal').style.display = 'none';
                 document.getElementById('clearLogsModal').style.display = 'flex';
             };
 
