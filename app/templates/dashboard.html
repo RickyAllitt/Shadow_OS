@@ -814,7 +814,9 @@
                 <a href="{{ url_for('main.focus_mode') }}" class="btn-small" style="color:#ccc;">VOID</a>
                 <a href="{{ url_for('main.calendar_view') }}" class="btn-small" style="color:#00bcd4;">CALENDAR</a>
                 <a href="{{ url_for('main.leaderboard') }}" class="btn-small u-color-gold">LEADERBOARD</a>
-                <button class="btn-small" onclick="document.getElementById('addQuestModal').style.display='flex'">+ NEW
+                <button class="btn-small"
+                    onclick="document.getElementById('addQuestModal').style.display='flex'; document.getElementById('addQuestModal').scrollTop=0;">+
+                    NEW
                     QUEST</button>
             </div>
         </div>
