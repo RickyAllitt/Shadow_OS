@@ -115,6 +115,35 @@
         backdrop-filter: blur(5px);
     }
 
+    /* LEVEL UP UI */
+    .levelup-title {
+        font-size: 5rem;
+        font-weight: 900;
+        color: var(--color-primary);
+        text-shadow: 0 0 20px var(--color-primary-glow);
+        letter-spacing: 10px;
+        text-align: center;
+    }
+
+    .levelup-subtitle {
+        font-size: 1.5rem;
+        color: #fff;
+        letter-spacing: 5px;
+        margin-top: 10px;
+        text-align: center;
+    }
+
+    @media (max-width: 600px) {
+        .levelup-title {
+            font-size: 3rem;
+            letter-spacing: 4px;
+        }
+        .levelup-subtitle {
+            font-size: 1rem;
+            letter-spacing: 2px;
+        }
+    }
+
     /* PENALTY UI ENHANCEMENTS */
     .system-lockdown-overlay {
         background: radial-gradient(circle, rgba(20, 0, 0, 0.95) 0%, rgba(0, 0, 0, 1) 100%) !important;
@@ -538,11 +567,10 @@
 {% endif %}
 
 <div id="levelUpOverlay" onclick="this.style.display='none'"
-    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:10000; justify-content:center; align-items:center; flex-direction:column;">
-    <div class="levelup-title"
-        style="font-size:5rem; font-weight:900; color:var(--color-primary); text-shadow:0 0 20px var(--color-primary-glow); letter-spacing:10px;">
+    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:10000; justify-content:center; align-items:center; flex-direction:column; padding: 20px; box-sizing: border-box;">
+    <div class="levelup-title">
         LEVEL UP!</div>
-    <div class="levelup-subtitle" style="font-size:1.5rem; color:#fff; letter-spacing:5px; margin-top:10px;">SYSTEM
+    <div class="levelup-subtitle">SYSTEM
         LIMITS INCREASED</div>
 </div>
 
