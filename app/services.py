@@ -620,7 +620,21 @@ def check_daily_reset(player):
                  player.in_penalty_zone = True
 
             # Stage 3: Level Down
-            if effective_missed_days >= 3:
+            # Only level down if there are NO active penalties, OR if the active penalty deadline has strictly passed.
+            active_penalty = Quest.query.filter_by(player_id=player.id, is_penalty=True, is_completed=False).first()
+            can_level_down = True
+            
+            if active_penalty and active_penalty.due_date:
+                # Compare in UTC
+                penalty_due_utc = active_penalty.due_date
+                if penalty_due_utc.tzinfo is None:
+                    penalty_due_utc = penalty_due_utc.replace(tzinfo=timezone.utc)
+                
+                # If we haven't reached the deadline, DO NOT level down yet.
+                if now_utc < penalty_due_utc:
+                    can_level_down = False
+                    
+            if effective_missed_days >= 3 and can_level_down:
                 if player.level > 1:
                     player.level = max(1, player.level - 3)
                     player.xp = 0 
@@ -659,6 +673,7 @@ def check_daily_reset(player):
         # Reset Dailies (Prepare for next day iteration)
         for quest in dailies:
             quest.is_completed = False
+            quest.progress = 0 # Bug fix: Ensure progress bars are emptied
             
         # Move last_daily_reset forward by 1 day
         player.last_daily_reset += timedelta(days=1)
