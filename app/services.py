@@ -157,7 +157,7 @@ def trigger_push_notification(player_id, title, message, url="/"):
     
     vapid_private_key = os.getenv("VAPID_PRIVATE_KEY")
     vapid_claims = {
-        "sub": "https://shadow-os.onrender.com" # Required by spec, must be valid URL or mailto
+        "sub": "mailto:admin@shadow-os.onrender.com" # Required by spec, must be valid URL or mailto
     }
 
     if not vapid_private_key:
@@ -187,7 +187,8 @@ def trigger_push_notification(player_id, title, message, url="/"):
                 },
                 data=payload,
                 vapid_private_key=vapid_private_key,
-                vapid_claims=vapid_claims
+                vapid_claims=vapid_claims,
+                ttl=86400
             )
             # Success - intentionally not logging to avoid user spam
         except WebPushException as ex:
