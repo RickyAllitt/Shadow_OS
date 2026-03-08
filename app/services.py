@@ -156,9 +156,6 @@ def trigger_push_notification(player_id, title, message, url="/"):
     from app.models import PushSubscription, Notification
     
     vapid_private_key = os.getenv("VAPID_PRIVATE_KEY")
-    vapid_claims = {
-        "sub": "mailto:admin@shadow-os.onrender.com" # Required by spec, must be valid URL or mailto
-    }
 
     if not vapid_private_key:
         print(">> Web Push Error: VAPID_PRIVATE_KEY not configured.")
@@ -187,7 +184,7 @@ def trigger_push_notification(player_id, title, message, url="/"):
                 },
                 data=payload,
                 vapid_private_key=vapid_private_key,
-                vapid_claims=vapid_claims,
+                vapid_claims={"sub": "mailto:admin@shadow-os.onrender.com"},
                 ttl=86400
             )
             # Success - intentionally not logging to avoid user spam
