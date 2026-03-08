@@ -456,6 +456,13 @@ def _check_and_apply_daily_bonus(player):
             print(f">> Daily Bonus Granted for {player.name}")
             bonus_granted = True
 
+            # New: Push Notification for Daily Completion
+            trigger_push_notification(
+                player.id, 
+                "Daily Routine Complete", 
+                "All tasks finished! Bonus rewarded: +100G, +50C, +XP."
+            )
+
         # 2. Penalty Redemption Logic
         # Independent of whether bonus was just granted or claimed previously.
         if player.consecutive_missed_days > 0:
@@ -583,6 +590,11 @@ def check_daily_reset(player):
             if effective_missed_days == 1:
                 player.has_debuff = True
                 messages.append("SYSTEM ALERT: Missed Dailies detected. Physical Condition degraded.")
+                trigger_push_notification(
+                    player.id,
+                    "SYSTEM ALERT",
+                    "Dailies missed. Your physical condition has degraded (Stat Debuff Applied)."
+                )
             elif effective_missed_days > 1:
                 player.has_debuff = True
             
