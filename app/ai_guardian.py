@@ -61,7 +61,8 @@ class TheArchitect:
             # Execute
 
             try:
-                with urllib.request.urlopen(req, timeout=15) as response:
+                import socket
+                with urllib.request.urlopen(req, timeout=25) as response:
                     if response.status == 200:
                         response_body = response.read().decode('utf-8')
                         json_response = json.loads(response_body)

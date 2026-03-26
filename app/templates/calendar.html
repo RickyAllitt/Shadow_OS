@@ -5,16 +5,16 @@
 
     <!-- HEADER: Navigation & Config -->
     <div
-        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--color-primary-dim); padding-bottom: 15px;">
-        <div style="display: flex; gap: 10px;">
+        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--color-primary-dim); padding-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+        <div style="display: flex; gap: 10px; align-items: center;">
             <a href="{{ url_for('main.calendar_view', year=prev_year, month=prev_month) }}" class="btn-small"
                 style="font-size: 1.2em;">&lt;</a>
-            <h2 style="margin: 0; color: var(--color-primary); font-size: 1.5em;">{{ month_name }} {{ year }}</h2>
+            <h2 style="margin: 0; color: var(--color-primary); font-size: 1.5em; white-space: nowrap;">{{ month_name }} {{ year }}</h2>
             <a href="{{ url_for('main.calendar_view', year=next_year, month=next_month) }}" class="btn-small"
                 style="font-size: 1.2em;">&gt;</a>
         </div>
 
-        <a href="{{ url_for('main.dashboard') }}" class="btn-small">BACK TO DASHBOARD</a>
+        <a href="{{ url_for('main.dashboard') }}" class="btn-small" style="white-space: nowrap;">BACK TO DASHBOARD</a>
     </div>
 
     <!-- CALENDAR GRID -->

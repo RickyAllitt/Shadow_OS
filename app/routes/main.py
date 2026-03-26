@@ -528,7 +528,13 @@ def architect_breakdown(quest_id):
 
     # POST: Execute Breakdown
     from app.ai_guardian import TheArchitect
-    sub_tasks = TheArchitect.decompose_task(quest.title)
+    
+    try:
+        sub_tasks = TheArchitect.decompose_task(quest.title)
+    except Exception as e:
+        print(f"Architect breakdown exception: {e}")
+        flash("The Architect encountered a critical error during task breakdown. Please try again.", "error")
+        return redirect(url_for('main.dashboard'))
     
     if not sub_tasks or len(sub_tasks) == 0:
         flash("The Architect could not decompose this task.", "warning")
