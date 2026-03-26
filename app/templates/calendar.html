@@ -18,57 +18,59 @@
     </div>
 
     <!-- CALENDAR GRID -->
-    <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; text-align: center;">
+    <div style="overflow-x: auto; width: 100%; padding-bottom: 15px;">
+        <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; text-align: center; min-width: 700px;">
 
-        <!-- Day Headers -->
-        <div style="color: var(--color-text-muted); font-weight: bold;">MON</div>
-        <div style="color: var(--color-text-muted); font-weight: bold;">TUE</div>
-        <div style="color: var(--color-text-muted); font-weight: bold;">WED</div>
-        <div style="color: var(--color-text-muted); font-weight: bold;">THU</div>
-        <div style="color: var(--color-text-muted); font-weight: bold;">FRI</div>
-        <div style="color: var(--color-text-muted); font-weight: bold;">SAT</div>
-        <div style="color: var(--color-text-muted); font-weight: bold;">SUN</div>
+            <!-- Day Headers -->
+            <div style="color: var(--color-text-muted); font-weight: bold;">MON</div>
+            <div style="color: var(--color-text-muted); font-weight: bold;">TUE</div>
+            <div style="color: var(--color-text-muted); font-weight: bold;">WED</div>
+            <div style="color: var(--color-text-muted); font-weight: bold;">THU</div>
+            <div style="color: var(--color-text-muted); font-weight: bold;">FRI</div>
+            <div style="color: var(--color-text-muted); font-weight: bold;">SAT</div>
+            <div style="color: var(--color-text-muted); font-weight: bold;">SUN</div>
 
-        <!-- Weeks -->
-        {% for week in calendar %}
-        {% for day in week %}
-        {% if day == 0 %}
-        <div style="background: rgba(255,255,255,0.02); height: 100px; border-radius: 4px;"></div>
-        {% else %}
-        <div
-            style="background: rgba(0,0,0,0.5); border: 1px solid #333; height: 100px; border-radius: 4px; padding: 5px; text-align: left; overflow-y: auto;">
-            <span style="color: #666; font-size: 0.9em; display: block; margin-bottom: 5px;">{{ day }}</span>
-
-            <!-- Quests for this day -->
-            {% if day in quest_map %}
-            {% for quest in quest_map[day] %}
-
-            {% set quest_time = '' %}
-            {% if quest.start_date and quest.start_date.day == day and quest.start_date.hour != 0 %}
-            {% set quest_time = quest.start_date.strftime('%H:%M') %}
-            {% elif quest.due_date and quest.due_date.day == day and quest.due_date.hour != 0 %}
-            {% set quest_time = quest.due_date.strftime('%H:%M') %}
-            {% endif %}
-
-            {% if quest.is_completed %}
-            <div title="{{ quest.title }} (Completed)"
-                style="display: block; margin-bottom: 3px; font-size: 0.75em; padding: 2px 4px; background: rgba(0, 255, 100, 0.1); border-left: 2px solid #00ff64; color: #888; text-decoration: line-through; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.6; cursor: not-allowed;">
-                {{ quest.rank }} {{ quest_time }} {{ quest.title }}
-            </div>
+            <!-- Weeks -->
+            {% for week in calendar %}
+            {% for day in week %}
+            {% if day == 0 %}
+            <div style="background: rgba(255,255,255,0.02); height: 100px; border-radius: 4px;"></div>
             {% else %}
-            <a href="/edit_quest/{{ quest.id }}" title="{{ quest.title }}"
-                style="display: block; margin-bottom: 3px; font-size: 0.75em; padding: 2px 4px; background: #222; border-left: 2px solid {{ 'var(--color-primary)' if quest.rank in ['B','A','S'] else '#666' }}; color: #ccc; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                {{ quest.rank }} {{ quest_time }} {{ quest.title }}
-            </a>
-            {% endif %}
+            <div
+                style="background: rgba(0,0,0,0.5); border: 1px solid #333; height: 100px; border-radius: 4px; padding: 5px; text-align: left; overflow-y: auto;">
+                <span style="color: #666; font-size: 0.9em; display: block; margin-bottom: 5px;">{{ day }}</span>
 
+                <!-- Quests for this day -->
+                {% if day in quest_map %}
+                {% for quest in quest_map[day] %}
+
+                {% set quest_time = '' %}
+                {% if quest.start_date and quest.start_date.day == day and quest.start_date.hour != 0 %}
+                {% set quest_time = quest.start_date.strftime('%H:%M') %}
+                {% elif quest.due_date and quest.due_date.day == day and quest.due_date.hour != 0 %}
+                {% set quest_time = quest.due_date.strftime('%H:%M') %}
+                {% endif %}
+
+                {% if quest.is_completed %}
+                <div title="{{ quest.title }} (Completed)"
+                    style="display: block; margin-bottom: 3px; font-size: 0.75em; padding: 2px 4px; background: rgba(0, 255, 100, 0.1); border-left: 2px solid #00ff64; color: #888; text-decoration: line-through; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.6; cursor: not-allowed;">
+                    {{ quest.rank }} {{ quest_time }} {{ quest.title }}
+                </div>
+                {% else %}
+                <a href="/edit_quest/{{ quest.id }}" title="{{ quest.title }}"
+                    style="display: block; margin-bottom: 3px; font-size: 0.75em; padding: 2px 4px; background: #222; border-left: 2px solid {{ 'var(--color-primary)' if quest.rank in ['B','A','S'] else '#666' }}; color: #ccc; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    {{ quest.rank }} {{ quest_time }} {{ quest.title }}
+                </a>
+                {% endif %}
+
+                {% endfor %}
+                {% endif %}
+            </div>
+            {% endif %}
             {% endfor %}
-            {% endif %}
-        </div>
-        {% endif %}
-        {% endfor %}
-        {% endfor %}
+            {% endfor %}
 
+        </div>
     </div>
 
 </div>

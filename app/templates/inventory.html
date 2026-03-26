@@ -10,10 +10,10 @@
 </style>
 <div class="dashboard-grid">
     <div class="panel" style="grid-column: 1 / -1; max-width: 1800px; margin: 0 auto;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
             <h2 style="margin: 0;">INVENTORY</h2>
             <a href="{{ url_for('main.dashboard') }}" class="btn-complete"
-                style="text-decoration: none; padding: 10px 20px; margin-left: 100px;">BACK TO DASHBOARD</a>
+                style="text-decoration: none; padding: 10px 20px;">BACK TO DASHBOARD</a>
         </div>
 
         <div class="inventory-section">
@@ -24,8 +24,8 @@
             <div class="inventory-list" style="display: flex; flex-direction: column; gap: 10px;">
                 {% for inv in player.inventory %}
                 <div class="inv-item"
-                    style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; {% if inv.is_equipped %}border: 1px solid var(--color-primary);{% endif %}">
-                    <div>
+                    style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; {% if inv.is_equipped %}border: 1px solid var(--color-primary);{% endif %}">
+                    <div style="flex: 1 1 auto; min-width: 200px;">
                         <span
                             style="color: #ddd; font-weight: bold; font-size: 1.1em; margin-bottom: 5px; display: block;">{{
                             inv.item.name }} {% if

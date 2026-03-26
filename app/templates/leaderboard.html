@@ -8,66 +8,68 @@
             <a href="{{ url_for('main.dashboard') }}" class="btn-small">BACK TO DASHBOARD</a>
         </div>
 
-        <table style="width: 100%; border-collapse: collapse; color: #eee;">
-            <thead>
-                <tr style="border-bottom: 2px solid var(--color-primary);">
-                    <th style="text-align: left; padding: 10px;">RANK</th>
-                    <th style="text-align: left; padding: 10px;">NAME</th>
-                    <th style="text-align: left; padding: 10px;">TITLE</th>
-                    <th style="text-align: right; padding: 10px;">LEVEL</th>
-                    <th style="text-align: left; padding: 10px;">CLASS</th>
-                    <th style="text-align: center; padding: 10px;">STREAK</th>
-                    <th style="text-align: center; padding: 10px;">BEST</th>
-                    <th style="text-align: left; padding: 10px;">FAILURES</th>
-                    <th style="text-align: left; padding: 10px;">VACATIONS</th>
-                    <th style="text-align: right; padding: 10px;">JOINED</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for player in leaderboard %}
-                <tr style="border-bottom: 1px solid #333;">
-                    <td style="padding: 15px; width: 50px; font-weight: bold; color: var(--color-accent);">#{{
-                        loop.index }}</td>
-                    <td style="padding: 15px;">
-                        <a href="{{ url_for('main.public_profile', player_id=player.id) }}"
-                            style="color: white; text-decoration: none; font-weight: bold; transition: color 0.2s;">
-                            {{ player.name }}
-                        </a>
-                        <!-- Add 'YOU' marker -->
-                        {% if player.id == current_user.id %}
-                        <span
-                            style="margin-left: 10px; font-size: 0.8em; color: var(--color-primary); border: 1px solid var(--color-primary); padding: 2px 5px; border-radius: 4px;">YOU</span>
-                        {% endif %}
-                    </td>
-                    <td style="padding: 15px; color: #aaa;">
-                        {{ player.title_display or 'None' }}
-                    </td>
-                    <td
-                        style="padding: 15px; text-align: right; font-family: 'Courier New', monospace; font-size: 1.2em; color: var(--color-gold);">
-                        LVL {{ player.level }}
-                    </td>
-                    <td style="padding: 15px; color: #b19cd9;">
-                        {{ player.job_class if player.job_class != 'None' else '-' }}
-                    </td>
-                    <td style="padding: 15px; color: #4CAF50; font-weight: bold; text-align: center;">
-                        {{ player.current_streak }} 🔥
-                    </td>
-                    <td style="padding: 15px; color: #FFD700; font-weight: bold; text-align: center;">
-                        {{ player.highest_streak }} 🏆
-                    </td>
-                    <td style="padding: 15px; color: red; font-weight: bold; text-align: center;">
-                        {{ player.penalties_count }}
-                    </td>
-                    <td style="padding: 15px; color: cyan; font-weight: bold; text-align: center;">
-                        {{ player.vacation_count }}
-                    </td>
-                    <td style="padding: 15px; color: #aaa; text-align: right; font-size: 0.9em;">
-                        {{ player.created_at.strftime('%d/%m/%Y') if player.created_at else '-' }}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <div style="overflow-x: auto; width: 100%; padding-bottom: 10px;">
+            <table style="width: 100%; border-collapse: collapse; color: #eee; min-width: 900px;">
+                <thead>
+                    <tr style="border-bottom: 2px solid var(--color-primary);">
+                        <th style="text-align: left; padding: 10px;">RANK</th>
+                        <th style="text-align: left; padding: 10px;">NAME</th>
+                        <th style="text-align: left; padding: 10px;">TITLE</th>
+                        <th style="text-align: right; padding: 10px;">LEVEL</th>
+                        <th style="text-align: left; padding: 10px;">CLASS</th>
+                        <th style="text-align: center; padding: 10px;">STREAK</th>
+                        <th style="text-align: center; padding: 10px;">BEST</th>
+                        <th style="text-align: center; padding: 10px;">FAILS</th>
+                        <th style="text-align: center; padding: 10px;">AWAY</th>
+                        <th style="text-align: right; padding: 10px;">JOINED</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for player in leaderboard %}
+                    <tr style="border-bottom: 1px solid #333;">
+                        <td style="padding: 15px; width: 50px; font-weight: bold; color: var(--color-accent);">#{{
+                            loop.index }}</td>
+                        <td style="padding: 15px; white-space: nowrap;">
+                            <a href="{{ url_for('main.public_profile', player_id=player.id) }}"
+                                style="color: white; text-decoration: none; font-weight: bold; transition: color 0.2s;">
+                                {{ player.name }}
+                            </a>
+                            <!-- Add 'YOU' marker -->
+                            {% if player.id == current_user.id %}
+                            <span
+                                style="margin-left: 10px; font-size: 0.8em; color: var(--color-primary); border: 1px solid var(--color-primary); padding: 2px 5px; border-radius: 4px;">YOU</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 15px; color: #aaa; white-space: nowrap;">
+                            {{ player.title_display or 'None' }}
+                        </td>
+                        <td
+                            style="padding: 15px; text-align: right; font-family: 'Courier New', monospace; font-size: 1.2em; color: var(--color-gold); white-space: nowrap;">
+                            LVL {{ player.level }}
+                        </td>
+                        <td style="padding: 15px; color: #b19cd9; white-space: nowrap;">
+                            {{ player.job_class if player.job_class != 'None' else '-' }}
+                        </td>
+                        <td style="padding: 15px; color: #4CAF50; font-weight: bold; text-align: center;">
+                            {{ player.current_streak }} 🔥
+                        </td>
+                        <td style="padding: 15px; color: #FFD700; font-weight: bold; text-align: center;">
+                            {{ player.highest_streak }} 🏆
+                        </td>
+                        <td style="padding: 15px; color: red; font-weight: bold; text-align: center;">
+                            {{ player.penalties_count }}
+                        </td>
+                        <td style="padding: 15px; color: cyan; font-weight: bold; text-align: center;">
+                            {{ player.vacation_count }}
+                        </td>
+                        <td style="padding: 15px; color: #aaa; text-align: right; font-size: 0.9em; white-space: nowrap;">
+                            {{ player.created_at.strftime('%d/%m/%Y') if player.created_at else '-' }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 {% endblock %}
