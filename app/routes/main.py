@@ -527,6 +527,7 @@ def architect_breakdown(quest_id):
         return render_template('confirm_breakdown.html', quest=quest)
 
     # POST: Execute Breakdown
+    from app.ai_guardian import TheArchitect
     sub_tasks = TheArchitect.decompose_task(quest.title)
     
     if not sub_tasks or len(sub_tasks) == 0:

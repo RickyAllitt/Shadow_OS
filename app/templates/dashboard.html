@@ -195,6 +195,40 @@
         transform: scale(1.02);
     }
 
+    /* Mobile overrides for penalty UI */
+    @media (max-width: 600px) {
+        .system-lockdown-overlay .glitch-text {
+            font-size: 2.2rem !important;
+            letter-spacing: 5px !important;
+        }
+        .system-lockdown-overlay .u-font-size-1-2rem {
+            font-size: 1rem !important;
+            letter-spacing: 2px !important;
+        }
+        .system-lockdown-overlay .u-padding-20 {
+            padding: 15px !important;
+        }
+        .system-lockdown-overlay .u-width-80 {
+            width: 95% !important;
+        }
+        .system-lockdown-overlay h3 {
+            font-size: 1.2rem !important;
+        }
+        .penalty-quest-card {
+            transform: scale(1) !important;
+            padding: 15px !important;
+            margin-top: 25px !important;
+        }
+        .penalty-quest-card .u-font-size-2rem {
+            font-size: 1.3rem !important;
+            letter-spacing: 2px !important;
+        }
+        .btn-complete-penalty {
+            padding: 12px 15px !important;
+            font-size: 0.9rem !important;
+        }
+    }
+
     .modal-content.system-alert {
         width: 90%;
         max-width: 500px;
@@ -907,6 +941,7 @@
                         {% endif %}
                     </div>
                     <div class="u-flex u-gap-10 u-align-center" style="white-space: nowrap; flex-shrink: 0;">
+                        {% if not quest.is_completed %}<a href="{{ url_for('main.architect_breakdown', quest_id=quest.id) }}" class="u-color-purple u-text-decoration-none" title="Architect Breakdown">⚡</a>{% endif %}
                         <a href="/edit_quest/{{ quest.id }}" class="u-color-muted u-text-decoration-none">✎</a>
                         <a href="/delete_quest/{{ quest.id }}" class="u-color-danger u-text-decoration-none">✖</a>
                         {% if not quest.is_completed %}<a href="/complete/{{ quest.id }}" class="btn-complete">✓</a>{%
