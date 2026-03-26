@@ -280,7 +280,8 @@ def calendar_view(year=None, month=None):
     quests = Quest.query.filter(
         Quest.player_id == current_user.id,
         Quest.due_date >= start_date,
-        Quest.due_date < end_date
+        Quest.due_date < end_date,
+        Quest.is_penalty == False
     ).all()
     
     # Map Quests to Days
