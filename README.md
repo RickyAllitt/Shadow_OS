@@ -1,4 +1,4 @@
-# Solo Leveling: The System
+# Solo Leveling: The System Personal Project
 
 > "You do not level up. You survive."
 
