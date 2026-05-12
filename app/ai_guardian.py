@@ -28,7 +28,7 @@ class TheArchitect:
             
         try:
             # Switching to gemini-3.1-flash-lite for high RPD limits
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key={api_key}"
+            url = f"https://generativelanguage.googleapis.com/v1alpha/models/gemini-3.1-flash-lite:generateContent?key={api_key}"
             headers = {
                 "Content-Type": "application/json"
             }
