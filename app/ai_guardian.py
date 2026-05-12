@@ -27,8 +27,8 @@ class TheArchitect:
             return None
             
         try:
-            # Switching to gemma-3-27b-it for maximum reasoning capability
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent?key={api_key}"
+            # Switching to gemma-3-27b for maximum reasoning capability
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b:generateContent?key={api_key}"
             headers = {
                 "Content-Type": "application/json"
             }
