@@ -52,6 +52,9 @@ class TheArchitect:
                 }]
             }
             
+            if json_mode:
+                data["generationConfig"] = {"responseMimeType": "application/json"}
+            
             # Encode data
             encoded_data = json.dumps(data).encode('utf-8')
             
@@ -62,7 +65,7 @@ class TheArchitect:
 
             try:
                 import socket
-                with urllib.request.urlopen(req, timeout=25) as response:
+                with urllib.request.urlopen(req, timeout=45) as response:
                     if response.status == 200:
                         response_body = response.read().decode('utf-8')
                         json_response = json.loads(response_body)
