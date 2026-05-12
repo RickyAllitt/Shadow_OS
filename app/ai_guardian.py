@@ -164,7 +164,19 @@ class TheArchitect:
         llm_result = cls._call_llm(prompt)
         # Validation
         if llm_result and isinstance(llm_result, dict) and all(k in llm_result for k in ['rank', 'stat']):
-            if 'xp' not in llm_result: llm_result['xp'] = 50
+            if 'xp' not in llm_result: 
+                llm_result['xp'] = 50
+            else:
+                try:
+                    llm_result['xp'] = int(llm_result['xp'])
+                except (ValueError, TypeError):
+                    llm_result['xp'] = 50
+                    
+            if not isinstance(llm_result['rank'], str):
+                llm_result['rank'] = str(llm_result['rank'])
+            if not isinstance(llm_result['stat'], str):
+                llm_result['stat'] = str(llm_result['stat'])
+                
             return llm_result
             
         # 2. Fallback
@@ -207,10 +219,16 @@ class TheArchitect:
             # Validate structure
             valid_results = []
             for item in llm_result:
-                if isinstance(item, dict) and 'step' in item:
-                    # Provide defaults if missing
-                    if 'rank' not in item: item['rank'] = 'E'
-                    if 'priority' not in item: item['priority'] = 4
+                if isinstance(item, dict) and 'step' in item and isinstance(item['step'], str):
+                    if 'rank' not in item or not isinstance(item['rank'], str): 
+                        item['rank'] = 'E'
+                    if 'priority' not in item: 
+                        item['priority'] = 4
+                    else:
+                        try:
+                            item['priority'] = int(item['priority'])
+                        except (ValueError, TypeError):
+                            item['priority'] = 4
                     valid_results.append(item)
             
             if valid_results:
