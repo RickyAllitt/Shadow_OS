@@ -1,4 +1,4 @@
-# Solo Leveling: The System Personal Project
+# Shadow_OS: Solo Leveling Life-Management System
 
 > "You do not level up. You survive."
 
@@ -107,8 +107,8 @@ The system is architected with security-first principles to ensure data integrit
 ### Installation
 1.  **Clone the Repository**
     ```bash
-    git clone https://github.com/your-username/solo-leveling-system.git
-    cd solo-leveling-system
+    git clone https://github.com/RickyAllitt/Shadow_OS.git
+    cd Shadow_OS
     ```
 
 2.  **Environment Setup**:
