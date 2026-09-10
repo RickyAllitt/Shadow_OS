@@ -20,8 +20,9 @@
     {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
     <div class="flash-container">
+        {% set popups_on = (current_user.settings_popups if current_user.is_authenticated and current_user.settings_popups is not none else True) %}
         {% for category, message in messages %}
-        {% if category == 'system_popup' %}
+        {% if category == 'system_popup' and popups_on %}
         <div class="flash-msg {{ category }}" style="display: none;">
             {{ message }}
         </div>
@@ -93,6 +94,14 @@
                     onchange="updateSettings(); if(window.audioManager) window.audioManager.play('notification');"
                     oninput="updateVolumeLabel(this.value)" style="width: 100px;">
                 <span id="volumeLabel" style="width: 30px; text-align: right;">{{ (js_vol * 100) | int }}%</span>
+            </div>
+
+            <div class="u-flex u-justify-between u-align-center u-mb-20 u-padding-10"
+                style="background:rgba(255,255,255,0.05);">
+                <span>System Pop-ups</span>
+                {% set js_popups = current_user.settings_popups if current_user.settings_popups is not none else True %}
+                <input type="checkbox" id="settingPopups" {{ 'checked' if js_popups else '' }}
+                    onchange="updateSettings()">
             </div>
 
             <div class="u-flex u-justify-between u-align-center u-mb-20 u-padding-10"
@@ -268,10 +277,15 @@
             if (window.audioManager) window.audioManager.setVolume(val);
         }
 
+        window.popupsEnabled = {{ 'true' if (current_user.settings_popups if current_user.settings_popups is not none else True) else 'false' }};
+
         function updateSettings() {
             const audio = document.getElementById('settingAudio').checked;
             const music = document.getElementById('settingMusic').checked;
             const volume = document.getElementById('settingVolume').value;
+            const popupsEl = document.getElementById('settingPopups');
+            const popups = popupsEl ? popupsEl.checked : true;
+            window.popupsEnabled = popups;
 
             if (window.audioManager) {
                 window.audioManager.enabled = audio;
@@ -283,7 +297,7 @@
                     'Content-Type': 'application/json',
                     'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                 },
-                body: JSON.stringify({ audio: audio, music: music, volume: volume })
+                body: JSON.stringify({ audio: audio, music: music, volume: volume, popups: popups })
             });
         }
     </script>
@@ -336,7 +350,9 @@
                     // Show new Toasts
                     const newUnread = unread.filter(n => !shownNotifications.has(n.id));
                     if (newUnread.length > 0) {
-                        showToasts(newUnread);
+                        if (window.popupsEnabled !== false) {
+                            showToasts(newUnread);
+                        }
                         newUnread.forEach(n => shownNotifications.add(n.id));
                     }
 

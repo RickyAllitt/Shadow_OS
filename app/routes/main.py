@@ -850,6 +850,7 @@ def update_settings():
     audio = request.json.get('audio')
     music = request.json.get('music')
     volume = request.json.get('volume')
+    popups = request.json.get('popups')
     
     if audio is not None:
         current_user.settings_audio = audio
@@ -857,6 +858,8 @@ def update_settings():
         current_user.settings_music = music
     if volume is not None:
         current_user.settings_volume = float(volume)
+    if popups is not None:
+        current_user.settings_popups = bool(popups)
         
     db.session.commit()
     return jsonify({'success': True})

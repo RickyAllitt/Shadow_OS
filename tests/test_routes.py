@@ -189,3 +189,38 @@ def test_abandon_insufficient_funds(client, app, csrf_token):
     
     with app.app_context():
         assert db.session.get(Quest, quest_id) is not None
+
+def test_update_settings_popups(auth_client, app, csrf_token):
+    """Test updating settings with popups toggle."""
+    # Default should be True
+    with app.app_context():
+        user = Player.query.filter_by(name="AuthUser").first()
+        assert user.settings_popups is True
+
+    # Disable popups
+    resp = auth_client.post('/update_settings', json={
+        'audio': True,
+        'music': True,
+        'volume': 0.5,
+        'popups': False
+    }, headers={'X-CSRFToken': csrf_token})
+    assert resp.status_code == 200
+    assert resp.get_json()['success'] is True
+
+    with app.app_context():
+        user = Player.query.filter_by(name="AuthUser").first()
+        assert user.settings_popups is False
+
+    # Enable popups again
+    resp = auth_client.post('/update_settings', json={
+        'audio': True,
+        'music': True,
+        'volume': 0.8,
+        'popups': True
+    }, headers={'X-CSRFToken': csrf_token})
+    assert resp.status_code == 200
+    assert resp.get_json()['success'] is True
+
+    with app.app_context():
+        user = Player.query.filter_by(name="AuthUser").first()
+        assert user.settings_popups is True

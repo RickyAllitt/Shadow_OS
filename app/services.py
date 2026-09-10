@@ -102,10 +102,25 @@ from datetime import datetime, timedelta, timezone
 import pytz
 
 GAME_TIMEZONE = pytz.timezone('Europe/Madrid')
+RESET_HOUR = 1  # 1:00 AM Europe/Madrid
+
+def get_latest_daily_reset_time(dt_game=None):
+    """
+    Returns the most recent 1:00 AM reset datetime in GAME_TIMEZONE.
+    If it's currently before 1:00 AM, the most recent reset was yesterday at 1:00 AM.
+    If it's at or after 1:00 AM, the most recent reset was today at 1:00 AM.
+    """
+    if dt_game is None:
+        dt_game = datetime.now(timezone.utc).astimezone(GAME_TIMEZONE)
+    if dt_game.hour < RESET_HOUR:
+        base_date = dt_game.date() - timedelta(days=1)
+    else:
+        base_date = dt_game.date()
+    return GAME_TIMEZONE.localize(datetime.combine(base_date, datetime.min.time()).replace(hour=RESET_HOUR))
 
 def check_weekly_reset(player):
     """
-    Checks if the weekly reset (Sunday night) has passed since the last reset.
+    Checks if the weekly reset (Sunday night / Monday morning at 1:00 AM) has passed since the last reset.
     If so, resets Gold to 0.
     Returns True if reset occurred.
     """
@@ -121,14 +136,17 @@ def check_weekly_reset(player):
     now_utc = datetime.now(timezone.utc)
     now_game = now_utc.astimezone(GAME_TIMEZONE)
     
-    # Reset is Sunday 23:59:59 Game Time
-    # Logic: If last reset was in a previous week?
-    # Simpler: Get start of current week (Monday 00:00) in Game Time.
-    # If last reset < start of current week, trigger reset.
+    # Reset is Sunday night / Monday 01:00:00 Game Time
+    # Logic: Get start of current week (Monday) in Game Time at RESET_HOUR (01:00).
+    # If last reset < start of current week at RESET_HOUR, trigger reset.
     
     today_game = now_game.date()
     start_of_week = today_game - timedelta(days=today_game.weekday()) # Monday
-    reset_threshold = GAME_TIMEZONE.localize(datetime.combine(start_of_week, datetime.min.time()))
+    reset_threshold = GAME_TIMEZONE.localize(datetime.combine(start_of_week, datetime.min.time()).replace(hour=RESET_HOUR))
+    
+    # If Monday 1:00 AM has not arrived yet, we are still in Sunday night
+    if now_game < reset_threshold:
+        return False
     
     # Convert player's last reset (stored as UTC usually or unaware) to Game Time aware
     last_reset_utc = player.last_weekly_reset
@@ -429,19 +447,17 @@ def _check_and_apply_daily_bonus(player):
         now_utc = datetime.now(timezone.utc)
         now_game = now_utc.astimezone(GAME_TIMEZONE)
         
-        # Check against today's midnight in Game Time
-        today_midnight_game = now_game.replace(hour=0, minute=0, second=0, microsecond=0)
+        # Check against latest 1:00 AM reset in Game Time
+        latest_reset_game = get_latest_daily_reset_time(now_game)
         
         last_bonus = player.last_daily_bonus
         if last_bonus and last_bonus.tzinfo is None:
             last_bonus = last_bonus.replace(tzinfo=timezone.utc)
             
-        # Optimization: We only care if last_bonus was BEFORE today_midnight.
-        # But last_bonus is UTC. Convert logic.
-        # If last_bonus < today_midnight_game (converted to UTC for comparison)
-        today_midnight_utc = today_midnight_game.astimezone(timezone.utc)
+        # Optimization: We only care if last_bonus was BEFORE latest_reset_utc.
+        latest_reset_utc = latest_reset_game.astimezone(timezone.utc)
         
-        if not last_bonus or last_bonus < today_midnight_utc:
+        if not last_bonus or last_bonus < latest_reset_utc:
             # Scaled Daily Bonus: 10% of Level Cap
             xp_cap = calculate_xp_required(player.level)
             bonus_xp = int(xp_cap * 0.10)
@@ -532,10 +548,10 @@ def check_daily_reset(player):
     now_utc = datetime.now(timezone.utc)
     now = now_utc
     now_game = now_utc.astimezone(GAME_TIMEZONE)
-    today_midnight_game = now_game.replace(hour=0, minute=0, second=0, microsecond=0)
+    latest_reset_game = get_latest_daily_reset_time(now_game)
     
-    # We compare everything in UTC to be safe with DB, but the "midnight point" is determined by Madrid time.
-    today_midnight_utc = today_midnight_game.astimezone(timezone.utc)
+    # We compare everything in UTC to be safe with DB, but the reset point is determined by Madrid time (1:00 AM).
+    latest_reset_utc = latest_reset_game.astimezone(timezone.utc)
     
     if player.last_daily_reset.tzinfo is None:
          player.last_daily_reset = player.last_daily_reset.replace(tzinfo=timezone.utc)
@@ -545,7 +561,7 @@ def check_daily_reset(player):
     days_processed = 0
     reset_occurred = False
     
-    while player.last_daily_reset < today_midnight_utc:
+    while player.last_daily_reset < latest_reset_utc:
         # Advance last_reset by 1 day
         # We process the day that just ended (last_daily_reset -> last_daily_reset + 1 day)
         # But efficiently, we just check "did we miss yesterday?"
@@ -555,7 +571,7 @@ def check_daily_reset(player):
         # We need to process failure for 01-01 to 01-02, and 01-02 to 01-03.
         
         # Target for this iteration is the end of the "current" recorded day
-        # We will simulate the check happening at midnight of the next day
+        # We will simulate the check happening at 1:00 AM of the next day
         
         # 1. Capture Analytics Snapshot (for the day being closed)
         _create_daily_snapshot(player)
@@ -605,10 +621,10 @@ def check_daily_reset(player):
                 
                 existing_penalty = Quest.query.filter_by(player_id=player.id, is_penalty=True, is_completed=False).first()
                 if not existing_penalty:
-                    # Calculate deadline: Next Midnight in Madrid
+                    # Calculate deadline: Next 1:00 AM in Madrid
                     # If we are in catch-up loop, we effectively set it relative to "now" since they just logged in?
-                    # Yes, give them until the upcoming midnight to fix it.
-                    deadline_game = today_midnight_game + timedelta(days=1)
+                    # Yes, give them until the upcoming 1:00 AM to fix it.
+                    deadline_game = latest_reset_game + timedelta(days=1)
                     deadline_utc = deadline_game.astimezone(timezone.utc)
 
                     penalty = Quest(
@@ -1143,7 +1159,7 @@ def check_daily_completion_status(app_instance):
             total = len(dailies)
             
             if completed < total:
-                msg = f"SYSTEM ALERT: Daily Routine incomplete ({completed}/{total}). Failure will result in penalties at midnight."
+                msg = f"SYSTEM ALERT: Daily Routine incomplete ({completed}/{total}). Failure will result in penalties at 1:00 AM."
                 create_notification(player.id, msg, "warning")
                 print(f">> Notification sent to {player.name}: Incomplete Dailies")
 

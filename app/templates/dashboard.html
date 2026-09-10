@@ -1197,16 +1197,20 @@
             document.getElementById('warningModal').style.display = 'flex';
         }
 
-        const systemFlashes = document.querySelectorAll('.flash-msg.system_popup');
-        const completionFlashes = document.querySelectorAll('.flash-msg.quest_complete');
-        if (systemFlashes.length > 0 || completionFlashes.length > 0) {
-            let html = "";
-            [...systemFlashes, ...completionFlashes].forEach(f => {
-                html += `<p class="u-mb-10">${f.innerText}</p>`;
-            });
-            document.getElementById('systemModalText').innerHTML = html;
-            document.getElementById('systemModal').style.display = 'flex';
-            if (window.audioManager) window.audioManager.play('notification');
+        const popupsEnabled = (typeof window.popupsEnabled !== 'undefined') ? window.popupsEnabled : {{ 'true' if (current_user.settings_popups if current_user.is_authenticated and current_user.settings_popups is not none else True) else 'false' }};
+
+        if (popupsEnabled) {
+            const systemFlashes = document.querySelectorAll('.flash-msg.system_popup');
+            const completionFlashes = document.querySelectorAll('.flash-msg.quest_complete');
+            if (systemFlashes.length > 0 || completionFlashes.length > 0) {
+                let html = "";
+                [...systemFlashes, ...completionFlashes].forEach(f => {
+                    html += `<p class="u-mb-10">${f.innerText}</p>`;
+                });
+                document.getElementById('systemModalText').innerHTML = html;
+                document.getElementById('systemModal').style.display = 'flex';
+                if (window.audioManager) window.audioManager.play('notification');
+            }
         }
 
         const lvlFlashes = document.querySelectorAll('.flash-msg.levelup');
