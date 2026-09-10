@@ -478,7 +478,9 @@
                     if (permission === 'granted') {
                         if ('serviceWorker' in navigator) {
                             navigator.serviceWorker.ready.then(function (swReg) {
-                                subscribeUser(swReg).then(() => {
+                                subscribeUser(swReg, true).then(() => {
+                                    updateNotificationButton();
+                                }).catch(() => {
                                     updateNotificationButton();
                                 });
                             });
@@ -573,8 +575,8 @@
                 navigator.serviceWorker.register('/service-worker.js')
                     .then(function (swReg) {
                         console.log('Service Worker is registered', swReg);
-                        if (Notification.permission === 'granted') {
-                            subscribeUser(swReg);
+                        if (Notification.permission === 'granted' && window.popupsEnabled !== false) {
+                            subscribeUser(swReg, false);
                         }
                     })
                     .catch(function (error) {
@@ -599,12 +601,14 @@
                 return outputArray;
             }
 
-            function subscribeUser(swRegistration) {
-                // Must fetch the public key from the backend securely, or inject via template.
-                // Assuming it's injected via Jinja or fetched. Let's create an endpoint to get the public key.
+            function subscribeUser(swRegistration, isManual = false) {
                 if (!window.isSecureContext) {
-                    alert("System Interface requires a secure HTTPS connection for Push Notifications. They will not function on this protocol.");
-                    return;
+                    if (isManual) {
+                        alert("System Interface requires a secure HTTPS connection for Push Notifications. They will not function on this protocol.");
+                    } else {
+                        console.warn("Push Notifications require a secure HTTPS connection.");
+                    }
+                    return Promise.resolve();
                 }
 
                 return fetch('/api/vapid_public_key')
@@ -637,8 +641,10 @@
                         }
                     })
                     .catch(function (err) {
-                        console.log('Failed to subscribe the user: ', err);
-                        alert("Push Subscription Failed: " + err.message + "\nEnsure your browser permits background notifications for this site.");
+                        console.warn('Failed to subscribe the user: ', err);
+                        if (isManual) {
+                            alert("Push Subscription Failed: " + err.message + "\nEnsure your browser permits background notifications for this site.");
+                        }
                     });
             }
         });
