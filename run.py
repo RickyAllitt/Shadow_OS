@@ -40,6 +40,10 @@ def init_database():
                     print("\n" + "=" * 78 + f"\n>> SCHEMA UPDATE NEEDED: {exc}\n" + "=" * 78 + "\n", flush=True)
                     raise SystemExit(1)
                 seed_database()
+                # Close the startup connections: gunicorn may fork workers from this process, and a
+                # connection (TLS session) shared by two processes corrupts both ("bad record mac").
+                db.session.remove()
+                db.engine.dispose()
         finally:
             fcntl.flock(lock, fcntl.LOCK_UN)
 

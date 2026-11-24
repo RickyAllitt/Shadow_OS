@@ -36,3 +36,6 @@ class Config:
     SECRET_KEY = _secret_key
     SQLALCHEMY_DATABASE_URI = database_url or 'sqlite:///system.db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    # Hosted MySQL/Postgres (TiDB Serverless) silently drops idle connections: test each one before
+    # use and recycle them before the server's idle timeout, instead of failing the next query.
+    SQLALCHEMY_ENGINE_OPTIONS = {'pool_pre_ping': True, 'pool_recycle': 280} if database_url else {}
