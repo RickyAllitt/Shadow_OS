@@ -70,6 +70,18 @@ def register_template_filters(app):
         """ISO string with an explicit UTC offset, so browsers don't read it as local time."""
         return _as_utc(dt).isoformat() if dt else ''
 
+    @app.template_filter('gate_time')
+    def gate_time(dt, left=False):
+        """Gate deadlines: 'Sun 01:00' in the viewer's timezone, or time remaining ('2d 5h')."""
+        from datetime import datetime
+        if not dt:
+            return ''
+        if left:
+            from app.progression import format_wait
+            delta = _as_utc(dt) - datetime.now(timezone.utc)
+            return format_wait(delta) if delta.total_seconds() > 0 else '0h'
+        return game_time(dt, '%a %H:%M')
+
     @app.template_filter('game_time')
     def game_time(dt, fmt='%d/%m %H:%M'):
         """Naive-UTC datetime shown in the viewer's timezone (GAME_TIMEZONE when logged out)."""

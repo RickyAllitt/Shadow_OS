@@ -56,8 +56,19 @@ def json_body():
     return data if isinstance(data, dict) else {}
 
 def level_up_flash(player):
-    """'<new level>|<levels gained>': parsed by SystemUI for the level-up overlay."""
-    return f"{player.level}|{max(1, getattr(player, 'levels_gained', 1))}"
+    """'<new level>|<levels gained>|<unlocked / next unlock>': parsed by SystemUI for the level-up overlay."""
+    from app.progression import level_up_preview
+    gained = max(1, getattr(player, 'levels_gained', 1))
+    return f"{player.level}|{gained}|{level_up_preview(player, player.level - gained)}"
+
+
+def evolution_flash(player):
+    from app.progression import skill_info
+    info = skill_info(player)
+    msg = f"CLASS EVOLVED: You are now a {player.just_evolved}!"
+    if info:
+        msg += f" Skill upgraded to {info['full_name']}: {info['effect']} Cooldown {info['cooldown_days']} days."
+    return msg
 
 bp = Blueprint('main', __name__)
 
@@ -92,6 +103,11 @@ def dashboard():
     for name in check_title_unlocks(player):
         flash(f"TITLE UNLOCKED: {name}", "system_popup")
 
+    # Gates, Red Gates, Rank Assessments and the Second Awakening
+    from app import gates as gate_engine
+    for msg in gate_engine.refresh(player):
+        flash(msg, "system_popup")
+
     # Once a week: how last week's league ended
     from app import league, kpi, social
     social.finalize_expired_raids()
@@ -120,9 +136,14 @@ def dashboard():
                                           for q in dailies + scheduled + backlog if q.is_measured},
                            fmt=kpi.format_amount,
                            rank_slots=league.rank_slots_left(player),
-                           rank_caps=league.WEEKLY_RANK_CAPS)
+                           rank_caps=league.WEEKLY_RANK_CAPS,
+                           skill=progression.skill_info(player),
+                           road=progression.next_milestone(player),
+                           gate_cards=[(g, gate_engine.progress(g)) for g in gate_engine.visible_gates(player)],
+                           shadow_info=shadow_info(player))
 
 from app.ai_guardian import TheArchitect
+from app import progression
 from app.league import claim_rank
 
 @bp.route('/add_quest', methods=['POST'])
@@ -268,7 +289,7 @@ def complete_quest(id):
 
     # Check for Evolution (Service attaches this attribute temporarily)
     if hasattr(player, 'just_evolved') and player.just_evolved:
-        flash(f"CLASS EVOLVED: You are now a {player.just_evolved}!", "system_popup")
+        flash(evolution_flash(player), "system_popup")
         
     # Check for Rank Up
     if hasattr(player, 'just_ranked_up') and player.just_ranked_up:
@@ -279,6 +300,9 @@ def complete_quest(id):
 
     for name in getattr(player, 'new_titles', []):
         flash(f"TITLE UNLOCKED: {name}", "system_popup")
+
+    for msg in getattr(player, 'progress_messages', []):
+        flash(msg, "system_popup")
 
     if can_arise:
         # Trigger 'Arise' Interaction via URL Param for reliability
@@ -873,6 +897,127 @@ def equip_title_route(title_id):
         flash(msg, "error")
     return redirect(url_for('main.dashboard'))
 
+@bp.route('/skill/use', methods=['POST'])
+@login_required
+def use_class_skill():
+    from app.progression import use_skill
+    ok, msg = use_skill(current_user)
+    flash(msg, "system_popup" if ok else "error")
+    return redirect(request.referrer if request.referrer and request.referrer.startswith(request.host_url)
+                    else url_for('main.dashboard'))
+
+
+def shadow_info(player):
+    """Shadow Army panel data: grade, kills, next promotion and assignable quests."""
+    from app import shadows
+    from app.progression import effective_level
+    rows = []
+    for sh in player.shadows:
+        nxt = shadows.next_grade(sh)
+        rows.append({'shadow': sh, 'grade': shadows.grade_name(sh), 'kills': sh.kills or 0,
+                     'next': nxt, 'weight': shadows.buff_weight(sh)})
+    quests = Quest.query.filter_by(player_id=player.id, is_penalty=False, is_completed=False).order_by(
+        Quest.is_daily.desc(), Quest.title).all() + Quest.query.filter_by(
+        player_id=player.id, is_daily=True, is_completed=True).all()
+    return {'rows': rows, 'can_command': effective_level(player) >= shadows.SHADOW_LEVEL,
+            'level': shadows.SHADOW_LEVEL, 'quests': {q.id: q for q in quests}}
+
+
+def _back(default='main.dashboard'):
+    ref = request.referrer
+    return redirect(ref if ref and ref.startswith(request.host_url) else url_for(default))
+
+
+@bp.route('/gates/<int:gate_id>/enter', methods=['POST'])
+@login_required
+def enter_gate(gate_id):
+    from app import gates
+    ok, msg = gates.enter(current_user, gate_id)
+    flash(msg, "system_popup" if ok else "error")
+    return _back()
+
+
+@bp.route('/gates/<int:gate_id>/decline', methods=['POST'])
+@login_required
+def decline_gate(gate_id):
+    from app import gates
+    ok, msg = gates.decline(current_user, gate_id)
+    flash(msg, "info" if ok else "error")
+    return _back()
+
+
+@bp.route('/gates/<int:gate_id>/claim', methods=['POST'])
+@login_required
+def claim_gate(gate_id):
+    from app import gates
+    current_user.levels_gained = 0
+    before = current_user.level
+    ok, messages, endpoint = gates.claim(current_user, gate_id)
+    if not ok:
+        flash(messages[0], "error")
+        return _back()
+    for msg in messages:
+        flash(msg, "system_popup")
+    if current_user.level > before:
+        flash(level_up_flash(current_user), "levelup")
+    if getattr(current_user, 'just_evolved', None):
+        flash(evolution_flash(current_user), "system_popup")
+    for name in getattr(current_user, 'new_titles', []):
+        flash(f"TITLE UNLOCKED: {name}", "system_popup")
+    return redirect(url_for(endpoint)) if endpoint else _back()
+
+
+@bp.route('/shadows/<int:shadow_id>/assign', methods=['POST'])
+@login_required
+def assign_shadow(shadow_id):
+    from app import shadows
+    quest_id = request.form.get('quest_id', type=int)
+    ok, msg = shadows.assign(current_user, shadow_id, quest_id)
+    flash(msg, "success" if ok else "error")
+    return _back()
+
+
+@bp.route('/awakening', methods=['GET', 'POST'])
+@login_required
+def awakening():
+    from app import progression
+    line = progression.base_class(current_user.job_class)
+    if request.method == 'POST':
+        ok, msg = progression.choose_specialization(current_user, request.form.get('specialization', ''))
+        flash(msg, "system_popup" if ok else "error")
+        return redirect(url_for('main.dashboard') if ok else url_for('main.awakening'))
+    from app.models import Gate
+    ready = bool(line and not current_user.specialization and current_user.gates.filter(
+        Gate.kind == 'awakening', Gate.status == 'claimed').first())
+    if not ready:
+        flash("The Second Awakening isn't available right now.", "info")
+        return redirect(url_for('main.dashboard'))
+    return render_template('awakening.html', line=line, options=progression.SPECIALIZATIONS[line])
+
+
+@bp.route('/ascend', methods=['POST'])
+@login_required
+def ascend():
+    from app import progression
+    ok, msg = progression.ascend(current_user)
+    flash(msg, "system_popup" if ok else "error")
+    for name in getattr(current_user, 'new_titles', []):
+        flash(f"TITLE UNLOCKED: {name}", "system_popup")
+    return redirect(url_for('main.dashboard') if ok else url_for('main.roadmap'))
+
+
+@bp.route('/roadmap')
+@login_required
+def roadmap():
+    from app import progression
+    return render_template('roadmap.html', player=current_user,
+                           stones=progression.milestones(current_user),
+                           upcoming=progression.next_milestone(current_user),
+                           skill=progression.skill_info(current_user),
+                           skills=progression.CLASS_SKILLS, roman=progression.ROMAN,
+                           cooldown=progression.cooldown_days, can_ascend=progression.can_ascend(current_user))
+
+
 @bp.route('/job_qualification')
 @login_required
 def job_qualification():
@@ -918,7 +1063,8 @@ from app.services import equip_item_service, unequip_item_service
 @bp.route('/inventory')
 @login_required
 def inventory():
-    return render_template('inventory.html', player=current_user)
+    from app.loot import set_summaries
+    return render_template('inventory.html', player=current_user, sets=set_summaries(current_user))
 
 @bp.route('/equip_item/<int:inv_id>', methods=['POST'])
 @login_required
@@ -1269,6 +1415,10 @@ def focus_complete():
     record_points(current_user, 'focus', base_xp, minutes=minutes)
     record_focus_effort(current_user, minutes)
 
+    from app.progression import insight_bonus_xp
+    insight = insight_bonus_xp(current_user, minutes, FOCUS_XP_PER_MINUTE, xp_multiplier(current_user))
+    xp += insight  # league points above stay on base XP
+
     from app.services import add_xp
     current_user.debt_paid = 0  # transient per-request counter (see services.add_xp)
     current_user.coins += coins
@@ -1284,7 +1434,7 @@ def focus_complete():
         flash(level_up_flash(current_user), "levelup")
 
     if hasattr(current_user, 'just_evolved') and current_user.just_evolved:
-        flash(f"CLASS EVOLVED: You are now a {current_user.just_evolved}!", "system_popup")
+        flash(evolution_flash(current_user), "system_popup")
         
     if hasattr(current_user, 'just_ranked_up') and current_user.just_ranked_up:
         flash(f"RANK UP: You have reached {current_user.just_ranked_up}-Rank!", "system_popup")
@@ -1293,6 +1443,8 @@ def focus_complete():
         flash(f"TITLE UNLOCKED: {name}", "system_popup")
 
     msg = f"FOCUS COMPLETE: {minutes}m. +{coins} Coins, +{xp} XP."
+    if insight:
+        msg += f" (INSIGHT +{insight} XP)"
     if getattr(current_user, 'debt_paid', 0):
         msg += f" ({current_user.debt_paid} XP paid off debt)"
     flash(msg, "system_popup")  # Shown on the next page load (focus page reloads / redirects)

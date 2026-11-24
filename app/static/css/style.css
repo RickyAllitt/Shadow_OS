@@ -688,6 +688,20 @@ body.glitch-theme b {
     animation: scaleIn 0.4s 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
 }
 
+.levelup-next {
+    margin-top: 18px;
+    max-width: 640px;
+    font-size: 1rem;
+    color: var(--color-gold);
+    letter-spacing: 2px;
+    text-align: center;
+    animation: scaleIn 0.4s 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+
+.levelup-next:empty {
+    display: none;
+}
+
 .levelup-hint {
     margin-top: 30px;
     font-size: 0.8rem;
@@ -749,7 +763,8 @@ body.glitch-theme b {
     .flash-msg,
     .modal-content,
     .levelup-title,
-    .levelup-subtitle {
+    .levelup-subtitle,
+    .levelup-next {
         animation: none;
     }
 }

@@ -148,8 +148,8 @@ def test_s_rank_message_and_level_up_payload(auth_client, app, csrf_token):
     page = auth_client.post(f'/complete/{q.id}', data={'csrf_token': csrf_token}, follow_redirects=True).data
     assert b'INSTANT LEVEL UP' in page
     assert b'+0 XP' not in page
-    # Level-up overlay payload: "<new level>|<levels gained>"
-    assert b'data-category="levelup">2|1<' in page
+    # Level-up overlay payload: "<new level>|<levels gained>|<unlocked or next unlock>"
+    assert b'data-category="levelup">2|1|NEXT: Job Change Trial at LV 10 (8 levels away)<' in page
 
 
 def test_daily_completion_shows_progress_not_zero_xp(auth_client, app, csrf_token):

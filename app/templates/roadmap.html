@@ -1,0 +1,66 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/progression.css') }}">
+
+<div class="roadmap">
+    <section class="panel u-padding-20">
+        <h1 class="u-color-primary">ROAD TO MONARCH</h1>
+        <p class="roadmap-intro">Every level that unlocks something. You are <strong>Lv {{ player.level }}</strong>
+            {%- if upcoming %}, {{ upcoming.levels_away }} level{{ 's' if upcoming.levels_away != 1 }} from your next unlock{% endif %}.
+            Every level also gives +1 to all stats and a full recovery.</p>
+
+        {% if skill %}
+        <div class="roadmap-skill">
+            <h2 class="u-font-small u-color-muted">CLASS SKILL: {{ skill.name | upper }}{% if skill.specialization %} · {{ skill.specialization | upper }}{% endif %}</h2>
+            <table class="roadmap-skill-tiers">
+                <thead><tr><th>Tier</th><th>Level</th><th>Effect</th><th>Cooldown</th></tr></thead>
+                <tbody>
+                    {% for t in range(1, 7) %}
+                    <tr class="{{ 'current' if t == skill.tier }}">
+                        <td>{{ roman[t] }}</td>
+                        <td>{{ 10 if t == 1 else (t - 1) * 20 }}</td>
+                        <td>{{ skills[skill.line].effect(t, skill.specialization) }}</td>
+                        <td>{{ cooldown(t, skill.specialization) }} days</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        {% if can_ascend %}
+        <div class="ascend-box">
+            <h2 class="u-color-gold">{{ icon('star') }} ASCENSION AVAILABLE</h2>
+            <p>Return to Level 1 and climb again. You keep your class, skill, rank, stats, gear, shadows and titles,
+                and gain a permanent +5% XP for every Ascension.</p>
+            <form method="POST" action="{{ url_for('main.ascend') }}"
+                onsubmit="return confirm('Ascend? Your level resets to 1. Everything else stays.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn-gate btn-gate-claim">ASCEND</button>
+            </form>
+        </div>
+        {% endif %}
+        {% if player.ascensions %}<p class="roadmap-intro">{{ icon('star') }} Ascensions: <strong>{{ player.ascensions }}</strong> (+{{ player.ascensions * 5 }}% XP).</p>{% endif %}
+
+        <ol class="timeline">
+            {% for m in stones %}
+            {% set is_next = upcoming and m.level == upcoming.level %}
+            <li class="timeline-stop{{ ' reached' if m.reached }}{{ ' next' if is_next }}">
+                <div class="timeline-head">
+                    <span class="timeline-level">LV {{ m.level }}</span>
+                    <span class="timeline-status">
+                        {% if m.reached %}{{ icon('check') }} UNLOCKED
+                        {% elif is_next %}NEXT · {{ upcoming.progress }}%
+                        {% else %}{{ icon('lock') }} {{ m.level - player.level }} levels away{% endif %}
+                    </span>
+                </div>
+                {% for r in m.rewards %}
+                <div class="timeline-reward">{{ icon(r.icon) }} <strong>{{ r.title }}</strong><small>{{ r.detail }}</small></div>
+                {% endfor %}
+            </li>
+            {% endfor %}
+        </ol>
+    </section>
+</div>
+{% endblock %}

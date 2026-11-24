@@ -189,7 +189,9 @@
         enqueue(done => {
             const overlay = document.getElementById('levelUpOverlay');
             if (!overlay) return done();
-            const [level, gained] = levelFlash.textContent.trim().split('|');
+            const [level, gained, preview] = levelFlash.textContent.trim().split('|');
+            const next = document.getElementById('levelUpNext');
+            if (next) next.textContent = preview || '';
             const sub = document.getElementById('levelUpDetail');
             if (sub) {
                 const n = parseInt(gained) || 1;
@@ -200,7 +202,7 @@
             openModal(overlay);
             play('level_up');
             if (window.confetti) window.confetti({ particleCount: 150, spread: 100, origin: { y: 0.5 } });
-            setTimeout(() => closeModal(overlay), 3500);
+            setTimeout(() => closeModal(overlay), preview ? 5500 : 3500);
         });
     }
 

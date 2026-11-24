@@ -186,5 +186,15 @@ def run_schema_upgrades():
     # Per-player timezone and reminder time
     _add_column('player', 'timezone', "VARCHAR(50) DEFAULT 'Europe/Madrid'")
     _add_column('player', 'reminder_time', "VARCHAR(5) DEFAULT '18:00'")
+    # Class skills (Vanish / Insight / Fortify)
+    _add_column('player', 'skill_ready_at', 'DATETIME')
+    _add_column('player', 'skill_armed', 'BOOLEAN DEFAULT FALSE')
+    # Gates, loot, Shadow Army grades, Second Awakening, Ascension
+    _add_column('player', 'specialization', 'VARCHAR(20)')
+    _add_column('player', 'ascensions', 'INTEGER DEFAULT 0')
+    _add_column('reward_item', 'rarity', 'VARCHAR(12)')
+    _add_column('reward_item', 'set_name', 'VARCHAR(40)')
+    _add_column('shadow', 'assigned_quest_id', 'INTEGER')
+    _add_column('shadow', 'kills', 'INTEGER DEFAULT 0')
     _normalize_conditions()
     _rescale_xp_to_current_curve()

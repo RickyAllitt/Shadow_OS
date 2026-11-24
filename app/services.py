@@ -40,6 +40,20 @@ TITLE_DEFINITIONS = [
      'unlock_condition': 'stat_strength', 'unlock_value': 50, 'buff': {'stat': ('strength', 5)}},
     {'name': "Coin Hoarder", 'description': "Hold 5,000 Coins at once.",
      'unlock_condition': 'coins', 'unlock_value': 5000, 'buff': {'coins': 0.05}},
+    {'name': "Sovereign Candidate", 'description': "Reach Level 75.",
+     'unlock_condition': 'level', 'unlock_value': 75, 'buff': {'all': 2}},
+    {'name': "Monarch", 'description': "Reach Level 100.",
+     'unlock_condition': 'level', 'unlock_value': 100, 'buff': {'xp': 0.15}},
+    {'name': "Gate Breaker", 'description': "Clear your first Gate.",
+     'unlock_condition': 'gates', 'unlock_value': 1, 'buff': {'coins': 0.05}},
+    {'name': "Dungeon Diver", 'description': "Clear 10 Gates.",
+     'unlock_condition': 'gates', 'unlock_value': 10, 'buff': {'stat': ('agility', 3)}},
+    {'name': "Red Gate Survivor", 'description': "Clear a Red Gate.",
+     'unlock_condition': 'red_gates', 'unlock_value': 1, 'buff': {'stat': ('vitality', 3)}},
+    {'name': "Shadow Commander", 'description': "Promote a shadow to Commander.",
+     'unlock_condition': 'shadow_grade', 'unlock_value': 3, 'buff': {'stat': ('sense', 3)}},
+    {'name': "Ascendant", 'description': "Ascend for the first time.",
+     'unlock_condition': 'ascension', 'unlock_value': 1, 'buff': {'xp': 0.10}},
 ]
 _TITLE_BUFFS = {t['name']: t['buff'] for t in TITLE_DEFINITIONS}
 _STAT_LABELS = {'strength': 'STR', 'intelligence': 'INT', 'agility': 'AGI', 'vitality': 'VIT', 'sense': 'SNS'}
@@ -60,8 +74,12 @@ def active_title_buff(player):
 
 def xp_multiplier(player):
     """Sleep condition x equipped title XP bonus x Hardcore bonus."""
+    from app.loot import set_xp_bonus
+    from app.progression import ASCENSION_XP_BONUS
     hardcore = 1 + HARDCORE_XP_BONUS if getattr(player, 'hardcore', False) else 1
-    return condition_xp_multiplier(player) * (1 + active_title_buff(player).get('xp', 0)) * hardcore
+    ascension = 1 + ASCENSION_XP_BONUS * (getattr(player, 'ascensions', 0) or 0)
+    return (condition_xp_multiplier(player) * (1 + active_title_buff(player).get('xp', 0)) * hardcore
+            * (1 + set_xp_bonus(player)) * ascension)
 
 def coin_multiplier(player):
     return 1 + active_title_buff(player).get('coins', 0)
@@ -451,12 +469,12 @@ def process_quest_completion(player, quest):
     
     # --- CLASS BONUSES ---
     # Assassin: +10% Coins
-    if player.job_class == 'Assassin':
-        coin_gain = int(coin_gain * 1.10)
-        
-    # Mage: +10% XP
-    if player.job_class == 'Mage':
-        xp_gain = int(xp_gain * 1.10)
+    # Assassin: +10% Coins (Blade: +20%), Mage: +10% XP (Elementalist: +15%), whole evolution line
+    from app.progression import class_coin_bonus, class_xp_bonus
+    if class_coin_bonus(player):
+        coin_gain = int(coin_gain * (1 + class_coin_bonus(player)))
+    if class_xp_bonus(player):
+        xp_gain = int(xp_gain * (1 + class_xp_bonus(player)))
 
     add_xp(player, xp_gain)
     player.gold += base_gold
@@ -472,6 +490,14 @@ def process_quest_completion(player, quest):
     # League points use base XP (before INT/class/title/sleep bonuses) so the league stays fair
     record_points(player, 'quest', S_RANK_LEAGUE_XP if instant_level_up else league_xp)
     record_quest_effort(player, quest)  # Life Balance: dailies count too
+
+    # Shadow Army kills and loot drops (announced by the route via player.progress_messages)
+    from app import loot, shadows
+    news = shadows.record_kill(player, quest)
+    drop = loot.maybe_drop_from_quest(player, quest)
+    if drop:
+        news.append(drop)
+    player.progress_messages = getattr(player, 'progress_messages', []) + news
 
     # 2. Apply Stat Buffs (Only for Rank B+ and NOT Daily/Penalty)
     if quest.rank in ['B', 'A', 'S'] and not quest.is_daily and not quest.is_penalty:
@@ -726,7 +752,11 @@ def check_daily_reset(player):
             from app.league import record
             record(player, 'daily_result', success=success, when=player.last_daily_reset)
         
-        if not success and (player.streak_freezes or 0) > 0:
+        from app.progression import consume_armed
+        vanished = consume_armed(player, 'Assassin')  # Vanish covers only the day being closed
+        if not success and vanished:
+            messages.append(f"VANISH: the System looked the other way. Your {player.current_streak}-day streak is safe.")
+        elif not success and (player.streak_freezes or 0) > 0:
             # STREAK FREEZE: the bad day is forgiven (no streak loss, debuff or penalty progress)
             player.streak_freezes -= 1
             messages.append(f"❄️ STREAK FREEZE USED: your {player.current_streak}-day streak is safe "
@@ -740,8 +770,8 @@ def check_daily_reset(player):
             player.penalties_count += 1
             
             effective_missed_days = player.consecutive_missed_days
-            if player.job_class == 'Tank':
-                effective_missed_days = max(0, effective_missed_days - 1)
+            from app.progression import penalty_grace_days
+            effective_missed_days = max(0, effective_missed_days - penalty_grace_days(player))
             
             # Stage 1: Debuff
             if effective_missed_days == 1:
@@ -806,7 +836,9 @@ def check_daily_reset(player):
                     can_level_down = False
                     
             if effective_missed_days >= 3 and can_level_down:
-                if player.hardcore:
+                if consume_armed(player, 'Tank'):
+                    messages.append("FORTIFY: your shield absorbed the failed penalty. No debt, no level lost.")
+                elif player.hardcore:
                     # Opt-in Hardcore: lose exactly one level (no stat loss)
                     if player.level > 1:
                         player.level -= 1
@@ -945,6 +977,17 @@ def check_title_unlocks(player):
         elif t.unlock_condition == 'coins':
             if player.coins >= t.unlock_value:
                 unlocked = True
+        elif t.unlock_condition == 'gates':
+            from app.gates import cleared_count
+            unlocked = cleared_count(player) >= t.unlock_value
+        elif t.unlock_condition == 'red_gates':
+            from app.gates import cleared_count
+            unlocked = cleared_count(player, ('red',)) >= t.unlock_value
+        elif t.unlock_condition == 'shadow_grade':
+            from app.shadows import max_grade
+            unlocked = max_grade(player) >= t.unlock_value
+        elif t.unlock_condition == 'ascension':
+            unlocked = (player.ascensions or 0) >= t.unlock_value
                 
         if unlocked:
             assoc = PlayerTitle(player=player, title=t)
@@ -1015,28 +1058,29 @@ def check_class_evolution(player):
             
     return False, None
 
+# Hunter Rank promotions: current rank -> (next rank, level required, total base stats required)
+RANK_REQUIREMENTS = {
+    'E': ('D', 10, 50),
+    'D': ('C', 20, 100),
+    'C': ('B', 40, 200),
+    'B': ('A', 60, 350),
+    'A': ('S', 80, 500),
+}
+
+def total_base_stats(player):
+    return player.strength + player.agility + player.intelligence + player.vitality + player.sense
+
 def check_player_rank_up(player):
     """ Checks if player qualifies for a higher Hunter Rank. """
-    # Rank Requirements: (Level, Total Stats)
-    rank_reqs = {
-        'E': ('D', 10, 50),
-        'D': ('C', 20, 100),
-        'C': ('B', 40, 200),
-        'B': ('A', 60, 350),
-        'A': ('S', 80, 500)
-    }
-    
-    if player.rank == 'S':
+    if player.rank not in RANK_REQUIREMENTS:
         return False, None
-
-    next_rank, req_lvl, req_stats = rank_reqs.get(player.rank, (None, 999, 9999))
-    
-    if next_rank:
-        total_stats = player.strength + player.agility + player.intelligence + player.vitality + player.sense
-        if player.level >= req_lvl and total_stats >= req_stats:
-            player.rank = next_rank
-            return True, next_rank
-            
+    next_rank, req_lvl, req_stats = RANK_REQUIREMENTS[player.rank]
+    from app.gates import EXAM_RANKS
+    if next_rank in EXAM_RANKS:
+        return False, None  # B, A and S need a Rank Assessment (app/gates.py)
+    if player.level >= req_lvl and total_base_stats(player) >= req_stats:
+        player.rank = next_rank
+        return True, next_rank
     return False, None
 
 def equip_item_service(player, inventory_id):
@@ -1175,6 +1219,11 @@ def calculate_total_stats(player):
             if target_stat in stats:
                 stats[target_stat] += inv_item.item.stat_value
                 
+    # Legendary set bonuses (2 pieces)
+    from app.loot import set_stat_bonuses
+    for field, value in set_stat_bonuses(player).items():
+        stats[field] += value
+
     # Equipped Title Bonuses
     buff = active_title_buff(player)
     if buff.get('all'):
@@ -1185,8 +1234,9 @@ def calculate_total_stats(player):
         if field in stats:
             stats[field] += value
 
-    # Shadow Army Buffs (Commanding Presence: Base 1% + 0.1% per 10 SNS)
-    shadow_count = len(player.shadows)
+    # Shadow Army Buffs (Commanding Presence: Base 1% + 0.1% per 10 SNS), each shadow weighted by grade
+    from app.shadows import army_weight
+    shadow_count = army_weight(player)
     if shadow_count > 0:
         sense_bonus = (player.sense / 10) * 0.001 # +0.1% per 10 SNS
         multiplier = 1 + (shadow_count * (0.01 + sense_bonus))

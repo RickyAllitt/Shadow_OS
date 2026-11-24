@@ -43,7 +43,7 @@ def test_focus_complete_can_level_up(auth_client, app, csrf_token):
     p = me(); p.xp = 99; p.xp_required = 100; db.session.commit()
     auth_client.post('/focus_complete', json={'minutes': 10}, headers=hdr(csrf_token))  # +100 XP
     assert me().level == 2
-    assert b'data-category="levelup">2|1<' in auth_client.get('/').data
+    assert b'data-category="levelup">2|1|NEXT: Job Change Trial at LV 10 (8 levels away)<' in auth_client.get('/').data
 
 
 # --- onboarding ---

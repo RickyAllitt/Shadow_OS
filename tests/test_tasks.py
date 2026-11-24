@@ -91,7 +91,7 @@ def test_tick_runs_everything_and_isolates_failures(app, monkeypatch):
     monkeypatch.setattr(tasks, 'send_due_deadline_reminders', boom)
     results = tasks.run_due_tasks(app)
     assert results['deadlines'] == 'error: RuntimeError'
-    assert results['purged'] == 1 and set(results) == {'reminders', 'deadlines', 'weekly_reports', 'purged'}
+    assert results['purged'] == 1 and set(results) == {'reminders', 'deadlines', 'weekly_reports', 'purged', 'gates'}
 
 
 # --- HTTP wake-up hook ---
@@ -108,7 +108,7 @@ def test_tasks_endpoint_requires_secret_header(client, app, monkeypatch):
     assert client.get('/tasks/run?key=s3cret-value').status_code == 403  # never via URL
     r = client.post('/tasks/run', headers={'X-Cron-Secret': 's3cret-value'})  # no CSRF token needed
     assert r.status_code == 200 and r.get_json()['ok']
-    assert set(r.get_json()['results']) == {'reminders', 'deadlines', 'weekly_reports', 'purged'}
+    assert set(r.get_json()['results']) == {'reminders', 'deadlines', 'weekly_reports', 'purged', 'gates'}
     assert client.get('/tasks/run', headers={'Authorization': 'Bearer s3cret-value'}).status_code == 200
 
 

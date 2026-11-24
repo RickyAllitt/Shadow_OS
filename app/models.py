@@ -111,6 +111,12 @@ class Player(UserMixin, db.Model):
     hardcore = db.Column(db.Boolean, default=False)         # opt-in: failed penalties cost a level
     hardcore_since = db.Column(db.DateTime, nullable=True)
 
+    # --- CLASS SKILL (see app/progression.py) ---
+    skill_ready_at = db.Column(db.DateTime, nullable=True)  # cooldown end (UTC); None = ready
+    skill_armed = db.Column(db.Boolean, default=False)      # Vanish / Insight / Fortify shield waiting to trigger
+    specialization = db.Column(db.String(20), nullable=True) # Second Awakening branch (Lv 50), e.g. 'Blade'
+    ascensions = db.Column(db.Integer, default=0)            # prestige: times reset from Lv 100 to Lv 1
+
     # --- VACATION SYSTEM ---
     is_on_vacation = db.Column(db.Boolean, default=False)
     vacation_start_date = db.Column(db.DateTime, nullable=True)
@@ -188,6 +194,8 @@ class RewardItem(db.Model):
     stat_bonus = db.Column(db.String(20), nullable=True) # e.g. 'STR'
     stat_value = db.Column(db.Integer, default=0) # e.g. 2
     slot = db.Column(db.String(20), nullable=True) # 'weapon', 'armor', 'accessory'
+    rarity = db.Column(db.String(12), nullable=True)   # loot only: common / rare / epic / legendary
+    set_name = db.Column(db.String(40), nullable=True) # legendary set pieces (see app/loot.py)
 
 class Inventory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -267,6 +275,10 @@ class Shadow(db.Model):
     # Buff Logic
     buff_type = db.Column(db.String(50), default='ALL_STATS') # 'ALL_STATS', 'STR', etc.
     buff_value = db.Column(db.Integer, default=1) # +1% or +1 Flat
+
+    # Shadow Army grades (Lv 25): a shadow assigned to a quest grows each time you complete it
+    assigned_quest_id = db.Column(db.Integer, nullable=True)
+    kills = db.Column(db.Integer, default=0)
     
     player = db.relationship('Player', backref=db.backref('shadows', lazy=True, cascade="all, delete-orphan"))
 
@@ -398,3 +410,28 @@ class Kudos(db.Model):
 
     event = db.relationship('ActivityEvent', backref=db.backref('kudos', lazy=True, cascade="all, delete-orphan"))
     from_player = db.relationship('Player', backref=db.backref('kudos_given', lazy=True, cascade="all, delete-orphan"))
+
+
+class Gate(db.Model):
+    """
+    A timed challenge (see app/gates.py). Kinds: 'gate' (weekly, Lv 15), 'red' (rare, Lv 30),
+    'exam' (Rank Assessment, Lv 40+) and 'awakening' (Second Awakening, Lv 50).
+    Objectives are measured from the activity log between entered_at and expires_at.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False, index=True)
+    kind = db.Column(db.String(12), nullable=False, default='gate')
+    grade = db.Column(db.String(2), nullable=False, default='C')
+    title = db.Column(db.String(80), nullable=False)
+    objectives = db.Column(db.Text, nullable=False)          # JSON list of objective dicts
+    target_rank = db.Column(db.String(2), nullable=True)     # exams: the rank being tested for
+    week_start = db.Column(db.Date, nullable=False)
+    appeared_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    enter_by = db.Column(db.DateTime, nullable=True)         # None = can be entered any time
+    entered_at = db.Column(db.DateTime, nullable=True)
+    expires_at = db.Column(db.DateTime, nullable=True)
+    status = db.Column(db.String(12), nullable=False, default='waiting')
+    # waiting -> active -> cleared -> claimed | failed ; waiting -> missed | declined
+    finished_at = db.Column(db.DateTime, nullable=True)
+
+    player = db.relationship('Player', backref=db.backref('gates', lazy='dynamic', cascade="all, delete-orphan"))

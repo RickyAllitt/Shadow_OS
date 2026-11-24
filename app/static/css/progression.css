@@ -1,0 +1,476 @@
+/* Road to Monarch (dashboard + /roadmap) and class skill card */
+
+/* --- skill card (dashboard status column) --- */
+.skill-card {
+    margin-top: 14px;
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #333;
+    border-radius: 5px;
+    background: rgba(0, 0, 0, 0.25);
+    text-align: center;
+}
+
+.skill-card.skill-ready {
+    border-color: var(--color-purple);
+    box-shadow: 0 0 10px var(--color-purple-dim);
+}
+
+.skill-card.skill-armed {
+    border-color: var(--color-gold);
+    box-shadow: 0 0 10px var(--color-gold-dim);
+}
+
+.skill-name {
+    font-family: var(--font-heading);
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+    color: var(--color-purple);
+}
+
+.skill-armed .skill-name {
+    color: var(--color-gold);
+}
+
+.skill-effect {
+    margin: 6px 0 8px;
+    font-size: 0.72rem;
+    line-height: 1.35;
+    color: #aaa;
+}
+
+.btn-skill {
+    width: 100%;
+    padding: 6px 8px;
+    font-family: var(--font-heading);
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    color: #fff;
+    background: var(--color-purple-dim);
+    border: 1px solid var(--color-purple);
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.btn-skill:hover {
+    background: var(--color-purple);
+    box-shadow: 0 0 12px var(--color-purple-glow);
+}
+
+.skill-state {
+    font-family: var(--font-heading);
+    font-size: 0.72rem;
+    letter-spacing: 1px;
+    color: var(--color-gold);
+}
+
+.skill-state.skill-cooldown {
+    color: var(--color-text-muted);
+}
+
+/* --- dashboard road panel --- */
+.road-link {
+    font-size: 0.72rem;
+    letter-spacing: 1px;
+    color: var(--color-primary);
+    text-decoration: none;
+}
+
+.road-next {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+}
+
+.road-level {
+    flex: none;
+    min-width: 72px;
+    padding: 8px 6px;
+    text-align: center;
+    font-family: var(--font-heading);
+    font-size: 1.1rem;
+    color: var(--color-gold);
+    border: 1px solid var(--color-gold);
+    border-radius: 4px;
+    box-shadow: 0 0 10px var(--color-gold-dim);
+}
+
+.road-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.road-rewards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    font-size: 0.85rem;
+    color: #fff;
+}
+
+.road-bar {
+    height: 6px;
+    margin: 8px 0 4px;
+    background: #222;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.road-fill {
+    width: 0;
+    height: 100%;
+    background: linear-gradient(90deg, var(--color-primary), var(--color-gold));
+    transition: width 0.8s ease;
+}
+
+.road-away {
+    font-size: 0.72rem;
+    color: var(--color-text-muted);
+}
+
+.road-after {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid #222;
+    font-size: 0.75rem;
+    color: #666;
+}
+
+/* --- full roadmap page --- */
+.roadmap {
+    max-width: 820px;
+    margin: 0 auto;
+}
+
+.roadmap-intro {
+    color: #aaa;
+    margin: 0 0 20px;
+}
+
+.roadmap-skill {
+    margin-bottom: 24px;
+}
+
+.roadmap-skill-tiers {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.roadmap-skill-tiers th,
+.roadmap-skill-tiers td {
+    padding: 6px 8px;
+    border-bottom: 1px solid #222;
+    text-align: left;
+    vertical-align: top;
+}
+
+.roadmap-skill-tiers th {
+    font-family: var(--font-heading);
+    font-size: 0.72rem;
+    letter-spacing: 1px;
+    color: var(--color-primary);
+}
+
+.roadmap-skill-tiers tr.current td {
+    color: var(--color-gold);
+}
+
+.timeline {
+    list-style: none;
+    margin: 0;
+    padding: 0 0 0 22px;
+    border-left: 2px solid #222;
+}
+
+.timeline-stop {
+    position: relative;
+    margin: 0 0 18px;
+    padding: 12px 14px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid #222;
+    border-radius: 5px;
+}
+
+.timeline-stop::before {
+    content: '';
+    position: absolute;
+    left: -31px;
+    top: 16px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #111;
+    border: 2px solid #444;
+}
+
+.timeline-stop.reached {
+    opacity: 0.65;
+}
+
+.timeline-stop.reached::before {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+.timeline-stop.next {
+    border-color: var(--color-gold);
+    box-shadow: 0 0 14px var(--color-gold-dim);
+}
+
+.timeline-stop.next::before {
+    border-color: var(--color-gold);
+    background: var(--color-gold);
+    box-shadow: 0 0 10px var(--color-gold);
+}
+
+.timeline-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 6px;
+}
+
+.timeline-level {
+    font-family: var(--font-heading);
+    color: var(--color-gold);
+    letter-spacing: 1px;
+}
+
+.timeline-stop.reached .timeline-level {
+    color: var(--color-primary);
+}
+
+.timeline-status {
+    font-size: 0.72rem;
+    letter-spacing: 1px;
+    color: var(--color-text-muted);
+}
+
+.timeline-reward {
+    margin: 4px 0;
+    font-size: 0.88rem;
+    color: #ddd;
+}
+
+.timeline-reward small {
+    display: block;
+    margin-left: 22px;
+    color: #888;
+}
+
+@media (max-width: 600px) {
+    .road-next {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
+/* --- Gates (dashboard) --- */
+.gate-panel {
+    border: 1px solid var(--color-primary);
+    box-shadow: 0 0 16px var(--color-primary-dim);
+}
+
+.gate-panel.gate-red {
+    border-color: var(--color-danger);
+    box-shadow: 0 0 18px var(--color-danger-dim);
+    background: linear-gradient(180deg, rgba(255, 42, 42, 0.08), var(--color-bg-panel) 60%);
+}
+
+.gate-panel.gate-exam,
+.gate-panel.gate-awakening {
+    border-color: var(--color-gold);
+    box-shadow: 0 0 16px var(--color-gold-dim);
+}
+
+.gate-panel.gate-cleared {
+    animation: gate-pulse 2s infinite;
+}
+
+@keyframes gate-pulse {
+    50% { box-shadow: 0 0 26px var(--color-gold); }
+}
+
+.gate-kicker {
+    color: var(--color-primary);
+    letter-spacing: 2px;
+}
+
+.gate-red .gate-kicker { color: var(--color-danger); }
+.gate-exam .gate-kicker,
+.gate-awakening .gate-kicker { color: var(--color-gold); }
+
+.gate-timer {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    letter-spacing: 1px;
+}
+
+.gate-title {
+    font-family: var(--font-heading);
+    font-size: 1.05rem;
+    color: #fff;
+    margin-bottom: 10px;
+}
+
+.gate-objectives {
+    list-style: none;
+    margin: 0 0 12px;
+    padding: 0;
+}
+
+.gate-objective {
+    display: grid;
+    grid-template-columns: 22px 1fr auto;
+    align-items: center;
+    gap: 2px 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid #1d1d1d;
+    font-size: 0.88rem;
+    color: #ccc;
+}
+
+.gate-objective.boss .gate-label {
+    color: var(--color-danger);
+    font-weight: 700;
+}
+
+.gate-objective.done .gate-label {
+    color: var(--color-success);
+}
+
+.gate-check { color: var(--color-text-muted); }
+.gate-objective.done .gate-check { color: var(--color-success); }
+
+.gate-count {
+    font-family: var(--font-heading);
+    font-size: 0.75rem;
+    color: #fff;
+}
+
+.gate-bar {
+    grid-column: 2 / 4;
+    height: 4px;
+    background: #222;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.gate-fill {
+    width: 0;
+    height: 100%;
+    background: var(--color-primary);
+    transition: width 0.8s ease;
+}
+
+.gate-red .gate-fill { background: var(--color-danger); }
+.gate-objective.done .gate-fill { background: var(--color-success); }
+
+.gate-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.btn-gate,
+.btn-gate-secondary {
+    padding: 8px 18px;
+    font-family: var(--font-heading);
+    font-size: 0.8rem;
+    letter-spacing: 2px;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.btn-gate {
+    color: #000;
+    background: var(--color-primary);
+    border: 1px solid var(--color-primary);
+}
+
+.gate-red .btn-gate {
+    color: #fff;
+    background: var(--color-danger);
+    border-color: var(--color-danger);
+}
+
+.btn-gate.btn-gate-claim {
+    color: #000;
+    background: var(--color-gold);
+    border-color: var(--color-gold);
+}
+
+.btn-gate-secondary {
+    color: var(--color-text-muted);
+    background: transparent;
+    border: 1px solid #444;
+}
+
+.gate-note {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+}
+
+/* --- Shadow Army grades (army modal) --- */
+.shadow-assign select {
+    width: 100%;
+    margin-top: 6px;
+    padding: 4px;
+    font-size: 0.75rem;
+    color: #ddd;
+    background: #111;
+    border: 1px solid #333;
+    border-radius: 3px;
+}
+
+.shadow-grade-knight { border-color: #6a8cff !important; }
+.shadow-grade-elite { border-color: var(--color-purple) !important; }
+.shadow-grade-commander { border-color: var(--color-gold) !important; }
+.shadow-grade-marshal { border-color: var(--color-danger) !important; box-shadow: 0 0 12px var(--color-danger-dim); }
+
+.shadow-help {
+    margin: 12px 0 0;
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    text-align: center;
+}
+
+/* --- Ascension / Awakening --- */
+.ascend-box {
+    margin: 0 0 24px;
+    padding: 14px 16px;
+    border: 1px solid var(--color-gold);
+    border-radius: 5px;
+    box-shadow: 0 0 18px var(--color-gold-dim);
+}
+
+.awakening-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+    margin-top: 20px;
+}
+
+.awakening-option {
+    padding: 18px;
+    border: 1px solid var(--color-purple);
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.3);
+    text-align: center;
+}
+
+.awakening-option h2 {
+    color: var(--color-purple);
+    letter-spacing: 3px;
+}
+
+/* --- Loot rarity --- */
+.rarity-common { color: #ccc; }
+.rarity-rare { color: #5aa9ff; }
+.rarity-epic { color: var(--color-purple); }
+.rarity-legendary { color: var(--color-gold); text-shadow: 0 0 8px var(--color-gold-dim); }

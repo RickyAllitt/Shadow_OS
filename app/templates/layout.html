@@ -86,6 +86,7 @@
     <div id="levelUpOverlay" class="levelup-overlay" aria-label="Level up">
         <div class="levelup-title">LEVEL UP!</div>
         <div id="levelUpDetail" class="levelup-subtitle">SYSTEM LIMITS INCREASED</div>
+        <div id="levelUpNext" class="levelup-next"></div>
         <div class="levelup-hint">tap to continue</div>
     </div>
     <div id="warningModal" class="modal-overlay">
@@ -271,7 +272,8 @@
                 </ul>
 
                 <p class="guide-h-attributes">ATTRIBUTES (LIFE AREAS)</p>
-                <p>• Allocate points upon leveling up to permanently increase your capabilities.</p>
+                <p>• Every level gives +1 to all stats. Clearing all your dailies also grants 3 points to
+                    allocate yourself on the dashboard.</p>
                 <ul class="guide-list">
                     <li><strong>Strength:</strong> Physical fitness, gym consistency, and diet adherence.</li>
                     <li><strong>Intelligence:</strong> University work, coding, reading, and learning.</li>
@@ -312,6 +314,59 @@
                     <li><strong>Install:</strong> add Shadow OS to your home screen to use it like an app.</li>
                 </ul>
 
+                <p class="guide-h-xp">CLASS & SKILLS</p>
+                {% if current_user.job_class and current_user.job_class != 'None' %}
+                <div class="guide-block">
+                    <p>• At <strong>Level 10</strong> the Job Change trial decides your class. Each class evolves at
+                        Lv 20, 40, 60, 80 and 100 and keeps its passive bonus all the way:
+                        Assassin +10% Coins, Mage +10% XP, Tank one grace day before penalties.</p>
+                    <p>• Every class has one <strong>skill</strong> (the skill card under your class on the dashboard).
+                        Each evolution makes it stronger and shortens its cooldown, from 7 days down to 2:</p>
+                    <ul class="guide-list">
+                        <li><strong>{{ icon('ghost') }} Vanish</strong> (Assassin): today becomes a rest day. Missed dailies don't
+                            break your streak or count towards penalties.</li>
+                        <li><strong>{{ icon('brain') }} Insight</strong> (Mage): your next focus session earns ×1.5 to ×2 XP
+                            on its first 60 minutes.</li>
+                        <li><strong>{{ icon('shield') }} Fortify</strong> (Tank): pays off 50–100% of your XP debt. With no
+                            debt, it raises a shield that absorbs your next failed penalty.</li>
+                    </ul>
+                    <p>• <strong>Second Awakening (Lv 50):</strong> a 7-day trial, then a permanent choice between two
+                        specialisations (e.g. Assassin: Blade +20% Coins, or Phantom: faster Vanish).</p>
+                </div>
+                {% else %}
+                <div class="guide-block">
+                    <p>• At <strong>Level 10</strong> a trial reveals your class. It comes with a passive bonus and an
+                        active skill, both of which grow stronger as your class evolves (Lv 20, 40, 60, 80, 100).
+                        At Lv 50 a Second Awakening lets you specialise.</p>
+                </div>
+                {% endif %}
+
+                <p class="guide-h-penalty">GATES & LOOT</p>
+                <div class="guide-block">
+                    <p>• Gate progress counts automatically from your quests, focus, dailies and sleep. Nothing
+                        extra to log. Gate rewards never add league points.</p>
+                    <ul class="guide-list">
+                        <li><strong>{{ icon('swords') }} Gates (Lv 15):</strong> one appears every week. Enter when you're ready,
+                            then clear two objectives and a boss within 72 hours for bonus XP (a quarter level),
+                            Coins and an item.</li>
+                        <li><strong>{{ icon('triangle-alert') }} Red Gates (Lv 30):</strong> rare surprises. Enter within 24 hours,
+                            clear within 48. Harder, but double rewards and Rare-or-better loot. Declining or
+                            failing costs nothing.</li>
+                        <li><strong>{{ icon('gem') }} Loot:</strong> drops from Gates, and sometimes from non-daily B, A and S
+                            quests. Common and Rare from Lv 15, Epic from 30, Legendary from 60. Duplicates are
+                            salvaged into Coins.</li>
+                        <li><strong>{{ icon('crown') }} Legendary sets:</strong> 2 pieces give +5 to two stats, 4 pieces give
+                            +5% XP. From Lv 80 every Red Gate drops a Legendary piece.</li>
+                    </ul>
+                </div>
+
+                <p class="guide-h-attributes">HUNTER RANK</p>
+                <div class="guide-block">
+                    <p>• Ranks D and C come automatically (Lv 10 / 20 with enough total stats). Promotions to
+                        <strong>B, A and S</strong> (Lv 40 / 60 / 80) need a 7-day <strong>Rank Assessment</strong>
+                        that opens once you qualify. Fail it and you can retry 3 days later.</p>
+                </div>
+
                 <p class="guide-h-titles">TITLES & SHADOWS</p>
                 <div class="guide-block">
                     <p>• <strong>Titles:</strong> Unlocked by level, streaks, stats and wealth (e.g., "The One Who
@@ -319,6 +374,16 @@
                         under your name to see them all.</p>
                     <p>• <strong>The Shadow Army:</strong> Clearing an S-Rank quest lets you "Arise" it into a shadow,
                         granting a permanent, stacking +1% to all stats (boosted by SNS). Unclaimed shadows wait in ARMY.</p>
+                    <p>• <strong>Shadow ranks (Lv 25):</strong> in ARMY, assign a shadow to a quest. Every completion
+                        is a kill: 10 make it a Knight, 30 Elite, 60 Commander, 100 Marshal. Each grade multiplies
+                        its share of the army buff.</p>
+                </div>
+
+                <p class="guide-h-xp">ASCENSION</p>
+                <div class="guide-block">
+                    <p>• At <strong>Level 100</strong> you can Ascend: back to Level 1, keeping your class, skill, rank,
+                        stats, gear, shadows and titles, plus a permanent +5% XP for every Ascension.</p>
+                    <p>• See every unlock on the <a href="{{ url_for('main.roadmap') }}" class="u-color-primary">Road to Monarch</a>.</p>
                 </div>
             </div>
             <div class="guide-footer">

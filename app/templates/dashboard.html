@@ -2,6 +2,7 @@
 
 {% block content %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/progression.css') }}">
 
 {% if player.is_on_vacation %}
 <div class="vacation-overlay vacation-frame">
@@ -229,6 +230,22 @@
                     <div class="u-font-small u-color-muted u-mt-10 status-hint">Class unlocks at Lv 10</div>
                     {% endif %}
                     {% endif %}
+                    {% if skill %}
+                    <div class="skill-card{{ ' skill-armed' if skill.armed else ' skill-ready' if skill.ready }}" title="{{ skill.effect }}">
+                        <div class="skill-name">{{ icon(skill.icon) }} {{ skill.full_name | upper }}</div>
+                        <p class="skill-effect">{{ skill.effect }}</p>
+                        {% if skill.armed %}
+                        <div class="skill-state">ACTIVE</div>
+                        {% elif skill.ready %}
+                        <form method="POST" action="{{ url_for('main.use_class_skill') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn-skill">USE SKILL</button>
+                        </form>
+                        {% else %}
+                        <div class="skill-state skill-cooldown">{{ icon('hourglass') }} Ready in {{ skill.ready_in }}</div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
                 </div>
 
                 <!-- Right: Stats & Currency -->
@@ -284,6 +301,82 @@
                 </div>
             </div>
         </section>
+
+        {% for gate, rows in gate_cards %}
+        <section class="panel u-padding-15 gate-panel gate-{{ gate.kind }} gate-{{ gate.status }}">
+            <div class="duel-header">
+                <h2 class="u-font-small gate-kicker">
+                    {% if gate.kind == 'red' %}{{ icon('triangle-alert') }} RED GATE
+                    {% elif gate.kind == 'exam' %}{{ icon('medal') }} RANK ASSESSMENT
+                    {% elif gate.kind == 'awakening' %}{{ icon('sparkles') }} SECOND AWAKENING
+                    {% else %}{{ icon('swords') }} GATE{% endif %}
+                </h2>
+                <span class="gate-timer">
+                    {% if gate.status == 'waiting' %}{% if gate.enter_by %}Closes {{ gate.enter_by | gate_time }}{% else %}Enter when ready{% endif %}
+                    {% elif gate.status == 'active' %}{{ gate.expires_at | gate_time(left=True) }} left
+                    {% else %}CLEARED{% endif %}
+                </span>
+            </div>
+            <div class="gate-title">{{ gate.title }}</div>
+            <ul class="gate-objectives">
+                {% for o in rows %}
+                <li class="gate-objective{{ ' done' if o.complete }}{{ ' boss' if o.boss }}">
+                    <span class="gate-check">{{ icon('check') if o.complete else icon('lock' if gate.status == 'waiting' else 'zap') }}</span>
+                    <span class="gate-label">{{ o.label }}</span>
+                    {% if gate.status != 'waiting' %}<span class="gate-count">{{ o.done }}/{{ o.target }}</span>{% endif %}
+                    {% if gate.status == 'active' %}<div class="gate-bar"><div class="js-fill gate-fill" data-width="{{ o.pct }}"></div></div>{% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+            <div class="gate-actions">
+                {% if gate.status == 'waiting' %}
+                <form method="POST" action="{{ url_for('main.enter_gate', gate_id=gate.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn-gate">ENTER</button>
+                </form>
+                {% if gate.kind in ('gate', 'red') %}
+                <form method="POST" action="{{ url_for('main.decline_gate', gate_id=gate.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn-gate-secondary">DECLINE</button>
+                </form>
+                {% endif %}
+                {% elif gate.status == 'cleared' %}
+                <form method="POST" action="{{ url_for('main.claim_gate', gate_id=gate.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn-gate btn-gate-claim">CLAIM REWARDS</button>
+                </form>
+                {% else %}
+                <span class="gate-note">Progress counts automatically from your quests, focus, dailies and sleep.</span>
+                {% endif %}
+            </div>
+        </section>
+        {% endfor %}
+
+        {% if road %}
+        <section class="panel u-padding-15 road-panel">
+            <div class="duel-header">
+                <h2 class="u-font-small u-color-muted">ROAD TO MONARCH</h2>
+                <a href="{{ url_for('main.roadmap') }}" class="road-link">FULL ROADMAP →</a>
+            </div>
+            <div class="road-next">
+                <div class="road-level">LV {{ road.level }}</div>
+                <div class="road-body">
+                    <div class="road-rewards">
+                        {% for r in road.rewards %}<span class="road-reward">{{ icon(r.icon) }} {{ r.title }}</span>{% endfor %}
+                    </div>
+                    <div class="road-bar"><div class="js-fill road-fill" data-width="{{ road.progress }}"></div></div>
+                    <div class="road-away">{{ road.levels_away }} level{{ 's' if road.levels_away != 1 }} away</div>
+                </div>
+            </div>
+            {% if road.after %}
+            <div class="road-after">
+                {% for m in road.after %}
+                <span class="road-locked">{{ icon('lock') }} LV {{ m.level }} · {{ m.rewards[0].title }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </section>
+        {% endif %}
 
         <section class="panel u-padding-15 balance-panel">
             <div class="duel-header">
@@ -609,16 +702,38 @@
         <p class="u-text-center u-color-muted u-padding-20">No shadows extracted yet. Clear an S-Rank quest to extract one.</p>
         {% else %}
         <div class="shadow-grid">
-            {% for shadow in player.shadows %}
-            <div class="shadow-item">
+            {% for row in shadow_info.rows %}
+            {% set shadow = row.shadow %}
+            <div class="shadow-item shadow-grade-{{ row.grade | lower }}">
                 <div class="shadow-icon">{{ icon('ghost') }}</div>
                 <div class="shadow-name">{{ shadow.original_quest_name }}</div>
-                <div class="shadow-rank">RANK {{ shadow.rank }}</div>
-                <div class="shadow-bonus">{{ shadow.buff_type.replace('_', ' ') }} +{{ shadow.buff_value }}%</div>
-                <div class="shadow-date">{{ shadow.extracted_at.strftime('%d/%m/%Y') }}</div>
+                <div class="shadow-rank">{{ row.grade | upper }} · {{ row.kills }} kill{{ 's' if row.kills != 1 }}</div>
+                <div class="shadow-bonus">Army buff ×{{ row.weight }}</div>
+                {% if row.next %}<div class="shadow-date">{{ row.next[1] - row.kills }} more to {{ row.next[0] }}</div>
+                {% else %}<div class="shadow-date">Highest grade</div>{% endif %}
+                {% if shadow_info.can_command %}
+                <form method="POST" action="{{ url_for('main.assign_shadow', shadow_id=shadow.id) }}" class="shadow-assign">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <select name="quest_id" onchange="this.form.submit()" aria-label="Quest this shadow hunts">
+                        <option value="">Idle</option>
+                        {% for qid, q in shadow_info.quests.items() %}
+                        <option value="{{ qid }}" {{ 'selected' if shadow.assigned_quest_id == qid }}>{{ '[Daily] ' if q.is_daily }}{{ q.title[:40] }}</option>
+                        {% endfor %}
+                        {% if shadow.assigned_quest_id and shadow.assigned_quest_id not in shadow_info.quests %}
+                        <option value="{{ shadow.assigned_quest_id }}" selected>(finished quest)</option>
+                        {% endif %}
+                    </select>
+                </form>
+                {% endif %}
             </div>
             {% endfor %}
         </div>
+        {% if shadow_info.can_command %}
+        <p class="shadow-help">Assign a shadow to a quest: each completion is a kill. Kills promote it
+            (Knight 10, Elite 30, Commander 60, Marshal 100) and multiply its share of the army buff.</p>
+        {% else %}
+        <p class="shadow-help">At Level {{ shadow_info.level }} you can assign shadows to quests and promote them.</p>
+        {% endif %}
         {% endif %}
 
         <div class="u-mt-20 u-text-center">

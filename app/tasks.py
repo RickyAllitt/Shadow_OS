@@ -118,12 +118,18 @@ def purge_old_notifications(app_instance, now=None):
         return n
 
 
+def refresh_gates(app_instance, now=None):
+    from app.gates import refresh_all
+    return refresh_all(app_instance, now)
+
+
 def run_due_tasks(app_instance, now=None):
     """One tick: run every due task. A failure in one task never blocks the others."""
     from app.services import send_due_reminders
     results = {}
     for name, task in (('reminders', send_due_reminders), ('deadlines', send_due_deadline_reminders),
-                       ('weekly_reports', send_weekly_reports_if_due), ('purged', purge_old_notifications)):
+                       ('weekly_reports', send_weekly_reports_if_due), ('purged', purge_old_notifications),
+                       ('gates', refresh_gates)):
         try:
             results[name] = task(app_instance, now)
         except Exception as exc:  # keep ticking; surface the error in logs and the HTTP response

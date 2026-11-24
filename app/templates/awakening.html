@@ -1,0 +1,24 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/progression.css') }}">
+
+<section class="panel u-padding-20 roadmap">
+    <p class="u-color-primary u-font-small">[ SYSTEM MESSAGE ]</p>
+    <h1 class="u-color-gold">SECOND AWAKENING</h1>
+    <p class="roadmap-intro">Your trial is complete. Your power as a {{ line }} splits into two paths.
+        Choose one. <strong>This choice is permanent.</strong></p>
+    <div class="awakening-options">
+        {% for name, text in options.items() %}
+        <form method="POST" class="awakening-option"
+            onsubmit="return confirm('Become a {{ name }} {{ line }}? This cannot be changed.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="specialization" value="{{ name }}">
+            <h2>{{ name | upper }}</h2>
+            <p>{{ text }}</p>
+            <button type="submit" class="btn-gate btn-gate-claim">CHOOSE {{ name | upper }}</button>
+        </form>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

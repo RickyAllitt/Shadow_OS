@@ -1,7 +1,9 @@
 {% extends "layout.html" %}
 
 {% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/progression.css') }}">
 <style>
+    .inv-set { margin: 0 0 12px; padding: 8px 10px; border: 1px solid rgba(255, 215, 0, 0.3); border-radius: 4px; }
     /* Override global constraint to allow full width for inventory */
     .system-container {
         max-width: 1800px !important;
@@ -18,13 +20,26 @@
         <div class="inventory-section">
 
 
+            {% if sets %}
+            <h3 class="inv-h3-inventory-list rarity-legendary">LEGENDARY SETS</h3>
+            {% for st in sets %}
+            <div class="inv-set">
+                <strong class="rarity-legendary">{{ st.name }}</strong>
+                <span class="inv-span-slot">{{ st.equipped }}/4 equipped ·
+                    2 pieces: +5 {{ st.stats | join(' & +5 ') }} {{ '(ACTIVE)' if st.two }} ·
+                    4 pieces: +5% XP {{ '(ACTIVE)' if st.four }}</span>
+                <div class="inv-span-slot">{% for p in st.pieces %}{{ p.name }}{{ ' ✓' if p.equipped else ' (owned)' if p.owned else ' (missing)' }}{{ ' · ' if not loop.last }}{% endfor %}</div>
+            </div>
+            {% endfor %}
+            {% endif %}
+
             <h3 class="inv-h3-inventory-list">INVENTORY LIST</h3>
             {% if player.inventory %}
             <div class="inventory-list inv-inventory-list">
                 {% for inv in player.inventory %}
                 <div class="inv-item inv-row{{ ' inv-row-equipped' if inv.is_equipped }}">
                     <div class="inv-div-2">
-                        <span class="inv-span">{{
+                        <span class="inv-span{{ ' rarity-' ~ inv.item.rarity if inv.item.rarity }}">{% if inv.item.rarity %}[{{ inv.item.rarity | upper }}] {% endif %}{{
                             inv.item.name }} {% if
                             inv.is_equipped %}<span class="inv-span-equipped">[EQUIPPED]</span>{%
                             endif %}</span>
