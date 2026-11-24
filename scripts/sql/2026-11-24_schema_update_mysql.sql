@@ -1,29 +1,29 @@
--- Shadow OS schema update for MySQL / TiDB (Nov 2026 overhaul).
+-- Shadow OS schema update for TiDB (Nov 2026 overhaul).
 --
--- Run ONCE as the database admin (e.g. TiDB Cloud SQL editor) when the app's own database user
--- is not allowed to CREATE/ALTER tables. Afterwards the app finds everything in place on startup.
--- If a statement reports "Duplicate column" or "Table already exists", that part is already done:
--- skip it and continue. Replace `test` with your database name if different.
+-- Run ONCE as the database admin (e.g. TiDB Cloud SQL editor: select everything, then run) when the
+-- app's own database user is not allowed to CREATE/ALTER tables. Safe to run again: every statement
+-- skips what already exists. Indexes are declared inside each CREATE TABLE so no statement depends
+-- on another one having run first, apart from table order (kudos needs activity_event,
+-- raid_contribution needs raid). Replace `test` with your database name if different.
+-- (ADD COLUMN IF NOT EXISTS is TiDB/MariaDB syntax; on plain MySQL drop "IF NOT EXISTS" there.)
 
 USE test;
 
--- 1) Room for the new secure password hashes (old: 64 chars; scrypt hashes are ~160)
 ALTER TABLE player MODIFY password_hash VARCHAR(255) NULL;
 
--- 2) New player columns: XP debt, streak freezes, Hardcore, timezone, reminder time
-ALTER TABLE player ADD COLUMN xp_debt INTEGER DEFAULT 0;
-ALTER TABLE player ADD COLUMN streak_freezes INTEGER DEFAULT 0;
-ALTER TABLE player ADD COLUMN hardcore BOOL DEFAULT FALSE;
-ALTER TABLE player ADD COLUMN hardcore_since DATETIME NULL;
-ALTER TABLE player ADD COLUMN timezone VARCHAR(50) DEFAULT 'Europe/Madrid';
-ALTER TABLE player ADD COLUMN reminder_time VARCHAR(5) DEFAULT '18:00';
+ALTER TABLE player
+    ADD COLUMN IF NOT EXISTS xp_debt INTEGER DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS streak_freezes INTEGER DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS hardcore BOOL DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS hardcore_since DATETIME NULL,
+    ADD COLUMN IF NOT EXISTS timezone VARCHAR(50) DEFAULT 'Europe/Madrid',
+    ADD COLUMN IF NOT EXISTS reminder_time VARCHAR(5) DEFAULT '18:00';
 
--- 3) Measured quests
-ALTER TABLE quest ADD COLUMN metric_target FLOAT NULL;
-ALTER TABLE quest ADD COLUMN metric_unit VARCHAR(20) NULL;
+ALTER TABLE quest
+    ADD COLUMN IF NOT EXISTS metric_target FLOAT NULL,
+    ADD COLUMN IF NOT EXISTS metric_unit VARCHAR(20) NULL;
 
--- 4) New tables (order matters: kudos references activity_event)
-CREATE TABLE activity_event (
+CREATE TABLE IF NOT EXISTS activity_event (
     id INTEGER NOT NULL AUTO_INCREMENT,
     player_id INTEGER NOT NULL,
     occurred_at DATETIME,
@@ -38,24 +38,24 @@ CREATE TABLE activity_event (
     value FLOAT,
     quest_id INTEGER,
     PRIMARY KEY (id),
+    INDEX ix_activity_event_player_id (player_id),
+    INDEX ix_activity_event_quest_id (quest_id),
+    INDEX ix_activity_event_week_start (week_start),
     FOREIGN KEY (player_id) REFERENCES player (id)
 );
-CREATE INDEX ix_activity_event_player_id ON activity_event (player_id);
-CREATE INDEX ix_activity_event_quest_id ON activity_event (quest_id);
-CREATE INDEX ix_activity_event_week_start ON activity_event (week_start);
 
-CREATE TABLE personal_reward (
+CREATE TABLE IF NOT EXISTS personal_reward (
     id INTEGER NOT NULL AUTO_INCREMENT,
     player_id INTEGER NOT NULL,
     name VARCHAR(60) NOT NULL,
     cost INTEGER NOT NULL,
     created_at DATETIME,
     PRIMARY KEY (id),
+    INDEX ix_personal_reward_player_id (player_id),
     FOREIGN KEY (player_id) REFERENCES player (id)
 );
-CREATE INDEX ix_personal_reward_player_id ON personal_reward (player_id);
 
-CREATE TABLE raid (
+CREATE TABLE IF NOT EXISTS raid (
     id INTEGER NOT NULL AUTO_INCREMENT,
     title VARCHAR(80) NOT NULL,
     unit VARCHAR(20) NOT NULL,
@@ -70,7 +70,7 @@ CREATE TABLE raid (
     FOREIGN KEY (created_by) REFERENCES player (id)
 );
 
-CREATE TABLE rivalry (
+CREATE TABLE IF NOT EXISTS rivalry (
     id INTEGER NOT NULL AUTO_INCREMENT,
     player_id INTEGER NOT NULL,
     rival_id INTEGER NOT NULL,
@@ -81,7 +81,7 @@ CREATE TABLE rivalry (
     FOREIGN KEY (rival_id) REFERENCES player (id)
 );
 
-CREATE TABLE kudos (
+CREATE TABLE IF NOT EXISTS kudos (
     id INTEGER NOT NULL AUTO_INCREMENT,
     event_id INTEGER NOT NULL,
     from_player_id INTEGER NOT NULL,
@@ -89,21 +89,21 @@ CREATE TABLE kudos (
     created_at DATETIME,
     PRIMARY KEY (id),
     CONSTRAINT uq_kudos_once UNIQUE (event_id, from_player_id),
+    INDEX ix_kudos_event_id (event_id),
     FOREIGN KEY (event_id) REFERENCES activity_event (id),
     FOREIGN KEY (from_player_id) REFERENCES player (id)
 );
-CREATE INDEX ix_kudos_event_id ON kudos (event_id);
 
-CREATE TABLE raid_contribution (
+CREATE TABLE IF NOT EXISTS raid_contribution (
     id INTEGER NOT NULL AUTO_INCREMENT,
     raid_id INTEGER NOT NULL,
     player_id INTEGER NOT NULL,
     amount FLOAT NOT NULL,
     created_at DATETIME,
     PRIMARY KEY (id),
+    INDEX ix_raid_contribution_raid_id (raid_id),
     FOREIGN KEY (raid_id) REFERENCES raid (id),
     FOREIGN KEY (player_id) REFERENCES player (id)
 );
-CREATE INDEX ix_raid_contribution_raid_id ON raid_contribution (raid_id);
 
--- Check: SHOW TABLES;  SHOW COLUMNS FROM player LIKE 'xp_debt';  SHOW COLUMNS FROM quest LIKE 'metric%';
+SHOW TABLES;

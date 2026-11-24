@@ -302,10 +302,10 @@ def test_admin_sql_script_matches_models():
     from app import schema_upgrades
     sql = (pathlib.Path(__file__).parent.parent / 'scripts/sql/2026-11-24_schema_update_mysql.sql').read_text()
     for table in ('activity_event', 'personal_reward', 'raid', 'rivalry', 'kudos', 'raid_contribution'):
-        assert re.search(rf'CREATE TABLE {table} \(', sql), table
+        assert re.search(rf'CREATE TABLE IF NOT EXISTS {table} \(', sql), table
         for col in db.metadata.tables[table].columns:
             assert re.search(rf'\n\s+`?{col.name}`? ', sql), f'{table}.{col.name}'
     for col in ('xp_debt', 'streak_freezes', 'hardcore', 'hardcore_since', 'timezone', 'reminder_time',
                 'metric_target', 'metric_unit'):
-        assert f'ADD COLUMN {col} ' in sql, col
+        assert f'ADD COLUMN IF NOT EXISTS {col} ' in sql, col
     assert 'scripts/sql/2026-11-24_schema_update_mysql.sql' in schema_upgrades.ADMIN_SQL_HINT
