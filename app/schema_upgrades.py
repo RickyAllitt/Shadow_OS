@@ -12,7 +12,21 @@ from sqlalchemy.schema import CreateTable
 from app.extensions import db
 
 
-MYSQL_REFERENCES_DENIED = 1142  # "REFERENCES command denied": user may not create foreign keys
+MYSQL_REFERENCES_DENIED = 1142  # "<COMMAND> command denied" (REFERENCES / CREATE / ALTER ...)
+ADMIN_SQL_HINT = ("The database user the app connects with is not allowed to change the schema "
+                  "({detail}). Run scripts/sql/2026-11-24_schema_update_mysql.sql once as the database "
+                  "admin (e.g. in TiDB Cloud's SQL editor), then redeploy.")
+
+
+class SchemaPermissionError(RuntimeError):
+    """The app's DB user may not create/alter tables; an admin must apply the SQL script."""
+
+
+def _denied_detail(exc):
+    orig = getattr(exc, 'orig', None)
+    if orig is not None and orig.args and orig.args[0] == MYSQL_REFERENCES_DENIED:
+        return str(orig.args[1]) if len(orig.args) > 1 else 'command denied'
+    return None
 
 
 def create_tables():
@@ -24,13 +38,21 @@ def create_tables():
     try:
         db.create_all()
     except OperationalError as exc:
-        code = exc.orig.args[0] if getattr(exc, 'orig', None) is not None and exc.orig.args else None
-        if code != MYSQL_REFERENCES_DENIED:
+        detail = _denied_detail(exc)
+        if detail is None:
             raise
+        if 'REFERENCES' not in detail.upper():
+            raise SchemaPermissionError(ADMIN_SQL_HINT.format(detail=detail)) from exc
         print(">> SCHEMA: Database user lacks the REFERENCES privilege; creating new tables without "
               "foreign keys (relationships are still enforced by the app).", flush=True)
         db.session.rollback()
-        _create_missing_tables_without_foreign_keys()
+        try:
+            _create_missing_tables_without_foreign_keys()
+        except OperationalError as exc2:
+            detail2 = _denied_detail(exc2)
+            if detail2 is None:
+                raise
+            raise SchemaPermissionError(ADMIN_SQL_HINT.format(detail=detail2)) from exc2
 
 
 def _create_missing_tables_without_foreign_keys():
@@ -75,8 +97,14 @@ def _widen_varchar(table, column, length):
         print(f">> SCHEMA: Unsupported dialect '{dialect}', cannot widen {table}.{column}.")
         return
 
-    with engine.begin() as conn:
-        conn.execute(text(stmt))
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(stmt))
+    except OperationalError as exc:
+        detail = _denied_detail(exc)
+        if detail is None:
+            raise
+        raise SchemaPermissionError(ADMIN_SQL_HINT.format(detail=detail)) from exc
     print(f">> SCHEMA: Widened {table}.{column} to VARCHAR({length}).")
 
 
@@ -92,8 +120,14 @@ def _add_column(table, column, ddl_type):
     quote = '`' if is_mysql else '"'
     if ddl_type.upper() == 'DATETIME' and not is_mysql:
         ddl_type = 'TIMESTAMP'  # naive timestamp on Postgres/SQLite (MySQL TIMESTAMP would convert zones)
-    with engine.begin() as conn:
-        conn.execute(text(f'ALTER TABLE {quote}{table}{quote} ADD COLUMN {quote}{column}{quote} {ddl_type}'))
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(f'ALTER TABLE {quote}{table}{quote} ADD COLUMN {quote}{column}{quote} {ddl_type}'))
+    except OperationalError as exc:
+        detail = _denied_detail(exc)
+        if detail is None:
+            raise
+        raise SchemaPermissionError(ADMIN_SQL_HINT.format(detail=detail)) from exc
     print(f">> SCHEMA: Added {table}.{column}.")
 
 

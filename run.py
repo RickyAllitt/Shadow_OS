@@ -12,7 +12,7 @@ if __name__ == '__main__' and debug_mode:
 from app import create_app
 from app.extensions import db
 from app.services import seed_database
-from app.schema_upgrades import create_tables, run_schema_upgrades
+from app.schema_upgrades import SchemaPermissionError, create_tables, run_schema_upgrades
 
 # Background jobs are registered inside create_app (app/tasks.py), so they also run under gunicorn
 # (wsgi.py imports this module, so the block below is skipped there).
@@ -33,8 +33,12 @@ def init_database():
         fcntl.flock(lock, fcntl.LOCK_EX)  # blocks until other workers finish
         try:
             with app.app_context():
-                create_tables()  # create_all, tolerant of users without the REFERENCES privilege
-                run_schema_upgrades()
+                try:
+                    create_tables()  # create_all, tolerant of users without the REFERENCES privilege
+                    run_schema_upgrades()
+                except SchemaPermissionError as exc:
+                    print("\n" + "=" * 78 + f"\n>> SCHEMA UPDATE NEEDED: {exc}\n" + "=" * 78 + "\n", flush=True)
+                    raise SystemExit(1)
                 seed_database()
         finally:
             fcntl.flock(lock, fcntl.LOCK_UN)

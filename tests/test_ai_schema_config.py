@@ -254,3 +254,58 @@ def test_create_tables_reraises_other_errors(app, monkeypatch):
 def test_create_tables_normal_path(app):
     from app import schema_upgrades
     schema_upgrades.create_tables()  # all tables already exist: no-op, no error
+
+
+def _denied(command, table):
+    import pymysql
+    from sqlalchemy.exc import OperationalError
+    return OperationalError(f'{command} ...', {},
+                            pymysql.err.OperationalError(1142, f"{command} command denied to user 'x'@'%' for table '{table}'"))
+
+
+def test_create_denied_raises_clear_schema_error(app, monkeypatch):
+    from app import schema_upgrades
+    monkeypatch.setattr(db, 'create_all', lambda: (_ for _ in ()).throw(_denied('CREATE', 'activity_event')))
+    with pytest.raises(schema_upgrades.SchemaPermissionError) as info:
+        schema_upgrades.create_tables()
+    msg = str(info.value)
+    assert 'CREATE command denied' in msg and 'scripts/sql/2026-11-24_schema_update_mysql.sql' in msg
+
+
+def test_create_denied_during_no_fk_fallback_raises_clear_schema_error(app, monkeypatch):
+    from app import schema_upgrades
+    monkeypatch.setattr(db, 'create_all', lambda: (_ for _ in ()).throw(_references_denied()))
+    monkeypatch.setattr(schema_upgrades, '_create_missing_tables_without_foreign_keys',
+                        lambda: (_ for _ in ()).throw(_denied('CREATE', 'activity_event')))
+    with pytest.raises(schema_upgrades.SchemaPermissionError, match='CREATE command denied'):
+        schema_upgrades.create_tables()
+
+
+def test_alter_denied_in_add_column_raises_clear_schema_error(app, monkeypatch):
+    from app import schema_upgrades
+
+    class DeniedEngine:
+        dialect = db.engine.dialect
+        def begin(self):
+            raise _denied('ALTER', 'player')
+
+    real_engine = db.engine
+    monkeypatch.setattr(type(db), 'engine', property(lambda self: DeniedEngine()))
+    monkeypatch.setattr(schema_upgrades, 'inspect', lambda _e: __import__('sqlalchemy').inspect(real_engine))
+    with pytest.raises(schema_upgrades.SchemaPermissionError, match='ALTER command denied'):
+        schema_upgrades._add_column('player', 'brand_new_column', 'INTEGER')
+
+
+def test_admin_sql_script_matches_models():
+    """The versioned admin script must create every table and column the startup upgrades would."""
+    import pathlib, re
+    from app import schema_upgrades
+    sql = (pathlib.Path(__file__).parent.parent / 'scripts/sql/2026-11-24_schema_update_mysql.sql').read_text()
+    for table in ('activity_event', 'personal_reward', 'raid', 'rivalry', 'kudos', 'raid_contribution'):
+        assert re.search(rf'CREATE TABLE {table} \(', sql), table
+        for col in db.metadata.tables[table].columns:
+            assert re.search(rf'\n\s+`?{col.name}`? ', sql), f'{table}.{col.name}'
+    for col in ('xp_debt', 'streak_freezes', 'hardcore', 'hardcore_since', 'timezone', 'reminder_time',
+                'metric_target', 'metric_unit'):
+        assert f'ADD COLUMN {col} ' in sql, col
+    assert 'scripts/sql/2026-11-24_schema_update_mysql.sql' in schema_upgrades.ADMIN_SQL_HINT
