@@ -7,37 +7,39 @@
 
         <div class="title-list">
             {% for pt in player.unlocked_titles %}
-            <form action="{{ url_for('main.equip_title_route', title_id=pt.title.id) }}" method="POST"
-                style="margin-bottom: 10px;">
+            <form class="title-form" action="{{ url_for('main.equip_title_route', title_id=pt.title.id) }}" method="POST">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="quest-card rank-{{ 'S' if 'S-Rank' in pt.title.name else 'E' }}"
-                    style="width: 100%; text-align: left; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: rgba(0,0,0,0.6); border: 1px solid #444;">
+                <button type="submit" class="quest-card rank-{{ 'S' if 'S-Rank' in pt.title.name else 'E' }} title-button">
                     <div>
-                        <span style="font-weight: bold; color: var(--color-primary);">{{ pt.title.name }}</span>
+                        <span class="title-span">{{ pt.title.name }}</span>
                         <br>
-                        <span style="font-size: 0.8em; color: #888;">{{ pt.title.description }}</span>
+                        <span class="title-span-2">{{ pt.title.description }}</span>
                     </div>
                     {% if pt.title.buff_description %}
-                    <span
-                        style="font-size: 0.7em; background: #333; padding: 2px 5px; border-radius: 4px; color: gold;">
+                    <span class="title-span-3">
                         {{ pt.title.buff_description }}
                     </span>
                     {% endif %}
 
                     {% if player.current_title_id == pt.title.id %}
-                    <span style="color: lime; font-weight: bold;">[EQUIPPED]</span>
+                    <span class="title-span-equipped">[EQUIPPED]</span>
                     {% endif %}
                 </button>
             </form>
             {% endfor %}
         </div>
 
-        <div style="margin-top: 20px; border-top: 1px solid #333; padding-top: 10px;">
-            <h4 style="font-size: 0.8em; color: #666;">Locked Titles (Preview)</h4>
-            <!-- Optional: Preview locked titles? For now, keep mystery or implemented later -->
-            <div style="font-size: 0.8em; color: #444; font-style: italic;">
-                Keep leveling up and maintaining streaks to unlock more.
+        <div class="title-div">
+            <h4 class="title-h4-locked-titles">Locked Titles</h4>
+            {% set unlocked_ids = player.unlocked_titles | map(attribute='title_id') | list %}
+            {% for t in all_titles if t.id not in unlocked_ids %}
+            <div class="title-div-2">
+                <span>{{ icon('lock') }} <strong class="title-strong">{{ t.name }}</strong> — {{ t.description }}</span>
+                {% if t.buff_description %}<span class="title-span-4">{{ t.buff_description }}</span>{% endif %}
             </div>
+            {% else %}
+            <div class="title-div-all-titles">All titles unlocked.</div>
+            {% endfor %}
         </div>
     </div>
 </div>
@@ -47,7 +49,7 @@
     .modal {
         display: none;
         position: fixed;
-        z-index: 200;
+        z-index: var(--z-modal);
         left: 0;
         top: 0;
         width: 100%;

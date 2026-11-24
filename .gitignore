@@ -18,12 +18,9 @@ app.db
 .webassets-cache
 
 # Testing
-# Testing
 .pytest_cache/
 .coverage
 htmlcov/
-tests/
-scripts/
 
 # OS
 .DS_Store
@@ -48,5 +45,7 @@ update_db.py
 purge_subs.py
 test_push_delivery.py
 test_render_keys.py
-*.py
 VAPID_KEYS.txt
+
+#Claude
+.claude/

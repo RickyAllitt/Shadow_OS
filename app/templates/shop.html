@@ -18,6 +18,43 @@
         width: 100%;
     }
 
+    .btn-buy-trigger {
+        display: block;
+        padding: 8px;
+        text-align: center;
+    }
+
+    .btn-buy-armed {
+        background: var(--color-gold) !important;
+        border-color: var(--color-gold) !important;
+        color: #000 !important;
+    }
+
+    .btn-buy-owned,
+    .btn-buy-locked {
+        border-color: #444 !important;
+        color: #777 !important;
+        cursor: not-allowed;
+    }
+
+    .btn-buy-owned:hover,
+    .btn-buy-locked:hover {
+        background: transparent;
+    }
+
+    a.btn-buy-owned {
+        cursor: pointer;
+        color: #aaa !important;
+    }
+
+    .shop-item-locked {
+        opacity: 0.55;
+    }
+
+    .shop-item-owned {
+        border-color: rgba(76, 175, 80, 0.4) !important;
+    }
+
     .btn-buy-trigger.currency-coins {
         border-color: var(--color-purple-light);
         color: var(--color-purple-light);
@@ -25,29 +62,79 @@
 </style>
 
 <div class="dashboard-grid">
-    <div class="panel" style="grid-column: 1 / -1; max-width: 1600px; margin: 0 auto; width: 95%;">
-        <div class="shop-header u-flex-column-mobile"
-            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <div class="panel shop-panel">
+        <div class="shop-header u-flex-column-mobile shop-shop-header">
             <div>
-                <h2 style="margin: 0;">SYSTEM SHOP</h2>
-                <div class="balance-display" style="font-size: 0.9em; margin-top: 5px; color: var(--color-gold);">
+                <h2 class="shop-h2-system-shop">SYSTEM SHOP</h2>
+                <div class="balance-display shop-balance-display">
                     <span id="playerGold">{{ player.gold }}</span> G
-                    <span style="color: #666;">|</span>
-                    <span id="playerCoins" style="color: var(--color-purple-light);">{{ player.coins }}</span> C
+                    <span class="shop-span">|</span>
+                    <span class="shop-player-coins" id="playerCoins">{{ player.coins }}</span> C
                 </div>
             </div>
-            <div class="shop-header-actions" style="display: flex; gap: 10px;">
-                <button onclick="document.getElementById('shopHistoryModal').style.display='flex'" class="btn-small"
-                    style="background: transparent; border: 1px solid #444;">HISTORY</button>
-                <a href="{{ url_for('main.dashboard') }}" class="btn-small" style="text-align: center;">BACK TO
+            <div class="shop-header-actions shop-shop-header-actions">
+                <button onclick="document.getElementById('shopHistoryModal').style.display='flex'" class="btn-small shop-button-history">HISTORY</button>
+                <a href="{{ url_for('main.dashboard') }}" class="btn-small shop-a-back-dashboard">BACK TO
                     DASHBOARD</a>
             </div>
         </div>
 
+        <section class="my-rewards" id="my-rewards">
+            <div class="my-rewards-head">
+                <h3 class="category-header currency-gold">MY REWARDS (GOLD)</h3>
+                <span class="my-rewards-note">Price your own real-life rewards. Gold halves every Monday, so you can save for
+                    about two weeks' worth.</span>
+            </div>
+
+            {% if to_redeem %}
+            <div class="redeem-list">
+                <h4 class="redeem-title">READY TO ENJOY</h4>
+                {% for log in to_redeem %}
+                <div class="redeem-row">
+                    <span>{{ icon('gift', 'icon-gold') }} {{ log.item_name }} <small>({{ "{:,}".format(log.cost) }} G)</small></span>
+                    <form action="{{ url_for('main.claim_purchase', log_id=log.id) }}" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn-small">MARK CLAIMED</button>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="reward-grid">
+                {% for r in personal_rewards %}
+                <div class="shop-item reward-card{{ ' shop-item-locked' if player.gold < r.cost }}">
+                    <form action="{{ url_for('main.delete_personal_reward', reward_id=r.id) }}" method="POST" class="reward-delete">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" aria-label="Remove {{ r.name }}" title="Remove">{{ icon('x') }}</button>
+                    </form>
+                    <div class="item-name">{{ r.name }}</div>
+                    <div class="reward-cost">{{ "{:,}".format(r.cost) }} G</div>
+                    <form action="{{ url_for('main.buy_personal_reward', reward_id=r.id) }}" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        {% if player.gold >= r.cost %}
+                        <button type="submit" class="btn-small btn-buy-trigger reward-buy">BUY</button>
+                        {% else %}
+                        <button type="button" class="btn-small btn-buy-trigger btn-buy-locked" disabled>NEED {{ "{:,}".format(r.cost - player.gold) }} MORE G</button>
+                        {% endif %}
+                    </form>
+                </div>
+                {% endfor %}
+
+                <form action="{{ url_for('main.add_personal_reward') }}" method="POST" class="shop-item reward-new">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="item-name">+ NEW REWARD</div>
+                    <input type="text" name="name" maxlength="60" placeholder="e.g. Cinema night" required>
+                    <input type="number" name="cost" min="1" max="1000000" placeholder="Price in Gold" required>
+                    <button type="submit" class="btn-small btn-buy-trigger">ADD</button>
+                </form>
+            </div>
+        </section>
+
         <div id="shopContent">
             {% for currency, currency_group in shop_items|groupby('currency') %}
 
-            <div style="margin-top: 30px; margin-bottom: 10px; border-bottom: 1px solid #444; padding-bottom: 5px;">
+            <div class="shop-div">
                 <h3 class="category-header currency-{{ currency }}">
                     {% if currency == 'coins' %}HUNTER'S SHOP (COINS){% else %}REAL WORLD REWARDS (GOLD){% endif %}
                 </h3>
@@ -55,59 +142,50 @@
 
             {% for type, type_group in currency_group|groupby('item_type') %}
 
-            <h4
-                style="color: #888; margin-top: 15px; margin-bottom: 10px; text-transform: uppercase; font-size: 0.9em;">
+            <h4 class="shop-h4">
                 {{ type }}
             </h4>
 
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px;">
+            <div class="shop-div-2">
                 {% for item in type_group %}
-                <div class="shop-item"
-                    style="border: 1px solid #333; padding: 15px; background: rgba(255,255,255,0.05); display: flex; flex-direction: column; justify-content: space-between; height: 100%;">
-                    <div style="margin-bottom: 10px;">
-                        <div class="item-name" style="font-weight: bold; color: #fff;">{{ item.name }}</div>
+                {% set affordable = (player.coins if item.currency == 'coins' else player.gold) >= item.cost %}
+                <div class="shop-item{{ ' shop-item-owned' if item.id in owned_item_ids }}{{ ' shop-item-locked' if not affordable and item.id not in owned_item_ids }} shop-div-3">
+                    <div class="shop-div-4">
+                        <div class="item-name shop-item-name">{{ item.name }}</div>
                         {% if item.description %}
-                        <div style="font-size: 0.8em; color: #888;">{{ item.description }}</div>
+                        <div class="shop-div-5">{{ item.description }}</div>
                         {% endif %}
 
                         <!-- Show Stats if Equipment -->
                         {% if item.item_type == 'equipment' and item.stat_bonus %}
-                        <div style="font-size: 0.8em; color: var(--color-info); margin-top: 2px;">
+                        <div class="shop-div-6">
                             {{ item.slot|upper }}: {{ item.stat_bonus }} +{{ item.stat_value }}
                         </div>
                         {% endif %}
 
-                        <div class="item-cost" style="margin-top: 5px;">
+                        <div class="item-cost shop-item-cost">
                             {% if item.currency == 'coins' %}
-                            <span style="color: var(--color-purple-light); font-weight: bold;">{{ item.cost }} C</span>
+                            <span class="shop-span-2">{{ item.cost }} C</span>
                             {% else %}
-                            <span style="color: var(--color-gold); font-weight: bold;">{{ item.cost }} G</span>
+                            <span class="shop-span-3">{{ item.cost }} G</span>
                             {% endif %}
                         </div>
                     </div>
 
-                    {% if item.currency == 'coins' %}
+                    {% set balance = player.coins if item.currency == 'coins' else player.gold %}
+                    {% set unit = 'C' if item.currency == 'coins' else 'G' %}
                     {% if item.id in owned_item_ids %}
-                    <button class="btn-small btn-buy-trigger"
-                        style="opacity: 0.5; cursor: not-allowed; border-color: #666; color: #666;"
-                        disabled>OWNED</button>
-                    {% elif player.coins >= item.cost %}
-                    <button id="btn-buy-{{ item.id }}" data-id="{{ item.id }}"
-                        class="btn-small btn-buy-trigger currency-coins">BUY</button>
+                    {% if item.item_type == 'equipment' %}
+                    <button class="btn-small btn-buy-trigger btn-buy-owned" disabled>OWNED</button>
                     {% else %}
-                    <button class="btn-small btn-buy-trigger" style="opacity: 0.3; cursor: not-allowed;">LOCKED</button>
+                    <a href="{{ url_for('main.inventory') }}" class="btn-small btn-buy-trigger btn-buy-owned"
+                        title="You can hold one at a time">IN BAG · USE IT FIRST</a>
                     {% endif %}
+                    {% elif balance >= item.cost %}
+                    <button id="btn-buy-{{ item.id }}" data-id="{{ item.id }}" data-cost="{{ item.cost }} {{ unit }}"
+                        class="btn-small btn-buy-trigger currency-{{ item.currency }}">BUY</button>
                     {% else %}
-                    {% if item.id in owned_item_ids %}
-                    <button class="btn-small btn-buy-trigger"
-                        style="opacity: 0.5; cursor: not-allowed; border-color: #666; color: #666;" disabled>SOLD
-                        OUT</button>
-                    {% elif player.gold >= item.cost %}
-                    <button id="btn-buy-{{ item.id }}" data-id="{{ item.id }}"
-                        class="btn-small btn-buy-trigger">BUY</button>
-                    {% else %}
-                    <button class="btn-small btn-buy-trigger" style="opacity: 0.3; cursor: not-allowed;">LOCKED</button>
-                    {% endif %}
+                    <button class="btn-small btn-buy-trigger btn-buy-locked" disabled>NEED {{ "{:,}".format(item.cost - balance) }} MORE {{ unit }}</button>
                     {% endif %}
                 </div>
                 {% endfor %}
@@ -123,18 +201,33 @@
 <script>
     // Removed local sound manager to use global
 
+    // First tap arms the button ("CONFIRM 100 C?"), second tap within 4s buys
     document.addEventListener('click', function (e) {
-        if (e.target && e.target.classList.contains('btn-buy-trigger')) {
-            const itemId = e.target.getAttribute('data-id');
-            if (itemId) buyItem(itemId);
+        const btn = e.target && e.target.closest('.btn-buy-trigger[data-id]');
+        if (!btn || btn.disabled) return;
+        if (btn.dataset.armed === '1') {
+            clearTimeout(btn._disarm);
+            btn.dataset.armed = '0';
+            btn.classList.remove('btn-buy-armed');
+            buyItem(btn.dataset.id);
+            return;
         }
+        document.querySelectorAll('.btn-buy-armed').forEach(b => {
+            b.dataset.armed = '0'; b.classList.remove('btn-buy-armed'); b.innerText = 'BUY';
+        });
+        btn.dataset.armed = '1';
+        btn.classList.add('btn-buy-armed');
+        btn.innerText = `CONFIRM ${btn.dataset.cost}?`;
+        btn._disarm = setTimeout(() => {
+            btn.dataset.armed = '0'; btn.classList.remove('btn-buy-armed'); btn.innerText = 'BUY';
+        }, 4000);
     });
 
     function buyItem(itemId) {
         const btn = document.getElementById(`btn-buy-${itemId}`);
         if (!btn) return;
 
-        const originalText = btn.innerText;
+        const originalText = 'BUY';
         btn.innerText = "...";
         btn.disabled = true;
 
@@ -152,6 +245,7 @@
 
                 if (data.success) {
                     if (window.audioManager) window.audioManager.play('buy_item');
+                    SystemUI.toast(data.message, 'success', { sound: false });
                     // Update Balance
                     if (document.getElementById('playerGold'))
                         document.getElementById('playerGold').innerText = data.new_gold;
@@ -160,35 +254,39 @@
 
                     // Visual Feedback
                     // Visual Feedback
-                    if (data.item_details && data.item_details.type == 'equipment') {
-                        btn.innerText = "OWNED";
-                    } else {
-                        // For consumables that are one-time buy logic (which Gold items seem to be implied as)
-                        // If the user request implies they become Sold Out, we set it here.
-                        // But wait, consumables usually can be bought multiple times? 
-                        // The user said: "show as sold out while you have one in the inventory".
-                        // This implies unique ownership.
-                        btn.innerText = "SOLD OUT";
-                    }
-
-                    btn.classList.add('btn-success');
-                    btn.style.borderColor = "#666";
-                    btn.style.color = "#666";
-                    btn.style.opacity = "0.5";
-                    btn.style.cursor = "not-allowed";
+                    // One of each item at a time: equipment is owned, consumables wait in the bag
+                    btn.innerText = (data.item_details && data.item_details.type == 'equipment') ? "OWNED" : "IN BAG";
+                    btn.classList.add('btn-buy-owned');
+                    btn.closest('.shop-item').classList.add('shop-item-owned');
                     btn.disabled = true;
+                    refreshAffordability(data.new_gold, data.new_coins);
 
                     // No timeout revert, effectively locking it.
 
                 } else {
-                    alert("Error: " + data.message);
+                    SystemUI.toast(data.message, 'error');
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
+                SystemUI.toast('Purchase failed. Check your connection and try again.', 'error');
                 btn.disabled = false;
                 btn.innerText = originalText;
             });
+    }
+
+    // After a purchase, lock BUY buttons the new balance can no longer cover
+    function refreshAffordability(gold, coins) {
+        document.querySelectorAll('.btn-buy-trigger[data-id]:not([disabled])').forEach(b => {
+            const [cost, unit] = b.dataset.cost.split(' ');
+            const balance = unit === 'C' ? coins : gold;
+            if (balance < parseInt(cost)) {
+                b.disabled = true;
+                b.classList.add('btn-buy-locked');
+                b.innerText = `NEED ${(parseInt(cost) - balance).toLocaleString()} MORE ${unit}`;
+                b.closest('.shop-item').classList.add('shop-item-locked');
+            }
+        });
     }
 </script>
 {% endblock %}

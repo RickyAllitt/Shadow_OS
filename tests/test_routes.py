@@ -31,7 +31,7 @@ def test_complete_quest(auth_client, app, csrf_token):
     with app.app_context():
         # Setup quest
         auth_user = Player.query.filter_by(name="AuthUser").first()
-        quest = Quest(title="Task", xp_reward=50, player=auth_user)
+        quest = Quest(title="Task", rank="E", player=auth_user)
         db.session.add(quest)
         db.session.commit()
         quest_id = quest.id
@@ -43,7 +43,7 @@ def test_complete_quest(auth_client, app, csrf_token):
     # Assert
     with app.app_context():
         player = Player.query.filter_by(name="AuthUser").first()
-        assert player.xp == 50
+        assert player.xp == 40  # E-rank = 40 XP (1 INT bonus rounds away)
         
         quest = db.session.get(Quest, quest_id)
         assert quest.is_completed

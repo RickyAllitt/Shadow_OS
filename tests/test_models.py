@@ -12,7 +12,7 @@ def test_new_player(app):
         assert retrieved.name == "Test Hunter"
         assert retrieved.level == 1
         assert retrieved.xp == 0
-        assert retrieved.condition == "Normal"
+        assert retrieved.condition == "NORMAL"
 
 def test_quest_creation(app):
     """Test quest creation and attributes."""

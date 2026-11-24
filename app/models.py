@@ -2,7 +2,8 @@ from .extensions import db, login_manager
 from flask_login import UserMixin
 from datetime import datetime, timezone
 import hashlib
-import os
+import hmac
+from werkzeug.security import generate_password_hash, check_password_hash
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -15,22 +16,38 @@ class Player(UserMixin, db.Model):
     quests = db.relationship('Quest', backref='player', lazy=True, cascade="all, delete-orphan")
     
     # --- AUTHENTICATION ---
-    password_hash = db.Column(db.String(64))
-    salt = db.Column(db.String(32))
+    # Werkzeug hash string (algorithm + salt embedded). Legacy accounts store a bare
+    # SHA-256 hex digest plus a separate `salt`; they are upgraded on next login.
+    password_hash = db.Column(db.String(255))
+    salt = db.Column(db.String(32))  # Legacy only; None for upgraded accounts
 
     def set_password(self, password):
-        self.salt = os.urandom(16).hex()
-        self.password_hash = hashlib.sha256((self.salt + password).encode('utf-8')).hexdigest()
+        from flask import current_app, has_app_context
+        # Werkzeug's default (scrypt) in production; tests may pick a cheaper method via config
+        method = current_app.config.get('PASSWORD_HASH_METHOD') if has_app_context() else None
+        self.password_hash = generate_password_hash(password, method=method) if method else generate_password_hash(password)
+        self.salt = None
+
+    def _is_legacy_hash(self):
+        return bool(self.salt) and self.password_hash is not None and '$' not in self.password_hash
 
     def check_password(self, password):
-        return self.password_hash == hashlib.sha256((self.salt + password).encode('utf-8')).hexdigest()
+        if not self.password_hash or password is None:
+            return False
+        if self._is_legacy_hash():
+            legacy = hashlib.sha256((self.salt + password).encode('utf-8')).hexdigest()
+            return hmac.compare_digest(self.password_hash, legacy)
+        return check_password_hash(self.password_hash, password)
+
+    def needs_rehash(self):
+        return self._is_legacy_hash()
     
     # --- PROGRESSION ---
     level = db.Column(db.Integer, default=1)
     xp = db.Column(db.Integer, default=0)
     job_class = db.Column(db.String(50), default='None')
     rank = db.Column(db.String(1), default='E') # New Rank System
-    xp_required = db.Column(db.Integer, default=100)
+    xp_required = db.Column(db.Integer, default=160)  # = services.calculate_xp_required(1)
     attribute_points = db.Column(db.Integer, default=0) # Unspent Ability Points
 
     # Replaced simple string with relationship, but keeping string for fallback or efficiency? 
@@ -67,7 +84,7 @@ class Player(UserMixin, db.Model):
     
     # Condition affects XP gain. 
     # "Healthy" (100% XP), "Well Rested" (110% XP), "Exhausted" (50% XP)
-    condition = db.Column(db.String(20), default="Normal")
+    condition = db.Column(db.String(20), default="NORMAL")
     
     # --- ATTRIBUTES (Mapped to Life Areas) ---
     strength = db.Column(db.Integer, default=1)     # Gym / Diet adherence
@@ -88,12 +105,22 @@ class Player(UserMixin, db.Model):
     # If set, this is the deadline for the "System" penalty quest.
     penalty_deadline = db.Column(db.DateTime, nullable=True) 
 
+    # --- ACCOUNTABILITY (soft penalties) ---
+    xp_debt = db.Column(db.Integer, default=0)              # owed XP: new XP pays this first
+    streak_freezes = db.Column(db.Integer, default=0)       # earned every 7-day streak, max 2
+    hardcore = db.Column(db.Boolean, default=False)         # opt-in: failed penalties cost a level
+    hardcore_since = db.Column(db.DateTime, nullable=True)
+
     # --- VACATION SYSTEM ---
     is_on_vacation = db.Column(db.Boolean, default=False)
     vacation_start_date = db.Column(db.DateTime, nullable=True)
     vacation_end_date = db.Column(db.DateTime, nullable=True)
     last_vacation_date = db.Column(db.DateTime, nullable=True)
     vacation_count = db.Column(db.Integer, default=0)
+
+    # --- LOCALE & REMINDERS ---
+    timezone = db.Column(db.String(50), default='Europe/Madrid')  # IANA name; daily reset is 01:00 local
+    reminder_time = db.Column(db.String(5), default='18:00')     # 'HH:MM' local, or None/'' = off
 
     # --- SETTINGS ---
     settings_audio = db.Column(db.Boolean, default=True)
@@ -130,6 +157,15 @@ class Quest(db.Model):
     progress = db.Column(db.Integer, default=0)
     
     priority = db.Column(db.Integer, default=4) # 1=Critical, 2=High, 3=Medium, 4=Low
+
+    # Measured quests (optional): e.g. target 50, unit "pushups". Amounts are logged as ActivityEvents
+    # (kind 'metric'); the quest completes when the logged total reaches the target.
+    metric_target = db.Column(db.Float, nullable=True)
+    metric_unit = db.Column(db.String(20), nullable=True)
+
+    @property
+    def is_measured(self):
+        return bool(self.metric_target and self.metric_target > 0 and self.metric_unit)
 
     comments = db.relationship('QuestComment', backref='quest', lazy=True, cascade="all, delete-orphan")
 
@@ -259,3 +295,106 @@ class PushSubscription(db.Model):
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     player = db.relationship('Player', backref=db.backref('push_subscriptions', lazy='dynamic', cascade="all, delete-orphan"))
+
+class ActivityEvent(db.Model):
+    """
+    Append-only log of league-relevant activity. Weekly leagues, rank caps and rival records
+    are computed from it, so nothing has to be reset when a new week starts.
+
+    kind: 'quest' | 'focus' | 'daily_bonus' -> points (percent of a level earned)
+          'daily_result'                     -> success (were all dailies done that day)
+          'rank_claim'                       -> rank ('A' / 'S' slot used)
+          'league_seen'                      -> weekly results popup shown
+          'effort'                           -> stat + units (Life Balance input), rank, quest_id
+          'metric'                           -> value logged toward a measured quest (quest_id)
+          'sleep'                            -> value = hours slept
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False, index=True)
+    occurred_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    week_start = db.Column(db.Date, nullable=False, index=True)  # Monday of the game week
+    kind = db.Column(db.String(20), nullable=False)
+    points = db.Column(db.Float, default=0.0)
+    minutes = db.Column(db.Integer, default=0)
+    success = db.Column(db.Boolean, nullable=True)
+    rank = db.Column(db.String(2), nullable=True)
+    stat = db.Column(db.String(3), nullable=True)
+    units = db.Column(db.Float, default=0.0)
+    value = db.Column(db.Float, nullable=True)
+    quest_id = db.Column(db.Integer, nullable=True, index=True)  # no FK: history outlives deleted quests
+
+    player = db.relationship('Player', backref=db.backref('activity', lazy='dynamic', cascade="all, delete-orphan"))
+
+
+class Rivalry(db.Model):
+    """ One chosen rival per player for the weekly head-to-head duel. """
+    id = db.Column(db.Integer, primary_key=True)
+    player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False, unique=True)
+    rival_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    player = db.relationship('Player', foreign_keys=[player_id],
+                             backref=db.backref('rivalry', uselist=False, cascade="all, delete-orphan"))
+    rival = db.relationship('Player', foreign_keys=[rival_id],
+                            backref=db.backref('rivaled_by', cascade="all, delete-orphan"))
+
+
+class PersonalReward(db.Model):
+    """ A real-life reward a player defines and prices themselves (bought with Gold). """
+    id = db.Column(db.Integer, primary_key=True)
+    player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False, index=True)
+    name = db.Column(db.String(60), nullable=False)
+    cost = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    player = db.relationship('Player', backref=db.backref('personal_rewards', lazy=True, cascade="all, delete-orphan"))
+
+
+class Raid(db.Model):
+    """ A shared goal everyone contributes to (e.g. 100 km run together in a month). """
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(80), nullable=False)
+    unit = db.Column(db.String(20), nullable=False)
+    target = db.Column(db.Float, nullable=False)
+    stat = db.Column(db.String(3), default='STR')            # Life Balance area contributions count toward
+    created_by = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    ends_at = db.Column(db.DateTime, nullable=False)
+    status = db.Column(db.String(12), default='active')      # active | completed | failed | cancelled
+    completed_at = db.Column(db.DateTime, nullable=True)
+
+    creator = db.relationship('Player', foreign_keys=[created_by],
+                              backref=db.backref('raids_created', lazy=True))  # deleting a player nulls created_by
+    contributions = db.relationship('RaidContribution', backref='raid', lazy=True, cascade="all, delete-orphan",
+                                    order_by='RaidContribution.created_at.desc()')
+
+    @property
+    def total(self):
+        return round(sum(c.amount for c in self.contributions), 2)
+
+    @property
+    def percent(self):
+        return min(100, int(100 * self.total / self.target)) if self.target else 0
+
+
+class RaidContribution(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    raid_id = db.Column(db.Integer, db.ForeignKey('raid.id'), nullable=False, index=True)
+    player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    player = db.relationship('Player', backref=db.backref('raid_contributions', lazy=True, cascade="all, delete-orphan"))
+
+
+class Kudos(db.Model):
+    """ A reaction from one hunter on another's S-rank clear (an 'effort' ActivityEvent). """
+    __table_args__ = (db.UniqueConstraint('event_id', 'from_player_id', name='uq_kudos_once'),)
+    id = db.Column(db.Integer, primary_key=True)
+    event_id = db.Column(db.Integer, db.ForeignKey('activity_event.id'), nullable=False, index=True)
+    from_player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
+    emoji = db.Column(db.String(8), nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    event = db.relationship('ActivityEvent', backref=db.backref('kudos', lazy=True, cascade="all, delete-orphan"))
+    from_player = db.relationship('Player', backref=db.backref('kudos_given', lazy=True, cascade="all, delete-orphan"))

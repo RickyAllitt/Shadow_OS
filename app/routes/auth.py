@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_user, logout_user, login_required, current_user
 from app.models import Player
 from app.extensions import db
+from app.services import calculate_xp_required
 
 bp = Blueprint('auth', __name__)
 
@@ -17,6 +18,9 @@ def login():
         user = Player.query.filter_by(name=username).first()
         
         if user and user.check_password(password):
+            if user.needs_rehash():
+                user.set_password(password)  # Upgrade legacy SHA-256 hash
+                db.session.commit()
             login_user(user)
             flash('System Access Granted.', 'success')
             return redirect(url_for('main.dashboard'))
@@ -31,10 +35,18 @@ def register():
         return redirect(url_for('main.dashboard'))
         
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        confirm = request.form.get('confirm')
-        
+        username = (request.form.get('username') or '').strip()
+        password = request.form.get('password') or ''
+        confirm = request.form.get('confirm') or ''
+
+        if not username or len(username) > 50:
+            flash('Error: Hunter name must be 1-50 characters.', 'error')
+            return redirect(url_for('auth.register'))
+
+        if not password:
+            flash('Error: Password required.', 'error')
+            return redirect(url_for('auth.register'))
+
         if password != confirm:
             flash('Error: Passwords do not match.', 'error')
             return redirect(url_for('auth.register'))
@@ -49,9 +61,12 @@ def register():
         # Give starting stats
         new_user.level = 1
         new_user.xp = 0
-        new_user.xp_required = 100
+        new_user.xp_required = calculate_xp_required(1)
         new_user.gold = 0
-        new_user.title = "E-Rank Hunter"
+        # Device timezone (filled in by the browser); the daily reset is 01:00 there
+        from app.services import is_valid_timezone, DEFAULT_TIMEZONE
+        tz_name = (request.form.get('timezone') or '').strip()
+        new_user.timezone = tz_name if is_valid_timezone(tz_name) else DEFAULT_TIMEZONE
         
         db.session.add(new_user)
         db.session.commit()

@@ -173,7 +173,7 @@ def test_weekly_reset_one_am_boundary(app):
 
             reset_occurred = check_weekly_reset(user)
             assert reset_occurred is True
-            assert user.gold == 0 # Gold reset at 1am Monday!
+            assert user.gold == 250 # Gold halved at 1am Monday (500 -> 250)
 
 def test_daily_bonus_one_am_boundary(app):
     """Test that daily bonus eligibility refreshes at 1:00 AM."""

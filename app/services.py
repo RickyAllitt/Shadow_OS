@@ -1,39 +1,87 @@
 from app.extensions import db
 from app.models import Player, RewardItem, Quest, Title, PlayerTitle, Inventory, Shadow, DailySnapshot
 
-def seed_database():
-    """Populates the database with initial game state."""
-    
-    # 1. Create the Player (The User)
-    if not Player.query.first():
-        new_player = Player(
-            name="Player One",
-            # Title is set via relationship logic now
-            level=1,
-            xp=0,
-            xp_required=100,
-            gold=0,
-            last_sleep_duration=0, 
-            condition="Normal",
-            strength=5,      
-            intelligence=5,
-            agility=5,
-            sense=5,
-            vitality=5,
-            in_penalty_zone=False
-        )
-        db.session.add(new_player)
-        print(">> Player Created.")
-        # Assign default title here if it exists
-        default_title = Title.query.filter_by(name="E-Rank Hunter").first()
-        if default_title:
-             new_player.current_title = default_title
-             
-             # Also unlock it
-             assoc = PlayerTitle(player=new_player, title=default_title)
-             db.session.add(assoc)
+# --- CONDITION (sleep) ---
+CONDITION_WELL_RESTED = "WELL RESTED"
+CONDITION_NORMAL = "NORMAL"
+CONDITION_TIRED = "TIRED"
+CONDITION_XP_MULTIPLIERS = {CONDITION_WELL_RESTED: 1.10, CONDITION_TIRED: 0.5}
 
-    # 2. Create Default Shop Items (Rewards)
+def condition_xp_multiplier(player):
+    return CONDITION_XP_MULTIPLIERS.get((player.condition or '').upper(), 1.0)
+
+def recover_condition(player):
+    """'Full recovery' (level up / daily bonus) clears fatigue but keeps a Well Rested buff."""
+    if (player.condition or '').upper() != CONDITION_WELL_RESTED:
+        player.condition = CONDITION_NORMAL
+
+# --- TITLES ---
+# Single source of truth for titles. `buff` keys:
+#   xp / coins: multiplier bonus (0.05 = +5%)   all: flat bonus to every stat
+#   stat: (player_field, flat bonus)
+TITLE_DEFINITIONS = [
+    {'name': "E-Rank Hunter", 'description': "Every hunter starts somewhere.",
+     'unlock_condition': 'level', 'unlock_value': 1, 'buff': {}},
+    {'name': "The Awakened", 'description': "Reach Level 10.",
+     'unlock_condition': 'level', 'unlock_value': 10, 'buff': {'xp': 0.05}},
+    {'name': "Wolf Slayer", 'description': "Reach Level 25.",
+     'unlock_condition': 'level', 'unlock_value': 25, 'buff': {'stat': ('strength', 3)}},
+    {'name': "Demon Hunter", 'description': "Reach Level 50.",
+     'unlock_condition': 'level', 'unlock_value': 50, 'buff': {'xp': 0.10}},
+    {'name': "Iron Will", 'description': "Complete all dailies 7 days in a row.",
+     'unlock_condition': 'streak_daily', 'unlock_value': 7, 'buff': {'all': 1}},
+    {'name': "The One Who Overcame Adversity", 'description': "Complete all dailies 30 days in a row.",
+     'unlock_condition': 'streak_daily', 'unlock_value': 30, 'buff': {'all': 3}},
+    {'name': "Well-Rested Sage", 'description': "Sleep 7.5h+ for 7 nights in a row.",
+     'unlock_condition': 'streak_sleep', 'unlock_value': 7, 'buff': {'stat': ('vitality', 2)}},
+    {'name': "Scholar", 'description': "Reach 50 base Intelligence.",
+     'unlock_condition': 'stat_intelligence', 'unlock_value': 50, 'buff': {'xp': 0.05}},
+    {'name': "Titan's Grip", 'description': "Reach 50 base Strength.",
+     'unlock_condition': 'stat_strength', 'unlock_value': 50, 'buff': {'stat': ('strength', 5)}},
+    {'name': "Coin Hoarder", 'description': "Hold 5,000 Coins at once.",
+     'unlock_condition': 'coins', 'unlock_value': 5000, 'buff': {'coins': 0.05}},
+]
+_TITLE_BUFFS = {t['name']: t['buff'] for t in TITLE_DEFINITIONS}
+_STAT_LABELS = {'strength': 'STR', 'intelligence': 'INT', 'agility': 'AGI', 'vitality': 'VIT', 'sense': 'SNS'}
+
+def describe_title_buff(buff):
+    parts = []
+    if buff.get('xp'): parts.append(f"XP +{int(buff['xp'] * 100)}%")
+    if buff.get('coins'): parts.append(f"COINS +{int(buff['coins'] * 100)}%")
+    if buff.get('all'): parts.append(f"ALL STATS +{buff['all']}")
+    if buff.get('stat'):
+        field, value = buff['stat']
+        parts.append(f"{_STAT_LABELS.get(field, field.upper())} +{value}")
+    return ", ".join(parts) or None
+
+def active_title_buff(player):
+    title = player.current_title
+    return _TITLE_BUFFS.get(title.name, {}) if title else {}
+
+def xp_multiplier(player):
+    """Sleep condition x equipped title XP bonus x Hardcore bonus."""
+    hardcore = 1 + HARDCORE_XP_BONUS if getattr(player, 'hardcore', False) else 1
+    return condition_xp_multiplier(player) * (1 + active_title_buff(player).get('xp', 0)) * hardcore
+
+def coin_multiplier(player):
+    return 1 + active_title_buff(player).get('coins', 0)
+
+def seed_titles():
+    for t in TITLE_DEFINITIONS:
+        row = Title.query.filter_by(name=t['name']).first()
+        if not row:
+            row = Title(name=t['name'])
+            db.session.add(row)
+        row.description = t['description']
+        row.buff_description = describe_title_buff(t['buff'])
+        row.unlock_condition = t['unlock_condition']
+        row.unlock_value = t['unlock_value']
+
+def seed_database():
+    """Populates the database with initial game state (titles + shop stock)."""
+    seed_titles()
+
+    # Create Default Shop Items (Rewards)
     # Define all desired items
     desired_items = [
         # Gold Rewards (Real Life)
@@ -104,24 +152,43 @@ import pytz
 GAME_TIMEZONE = pytz.timezone('Europe/Madrid')
 RESET_HOUR = 1  # 1:00 AM Europe/Madrid
 
-def get_latest_daily_reset_time(dt_game=None):
+DEFAULT_TIMEZONE = 'Europe/Madrid'
+
+
+def player_tz(player):
+    """The player's own timezone (daily reset is 01:00 there). Falls back to GAME_TIMEZONE."""
+    name = getattr(player, 'timezone', None) or DEFAULT_TIMEZONE
+    try:
+        return pytz.timezone(name)
+    except pytz.UnknownTimeZoneError:
+        return GAME_TIMEZONE
+
+
+def is_valid_timezone(name):
+    return bool(name) and name in pytz.all_timezones_set
+
+
+def get_latest_daily_reset_time(dt_game=None, tz=None):
     """
-    Returns the most recent 1:00 AM reset datetime in GAME_TIMEZONE.
+    Returns the most recent 1:00 AM reset datetime in `tz` (default GAME_TIMEZONE).
     If it's currently before 1:00 AM, the most recent reset was yesterday at 1:00 AM.
     If it's at or after 1:00 AM, the most recent reset was today at 1:00 AM.
     """
+    tz = tz or GAME_TIMEZONE
     if dt_game is None:
-        dt_game = datetime.now(timezone.utc).astimezone(GAME_TIMEZONE)
+        dt_game = datetime.now(timezone.utc).astimezone(tz)
+    else:
+        dt_game = dt_game.astimezone(tz)
     if dt_game.hour < RESET_HOUR:
         base_date = dt_game.date() - timedelta(days=1)
     else:
         base_date = dt_game.date()
-    return GAME_TIMEZONE.localize(datetime.combine(base_date, datetime.min.time()).replace(hour=RESET_HOUR))
+    return tz.localize(datetime.combine(base_date, datetime.min.time()).replace(hour=RESET_HOUR))
 
 def check_weekly_reset(player):
     """
     Checks if the weekly reset (Sunday night / Monday morning at 1:00 AM) has passed since the last reset.
-    If so, resets Gold to 0.
+    If so, halves Gold (saving is possible, hoarding is not).
     Returns True if reset occurred.
     """
     if not player.last_weekly_reset:
@@ -134,15 +201,16 @@ def check_weekly_reset(player):
 
     # Convert everything to Game Time for logic
     now_utc = datetime.now(timezone.utc)
-    now_game = now_utc.astimezone(GAME_TIMEZONE)
-    
-    # Reset is Sunday night / Monday 01:00:00 Game Time
+    tz = player_tz(player)
+    now_game = now_utc.astimezone(tz)
+
+    # Reset is Sunday night / Monday 01:00:00 in the player's timezone
     # Logic: Get start of current week (Monday) in Game Time at RESET_HOUR (01:00).
     # If last reset < start of current week at RESET_HOUR, trigger reset.
     
     today_game = now_game.date()
     start_of_week = today_game - timedelta(days=today_game.weekday()) # Monday
-    reset_threshold = GAME_TIMEZONE.localize(datetime.combine(start_of_week, datetime.min.time()).replace(hour=RESET_HOUR))
+    reset_threshold = tz.localize(datetime.combine(start_of_week, datetime.min.time()).replace(hour=RESET_HOUR))
     
     # If Monday 1:00 AM has not arrived yet, we are still in Sunday night
     if now_game < reset_threshold:
@@ -154,7 +222,8 @@ def check_weekly_reset(player):
         last_reset_utc = last_reset_utc.replace(tzinfo=timezone.utc)
     
     if last_reset_utc < reset_threshold:
-        player.gold = 0
+        player.weekly_gold_before = player.gold  # transient, for the reset message
+        player.gold = (player.gold or 0) // 2    # halve: keeps spending pressure but allows saving
         player.last_weekly_reset = now_utc
         db.session.commit()
         return True
@@ -229,49 +298,83 @@ def trigger_push_notification(player_id, title, message, url="/"):
         db.session.add(new_log)
         db.session.commit()
 
-def calculate_xp_required(level):
-    """ Exponential Curve: Next Level = Previous * 1.25 """
-    # Base is 100 for Level 1 -> 2
-    return int(100 * (1.25 ** (level - 1)))
+# --- LEVELLING ECONOMY ---
+# Gentle polynomial curve + fixed rewards: numbers stay readable (Lv 100 needs ~38k XP, not ~390 billion)
+# and the same action earns the same XP at every level. A typical active day (4 dailies + bonus,
+# 1.5h focus, a C and a B quest) is ~2,000 XP: about a level a day early on, ~18 days per level in
+# the 90s, roughly 2 years to Lv 100.
+XP_CURVE_BASE = 100
+XP_CURVE_FACTOR = 60
+XP_CURVE_EXPONENT = 1.4
 
-def calculate_rewards(rank, player_level=1):
-    """ Returns (XP, Gold, Coins) based on Rank and Scaled Level Cap """
-    
-    # 1. Calculate XP Requirement for current level
-    xp_cap = calculate_xp_required(player_level)
-    
-    # 2. Define Percentages (Target: 2 Years to Lvl 100)
-    percentages = {
-        'E': 0.01,  # 1%
-        'D': 0.02,  # 2%
-        'C': 0.03,  # 3%
-        'B': 0.05,  # 5%
-        'A': 0.12,  # 12%
-        'S': 0.0    # 0 here, handled via Instant Level Up
-    }
-    
-    # 3. Calculate Scaled XP
-    pct = percentages.get(rank, 0.0)
-    scaled_xp = int(xp_cap * pct)
-    
-    # 4. Enforce Minimums (Base Values) so low levels don't get 0 XP
-    min_xp = {
-        'E': 1, 'D': 2, 'C': 5, 'B': 10, 'A': 25, 'S': 0
-    }
-    final_xp = max(min_xp.get(rank, 0), scaled_xp)
-    
-    # 5. Gold/Coins remain flat (Economy balance separate from Leveling)
-    rewards_flat = {
-        'E': (0, 0),
-        'D': (0, 0),
-        'C': (0, 0),
-        'B': (50, 15),
-        'A': (100, 30),
-        'S': (250, 100)
-    }
-    gold, coins = rewards_flat.get(rank, (0, 0))
-    
-    return final_xp, gold, coins
+RANK_XP = {'E': 40, 'D': 80, 'C': 150, 'B': 300, 'A': 600, 'S': 1000}  # non-daily S = instant level up
+DAILY_BONUS_XP = 500          # all dailies done
+FOCUS_XP_PER_MINUTE = 10      # 600 XP per hour of deep work
+RANK_GOLD_COINS = {'E': (0, 0), 'D': (0, 0), 'C': (0, 0), 'B': (50, 15), 'A': (100, 30), 'S': (250, 100)}
+# Big one-off quests stay meaningful at every level: non-daily B/A pay the higher of their fixed XP
+# or this share of the current level (A-ranks are also capped at 3/week). League points use the
+# fixed RANK_XP only, so higher levels gain no league advantage.
+RANK_LEVEL_SHARE = {'B': 0.05, 'A': 0.15}
+
+# --- ACCOUNTABILITY ---
+XP_DEBT_SHARE = 0.5        # failed penalty (normal mode): owe half a level, capped at one level
+HARDCORE_XP_BONUS = 0.10   # opt-in Hardcore: +10% XP, but a failed penalty costs one level
+FREEZE_EVERY_DAYS = 7      # earn a streak freeze every 7-day streak...
+MAX_STREAK_FREEZES = 2     # ...and bank at most this many
+
+
+def calculate_xp_required(level):
+    """ XP needed to go from `level` to `level + 1`: 100 + 60 * level^1.4, rounded to 10. """
+    return int(round(XP_CURVE_BASE + XP_CURVE_FACTOR * max(1, level) ** XP_CURVE_EXPONENT, -1))
+
+
+def calculate_rewards(rank, player_level=None, is_daily=False):
+    """
+    Returns (XP, Gold, Coins) for a quest rank. Fixed per rank, except non-daily B/A quests which pay
+    at least RANK_LEVEL_SHARE of the current level's requirement (rounded to 10).
+    """
+    gold, coins = RANK_GOLD_COINS.get(rank, (0, 0))
+    xp = RANK_XP.get(rank, 0)
+    if player_level and not is_daily and rank in RANK_LEVEL_SHARE:
+        xp = max(xp, int(round(RANK_LEVEL_SHARE[rank] * calculate_xp_required(player_level), -1)))
+    return xp, gold, coins
+
+
+def add_xp(player, amount):
+    """
+    Credit XP, paying off any XP debt first. Returns (credited_to_bar, paid_to_debt).
+    Also records the payment on the player (transient) so routes can report it.
+    """
+    amount = max(0, int(amount))
+    paid = min(player.xp_debt or 0, amount)
+    if paid:
+        player.xp_debt -= paid
+        player.debt_paid = getattr(player, 'debt_paid', 0) + paid
+    player.xp += amount - paid
+    return amount - paid, paid
+
+
+def apply_xp_debt(player):
+    """Failed penalty in normal mode: owe half a level (total debt capped at one full level)."""
+    added = int(round(player.xp_required * XP_DEBT_SHARE, -1))
+    player.xp_debt = min((player.xp_debt or 0) + added, player.xp_required)
+    return player.xp_debt
+
+
+def set_hardcore(player, enabled):
+    if enabled:
+        if player.hardcore:
+            return False, "Hardcore mode is already active."
+        if player.in_penalty_zone:
+            return False, "Clear the Penalty Zone before entering Hardcore mode."
+        player.hardcore, player.hardcore_since = True, datetime.now(timezone.utc)
+        db.session.commit()
+        return True, "💀 HARDCORE MODE ENGAGED. +10% XP. A failed penalty now costs a level."
+    if not player.hardcore:
+        return False, "Hardcore mode is not active."
+    player.hardcore, player.hardcore_since = False, None
+    db.session.commit()
+    return True, "Hardcore mode disabled. Your Hardcore streak has ended."
 
 def process_level_up(player):
     """ Handles level up logic, stats, class evolution, rank up, and titles. """
@@ -287,7 +390,7 @@ def process_level_up(player):
         player.agility += 1
         player.vitality += 1
         player.sense += 1
-        player.condition = "Healthy" # Full Recovery
+        recover_condition(player) # Full Recovery
         
         # Check Evolution immediately on level up
         evolved, new_class = check_class_evolution(player)
@@ -303,7 +406,9 @@ def process_level_up(player):
              
     # Check titles on every completion (level up or streak)
     check_title_unlocks(player)
-    
+
+    # Transient (not persisted): lets routes describe the level up
+    player.levels_gained = getattr(player, 'levels_gained', 0) + (player.level - initial_level)
     return player.level > initial_level
 
 def process_quest_completion(player, quest):
@@ -317,28 +422,32 @@ def process_quest_completion(player, quest):
     if quest.is_daily:
         quest.progress = 0
     
-    # 1. Calculate Rewards
-    # 1. Calculate Rewards (Pass Level for Scaling)
-    base_xp, base_gold, base_coins = calculate_rewards(quest.rank, player.level)
-    # If quest has explicit rewards set (>0), use them. Otherwise use rank-based.
-    if quest.xp_reward and quest.xp_reward > 10: # 10 is the model default
-        base_xp = quest.xp_reward
+    # 1. Calculate Rewards (fixed per rank; non-daily B/A scale with level)
+    base_xp, base_gold, base_coins = calculate_rewards(quest.rank, player.level, quest.is_daily)
+    league_xp = RANK_XP.get(quest.rank, 0)
     if quest.gold_reward and quest.gold_reward > 0:
         base_gold = quest.gold_reward
-        
-    # User Rule: Dailies and Penalties give NO rewards.
-    if quest.is_daily or quest.is_penalty:
-        base_gold = 0
-        base_xp = 0
-        base_coins = 0
+
+    # Dailies earn their rank XP (so every daily counts) but no Gold/Coins: those come from the
+    # all-dailies bonus. Penalty quests give nothing: they only clear the penalty.
+    if quest.is_daily:
+        base_gold = base_coins = 0
+    if quest.is_penalty:
+        base_xp = base_gold = base_coins = league_xp = 0
+    instant_level_up = quest.rank == 'S' and not quest.is_penalty and not quest.is_daily
+    if instant_level_up:
+        base_xp = 0  # the reward is the level itself
         
     # INT Multiplier: +5% per 10 INT
     int_multiplier = 1 + (player.intelligence / 10) * 0.05
     xp_gain = int(base_xp * int_multiplier)
     
+    # Sleep condition (Well Rested +10% / Tired -50%) and equipped title bonus
+    xp_gain = int(xp_gain * xp_multiplier(player))
+
     # AGI Multiplier: +5% Coins per 10 AGI
     agi_multiplier = 1 + (player.agility / 10) * 0.05
-    coin_gain = int(base_coins * agi_multiplier)
+    coin_gain = int(base_coins * agi_multiplier * coin_multiplier(player))
     
     # --- CLASS BONUSES ---
     # Assassin: +10% Coins
@@ -349,15 +458,20 @@ def process_quest_completion(player, quest):
     if player.job_class == 'Mage':
         xp_gain = int(xp_gain * 1.10)
 
-    player.xp += xp_gain
+    add_xp(player, xp_gain)
     player.gold += base_gold
     player.coins += coin_gain
     # S-RANK REWARD: INSTANT LEVEL UP
-    if quest.rank == 'S' and not quest.is_penalty and not quest.is_daily:
+    if instant_level_up:
         # Fill XP bar to max immediately so that they just level up ONE time
-        # Do not add remaining to xp_gain, otherwise it counts as excess
-        player.xp = player.xp_required
+        player.xp = max(player.xp, player.xp_required)
         print(f">> S-RANK BONUS: Instant Level Up for {player.name}")
+
+    from app.league import record_points, S_RANK_LEAGUE_XP
+    from app.kpi import record_quest_effort
+    # League points use base XP (before INT/class/title/sleep bonuses) so the league stays fair
+    record_points(player, 'quest', S_RANK_LEAGUE_XP if instant_level_up else league_xp)
+    record_quest_effort(player, quest)  # Life Balance: dailies count too
 
     # 2. Apply Stat Buffs (Only for Rank B+ and NOT Daily/Penalty)
     if quest.rank in ['B', 'A', 'S'] and not quest.is_daily and not quest.is_penalty:
@@ -420,19 +534,31 @@ def process_quest_completion(player, quest):
     can_arise = (quest.rank == 'S')
     return xp_gain, base_gold, coin_gain, (player.level > initial_level), daily_bonus, can_arise
 
+VALID_STATS = ('STR', 'INT', 'AGI', 'VIT', 'SNS')
+_STAT_ALIASES = {'SEN': 'SNS', 'SENSE': 'SNS'}
+
+def normalize_stat(stat, default='INT'):
+    """Maps any stat code (incl. legacy 'SEN') to one of VALID_STATS."""
+    if not stat:
+        return default
+    code = str(stat).strip().upper()
+    code = _STAT_ALIASES.get(code, code)
+    return code if code in VALID_STATS else default
+
 def _apply_quest_stat_reward(player, quest):
     """Helper to apply stat rewards from a quest."""
+    stat = normalize_stat(quest.stat_reward, default=None)
     amount = 1
     if quest.rank == 'A':
         amount = 2
     elif quest.rank == 'S':
         amount = 3
         
-    if quest.stat_reward == 'STR': player.strength += amount
-    elif quest.stat_reward == 'INT': player.intelligence += amount
-    elif quest.stat_reward == 'AGI': player.agility += amount
-    elif quest.stat_reward == 'VIT': player.vitality += amount
-    elif quest.stat_reward == 'SNS': player.sense += amount
+    if stat == 'STR': player.strength += amount
+    elif stat == 'INT': player.intelligence += amount
+    elif stat == 'AGI': player.agility += amount
+    elif stat == 'VIT': player.vitality += amount
+    elif stat == 'SNS': player.sense += amount
 
 def _check_and_apply_daily_bonus(player):
     """Checks if all dailies are done. Applies bonus if eligible. Clears penalty if active."""
@@ -445,10 +571,11 @@ def _check_and_apply_daily_bonus(player):
     if all_completed:
         # 1. Daily Bonus Logic
         now_utc = datetime.now(timezone.utc)
-        now_game = now_utc.astimezone(GAME_TIMEZONE)
-        
-        # Check against latest 1:00 AM reset in Game Time
-        latest_reset_game = get_latest_daily_reset_time(now_game)
+        tz = player_tz(player)
+        now_game = now_utc.astimezone(tz)
+
+        # Check against the latest 1:00 AM reset in the player's timezone
+        latest_reset_game = get_latest_daily_reset_time(now_game, tz)
         
         last_bonus = player.last_daily_bonus
         if last_bonus and last_bonus.tzinfo is None:
@@ -458,17 +585,20 @@ def _check_and_apply_daily_bonus(player):
         latest_reset_utc = latest_reset_game.astimezone(timezone.utc)
         
         if not last_bonus or last_bonus < latest_reset_utc:
-            # Scaled Daily Bonus: 10% of Level Cap
-            xp_cap = calculate_xp_required(player.level)
-            bonus_xp = int(xp_cap * 0.10)
-            player.xp += bonus_xp
+            # All-dailies bonus (fixed)
+            bonus_xp = DAILY_BONUS_XP
+            add_xp(player, bonus_xp)
             
             player.gold += 100 
             player.coins += 50 
             player.attribute_points += 3 # Daily Ability Points
-            player.condition = "Healthy" # Status Recovery
+            recover_condition(player) # Status Recovery
             
             player.last_daily_bonus = now_utc
+            # Transient (not persisted): lets the route report the real amounts
+            player.daily_bonus_rewards = {'xp': bonus_xp, 'gold': 100, 'coins': 50, 'points': 3}
+            from app.league import record_points
+            record_points(player, 'daily_bonus', bonus_xp)
             print(f">> Daily Bonus Granted for {player.name}")
             bonus_granted = True
 
@@ -547,10 +677,11 @@ def check_daily_reset(player):
 
     now_utc = datetime.now(timezone.utc)
     now = now_utc
-    now_game = now_utc.astimezone(GAME_TIMEZONE)
-    latest_reset_game = get_latest_daily_reset_time(now_game)
+    tz = player_tz(player)
+    now_game = now_utc.astimezone(tz)
+    latest_reset_game = get_latest_daily_reset_time(now_game, tz)
     
-    # We compare everything in UTC to be safe with DB, but the reset point is determined by Madrid time (1:00 AM).
+    # We compare everything in UTC to be safe with DB; the reset point is 1:00 AM in the player's timezone.
     latest_reset_utc = latest_reset_game.astimezone(timezone.utc)
     
     if player.last_daily_reset.tzinfo is None:
@@ -591,8 +722,18 @@ def check_daily_reset(player):
         # Loop 2 (Jan 2->3): Dailies are now False (reset in Loop 1). Failure.
         
         success = (total_dailies == 0) or (completed_dailies == total_dailies)
+        if total_dailies:
+            from app.league import record
+            record(player, 'daily_result', success=success, when=player.last_daily_reset)
         
-        if not success:
+        if not success and (player.streak_freezes or 0) > 0:
+            # STREAK FREEZE: the bad day is forgiven (no streak loss, debuff or penalty progress)
+            player.streak_freezes -= 1
+            messages.append(f"❄️ STREAK FREEZE USED: your {player.current_streak}-day streak is safe "
+                            f"({player.streak_freezes} left).")
+            trigger_push_notification(player.id, "Streak Freeze used",
+                                      f"You missed your dailies, but a freeze protected your {player.current_streak}-day streak.")
+        elif not success:
             # FAILURE LOGIC
             player.current_streak = 0
             player.consecutive_missed_days += 1
@@ -621,10 +762,12 @@ def check_daily_reset(player):
                 
                 existing_penalty = Quest.query.filter_by(player_id=player.id, is_penalty=True, is_completed=False).first()
                 if not existing_penalty:
-                    # Calculate deadline: Next 1:00 AM in Madrid
+                    # Calculate deadline: next 1:00 AM in the player's timezone
                     # If we are in catch-up loop, we effectively set it relative to "now" since they just logged in?
                     # Yes, give them until the upcoming 1:00 AM to fix it.
-                    deadline_game = latest_reset_game + timedelta(days=1)
+                    # Localize the next reset explicitly (adding 24h to an aware time drifts an hour across DST)
+                    deadline_game = tz.localize(datetime.combine(
+                        latest_reset_game.date() + timedelta(days=1), datetime.min.time()).replace(hour=RESET_HOUR))
                     deadline_utc = deadline_game.astimezone(timezone.utc)
 
                     penalty = Quest(
@@ -663,32 +806,27 @@ def check_daily_reset(player):
                     can_level_down = False
                     
             if effective_missed_days >= 3 and can_level_down:
-                if player.level > 1:
-                    player.level = max(1, player.level - 3)
-                    player.xp = 0 
-                    player.xp_required = calculate_xp_required(player.level)
-                    
-                    endurance = (player.vitality / 10) * 0.1
-                    loss = max(1, int(3 * (1.0 - endurance)))
-                    
-                    player.strength = max(1, player.strength - loss)
-                    player.intelligence = max(1, player.intelligence - loss)
-                    player.agility = max(1, player.agility - loss)
-                    player.sense = max(1, player.sense - loss)
-                    player.vitality = max(1, player.vitality - loss)
-                    
-                    messages.append("CRITICAL: PROLONGED ABSENCE. STATS REDUCED.")
-                    
-                    # Clear penalty
-                    active_penalties = Quest.query.filter_by(player_id=player.id, is_penalty=True, is_completed=False).all()
-                    for p_quest in active_penalties:
-                        p_quest.is_completed = True
-                        p_quest.completed_at = now
-                    
-                player.consecutive_missed_days = 0 
-                player.in_penalty_zone = False 
-                player.has_debuff = False 
-        
+                if player.hardcore:
+                    # Opt-in Hardcore: lose exactly one level (no stat loss)
+                    if player.level > 1:
+                        player.level -= 1
+                        player.xp = 0
+                        player.xp_required = calculate_xp_required(player.level)
+                    messages.append(f"💀 HARDCORE: PENALTY FAILED. LEVEL LOST (now Lv {player.level}).")
+                else:
+                    # Normal mode: XP debt instead of losing levels or stats
+                    debt = apply_xp_debt(player)
+                    messages.append(f"PENALTY FAILED: XP DEBT {debt:,} XP. New XP pays it off first.")
+
+                # Clear penalty
+                for p_quest in Quest.query.filter_by(player_id=player.id, is_penalty=True, is_completed=False).all():
+                    p_quest.is_completed = True
+                    p_quest.completed_at = now
+
+                player.consecutive_missed_days = 0
+                player.in_penalty_zone = False
+                player.has_debuff = False
+
         else:
             # SUCCESS LOGIC
             player.consecutive_missed_days = 0
@@ -697,6 +835,10 @@ def check_daily_reset(player):
             player.current_streak += 1
             if player.current_streak > player.highest_streak:
                 player.highest_streak = player.current_streak
+            if player.current_streak % FREEZE_EVERY_DAYS == 0 and (player.streak_freezes or 0) < MAX_STREAK_FREEZES:
+                player.streak_freezes = (player.streak_freezes or 0) + 1
+                messages.append(f"❄️ STREAK FREEZE EARNED for a {player.current_streak}-day streak "
+                                f"({player.streak_freezes}/{MAX_STREAK_FREEZES}).")
             
         # Reset Dailies (Prepare for next day iteration)
         for quest in dailies:
@@ -765,8 +907,6 @@ def get_categorized_quests(player_id):
 
 def check_title_unlocks(player):
     """ Checks and unlocks titles based on player stats/milestones. """
-    print(f"Checking titles for {player.name}...")
-    
     # 1. Get all titles NOT yet unlocked by player
     # subquery for titles player uses
     unlocked_ids = [t.title_id for t in player.unlocked_titles]
@@ -781,9 +921,12 @@ def check_title_unlocks(player):
             if player.level >= t.unlock_value:
                 unlocked = True
                 
-        elif t.unlock_condition == 'streak_daily' or t.unlock_condition == 'streak_sleep':
-            # Mapping 'streak_daily' to sleep_streak for now as it is the primary tracked streak
-            if player.sleep_streak >= t.unlock_value:
+        elif t.unlock_condition == 'streak_daily':
+            if max(player.current_streak or 0, player.highest_streak or 0) >= t.unlock_value:
+                unlocked = True
+
+        elif t.unlock_condition == 'streak_sleep':
+            if (player.sleep_streak or 0) >= t.unlock_value:
                 unlocked = True
 
         # Stat Unlocks
@@ -807,9 +950,12 @@ def check_title_unlocks(player):
             assoc = PlayerTitle(player=player, title=t)
             db.session.add(assoc)
             new_unlocks.append(t.name)
-            
+            if player.current_title is None:
+                player.current_title = t  # Auto-equip the first title earned
+
     if new_unlocks:
-        print(f"New Titles Unlocked: {new_unlocks}")
+        # Transient (not persisted): routes read this to announce unlocks
+        player.new_titles = getattr(player, 'new_titles', []) + new_unlocks
         db.session.commit()
     
     return new_unlocks
@@ -828,35 +974,37 @@ def equip_title_service(player, title_id):
     db.session.commit()
     return True, f"Equipped title: {title.name}"
 
+# Class -> (next class, level required). Base classes come from the Job Change trial (app/job_trial.py).
+CLASS_EVOLUTIONS = {
+    "Assassin": ("Shadow Assassin", 20),
+    "Mage": ("Archmage", 20),
+    "Tank": ("Juggernaut", 20),
+    "Shadow Assassin": ("Shadow Lord", 40),
+    "Archmage": ("Spellweaver", 40),
+    "Juggernaut": ("Iron Fortress", 40),
+    "Shadow Lord": ("Nightwalker", 60),
+    "Spellweaver": ("Arcane Sage", 60),
+    "Iron Fortress": ("Titan", 60),
+    "Nightwalker": ("Eclipse Bringer", 80),
+    "Arcane Sage": ("Void Walker", 80),
+    "Titan": ("World Guardian", 80),
+    "Eclipse Bringer": ("Monarch of Shadows", 100),
+    "Void Walker": ("Monarch of Scrolls", 100),
+    "World Guardian": ("Monarch of Iron", 100),
+}
+
+def class_evolution_path(job_class):
+    """[(class, level), ...] for every evolution after job_class."""
+    path = []
+    while job_class in CLASS_EVOLUTIONS:
+        job_class, level = CLASS_EVOLUTIONS[job_class]
+        path.append((job_class, level))
+    return path
+
 def check_class_evolution(player):
     """ Checks for Class Upgrades at Level 20, 40, 60, 80, 100. """
-    evolution_map = {
-        # Tier 1 -> Tier 2 (Level 20)
-        "Assassin": ("Shadow Assassin", 20),
-        "Mage": ("Archmage", 20),
-        "Tank": ("Juggernaut", 20),
-        
-        # Tier 2 -> Tier 3 (Level 40)
-        "Shadow Assassin": ("Shadow Lord", 40),
-        "Archmage": ("Spellweaver", 40),
-        "Juggernaut": ("Iron Fortress", 40),
-        
-        # Tier 3 -> Tier 4 (Level 60)
-        "Shadow Lord": ("Nightwalker", 60),
-        "Spellweaver": ("Arcane Sage", 60),
-        "Iron Fortress": ("Titan", 60),
-        
-        # Tier 4 -> Tier 5 (Level 80)
-        "Nightwalker": ("Eclipse Bringer", 80),
-        "Arcane Sage": ("Void Walker", 80),
-        "Titan": ("World Guardian", 80),
-        
-        # Tier 5 -> Tier 6 (Level 100)
-        "Eclipse Bringer": ("Monarch of Shadows", 100),
-        "Void Walker": ("Monarch of Scrolls", 100),
-        "World Guardian": ("Monarch of Iron", 100)
-    }
-    
+    evolution_map = CLASS_EVOLUTIONS
+
     current_class = player.job_class
     if current_class in evolution_map:
         next_class, required_level = evolution_map[current_class]
@@ -939,7 +1087,7 @@ def extract_shadow(player, quest_id):
     if not quest or quest.player_id != player.id:
         return False, "Quest not found."
     
-    if quest.rank != 'S' and not quest.is_penalty: # Allow Penalty extraction? No, only glory.
+    if quest.rank != 'S' or quest.is_penalty or quest.is_daily: # Only glory can be extracted.
          return False, "Only S-Rank feats can be extracted."
          
     if not quest.is_completed:
@@ -962,12 +1110,22 @@ def extract_shadow(player, quest_id):
     
     return True, f"ARISE! {quest.title} has joined your army."
 
+def get_arise_candidates(player):
+    """Completed S-Rank (non-penalty) quests that have not been extracted yet."""
+    extracted = {s.original_quest_name for s in player.shadows}
+    quests = Quest.query.filter_by(player_id=player.id, rank='S', is_completed=True,
+                                   is_penalty=False, is_daily=False).all()
+    return [q for q in quests if q.title not in extracted]
+
 def allocate_attributes(player, distribution):
     """
     Allocates ability points to stats.
     distribution: dict {'STR': 0, 'INT': 0, ...}
     Returns: (Success, Message)
     """
+    if any(v < 0 for v in distribution.values()):
+        return False, "Invalid allocation."
+
     total_requested = sum(distribution.values())
     
     if total_requested <= 0:
@@ -987,22 +1145,6 @@ def allocate_attributes(player, distribution):
     player.attribute_points -= total_requested
     db.session.commit()
     return True, "Attributes updated."
-    # Let's check duplicate original name to prevent spamming same quest?
-    # For now, allow it.
-    
-    shadow = Shadow(
-        player_id=player.id,
-        original_quest_name=quest.title,
-        rank=quest.rank,
-        buff_type='ALL_STATS', # Default for now
-        buff_value=1 # +1%
-    )
-    db.session.add(shadow)
-    db.session.commit()
-    
-    return True, f"ARISE. {quest.title} has joined your Shadow Army."
-
-
 
 def calculate_total_stats(player):
     """
@@ -1033,6 +1175,16 @@ def calculate_total_stats(player):
             if target_stat in stats:
                 stats[target_stat] += inv_item.item.stat_value
                 
+    # Equipped Title Bonuses
+    buff = active_title_buff(player)
+    if buff.get('all'):
+        for key in stats:
+            stats[key] += buff['all']
+    if buff.get('stat'):
+        field, value = buff['stat']
+        if field in stats:
+            stats[field] += value
+
     # Shadow Army Buffs (Commanding Presence: Base 1% + 0.1% per 10 SNS)
     shadow_count = len(player.shadows)
     if shadow_count > 0:
@@ -1140,69 +1292,55 @@ def create_notification(player_id, message, category="info"):
     db.session.add(notif)
     db.session.commit()
 
-def check_daily_completion_status(app_instance):
+def reminder_due_at(player, now=None):
     """
-    Scheduled Job (18:00): Checks if players have completed their dailies.
-    If not, sends a WARNING notification.
+    UTC datetime of this game day's reminder for the player, or None if reminders are off.
+    A time before 01:00 (e.g. 00:30) belongs to the end of the current game day.
     """
-    with app_instance.app_context():
-        players = Player.query.all()
-        for player in players:
-            if player.is_on_vacation:
-                continue
-                
-            dailies = Quest.query.filter_by(player_id=player.id, is_daily=True).all()
-            if not dailies:
-                continue
-                
-            completed = sum(1 for q in dailies if q.is_completed)
-            total = len(dailies)
-            
-            if completed < total:
-                msg = f"SYSTEM ALERT: Daily Routine incomplete ({completed}/{total}). Failure will result in penalties at 1:00 AM."
-                create_notification(player.id, msg, "warning")
-                print(f">> Notification sent to {player.name}: Incomplete Dailies")
+    if not player.reminder_time:
+        return None
+    try:
+        hour, minute = (int(x) for x in player.reminder_time.split(':'))
+    except ValueError:
+        return None
+    tz = player_tz(player)
+    game_day = get_latest_daily_reset_time(now or datetime.now(timezone.utc), tz).date()
+    if (hour, minute) < (RESET_HOUR, 0):
+        game_day += timedelta(days=1)
+    return tz.localize(datetime(game_day.year, game_day.month, game_day.day, hour, minute)).astimezone(timezone.utc)
 
-def check_upcoming_deadlines(app_instance):
+
+def send_due_reminders(app_instance, now=None):
     """
-    Scheduled Job (08:00): Checks for quests due Today or Tomorrow.
+    Scheduled Job (every 5 minutes): at each player's own reminder time (in their timezone),
+    if dailies are unfinished, send one reminder per game day (inbox + push).
     """
+    from app.league import record
+    from app.models import ActivityEvent
     with app_instance.app_context():
-        # Clean up old read notifications first (maintain hygiene)
-        # Delete read notifications older than 7 days
-        cutoff = datetime.now(timezone.utc) - timedelta(days=7)
-        old_notifs = Notification.query.filter(Notification.is_read == True, Notification.created_at < cutoff).delete()
-        db.session.commit()
-        
-        players = Player.query.all()
-        now = datetime.now(timezone.utc)
-        today_end = now.replace(hour=23, minute=59, second=59)
-        tomorrow_end = today_end + timedelta(days=1)
-        
-        for player in players:
+        now = now or datetime.now(timezone.utc)
+        sent = 0
+        for player in Player.query.filter_by(setup_complete=True).all():
             if player.is_on_vacation:
                 continue
-                
-            # Check Tasks Due Today (excluding Dailies as they are unspoken)
-            urgent_tasks = Quest.query.filter(
-                Quest.player_id == player.id,
-                Quest.is_completed == False,
-                Quest.is_daily == False,
-                Quest.due_date >= now, 
-                Quest.due_date <= today_end
-            ).all()
-            
-            for task in urgent_tasks:
-                create_notification(player.id, f"REMINDER: '{task.title}' is due TODAY.", "warning")
-                
-            # Check Tasks Due Tomorrow
-            future_tasks = Quest.query.filter(
-                Quest.player_id == player.id,
-                Quest.is_completed == False,
-                Quest.is_daily == False,
-                Quest.due_date > today_end, 
-                Quest.due_date <= tomorrow_end
-            ).all()
-            
-            for task in future_tasks:
-                create_notification(player.id, f"HEADS UP: '{task.title}' is due tomorrow.", "info")
+            due = reminder_due_at(player, now)
+            if due is None or now < due:
+                continue
+            day_start = get_latest_daily_reset_time(now, player_tz(player)).astimezone(timezone.utc)
+            already = ActivityEvent.query.filter(
+                ActivityEvent.player_id == player.id, ActivityEvent.kind == 'reminder',
+                ActivityEvent.occurred_at >= day_start.replace(tzinfo=None)).first()
+            if already:
+                continue
+            dailies = Quest.query.filter_by(player_id=player.id, is_daily=True).all()
+            left = sum(1 for q in dailies if not q.is_completed)
+            if not dailies or left == 0:
+                continue
+            msg = (f"⏰ {left} dail{'y' if left == 1 else 'ies'} left before your 01:00 reset."
+                   + (f" Your {player.current_streak}-day streak is on the line." if player.current_streak else ""))
+            create_notification(player.id, msg, "warning")
+            trigger_push_notification(player.id, "Daily Reminder", msg, url="/")
+            record(player, 'reminder', when=now)
+            db.session.commit()
+            sent += 1
+        return sent

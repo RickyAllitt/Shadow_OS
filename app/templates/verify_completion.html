@@ -1,21 +1,20 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div style="display: flex; justify-content: center; align-items: center; min-height: 80vh;">
-    <div class="panel" style="max-width: 500px; text-align: center; border-color: var(--color-primary);">
+<div class="verify-div">
+    <div class="panel verify-panel">
 
-        <h2
-            style="color: var(--color-primary); margin-bottom: 30px; font-size: 1.5em; text-transform: uppercase; letter-spacing: 2px;">
+        <h2 class="verify-h2-verify-completion">
             VERIFY COMPLETION
         </h2>
 
-        <div style="margin-bottom: 40px;">
-            <p style="color: #888; margin-bottom: 10px; font-size: 0.9em;">OBJECTIVE</p>
-            <h1 style="font-size: 2em; margin: 0; color: white;">{{ quest.title }}</h1>
+        <div class="verify-div-2">
+            <p class="verify-p-objective">OBJECTIVE</p>
+            <h1 class="verify-h1">{{ quest.title }}</h1>
         </div>
 
-        <div style="margin-bottom: 50px; padding: 20px; border: 1px solid #333; background: rgba(0,0,0,0.3);">
-            <p style="color: #aaa; line-height: 1.6; font-style: italic;">
+        <div class="verify-div-3">
+            <p class="verify-p-hereby-swear">
                 "I hereby swear on my honor as a Player that this task is fully complete.
                 I understand that false validation weakens my resolve and corrupts the System."
             </p>
@@ -23,13 +22,27 @@
 
         <form action="{{ url_for('main.complete_quest', id=quest.id) }}" method="POST">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="btn-complete"
-                style="width: 100%; padding: 20px; font-size: 1.2em; margin-bottom: 15px;">
+            {% if quest.is_measured %}
+            {% set remaining = [quest.metric_target - metric_total, 0] | max %}
+            <div class="metric-log">
+                <p class="metric-log-progress">
+                    {{ fmt(metric_total) }} / {{ fmt(quest.metric_target) }} {{ quest.metric_unit }}
+                    {{ 'today' if quest.is_daily else 'so far' }}
+                </p>
+                <div class="metric-log-bar"><div class="metric-log-fill" style="width: {{ [100, (metric_total / quest.metric_target * 100) | round] | min }}%;"></div></div>
+                <label class="metric-log-label" for="metricAmount">How many {{ quest.metric_unit }} did you just do?</label>
+                <input id="metricAmount" class="metric-log-input" type="number" name="amount" min="0" step="any"
+                    inputmode="decimal" value="{{ fmt(remaining) if remaining else '' }}" required autofocus>
+            </div>
+            <button type="submit" class="btn-complete verify-button-swear">LOG IT</button>
+            {% else %}
+            <button type="submit" class="btn-complete verify-button-swear">
                 I SWEAR
             </button>
+            {% endif %}
         </form>
 
-        <a href="{{ url_for('main.dashboard') }}" style="color: #666; text-decoration: none; font-size: 0.9em;">
+        <a class="verify-a-cancel" href="{{ url_for('main.dashboard') }}">
             CANCEL
         </a>
 

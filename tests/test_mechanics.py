@@ -6,7 +6,7 @@ import pytest
 from unittest.mock import patch
 
 def test_weekly_reset_triggers(app):
-    """Test that gold resets if last reset was last week."""
+    """Test that gold is halved if the last reset was last week."""
     with app.app_context():
         # Setup: Player reset 8 days ago
         player = Player(name="ResetTester", gold=1000)
@@ -21,7 +21,7 @@ def test_weekly_reset_triggers(app):
         was_reset = check_weekly_reset(player)
         
         assert was_reset is True
-        assert player.gold == 0
+        assert player.gold == 500  # halved (1000 -> 500), not wiped
         # last_weekly_reset should be updated to roughly now
         # Handle naive datetime from DB
         last_reset = player.last_weekly_reset

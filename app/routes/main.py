@@ -1,11 +1,14 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, send_from_directory
 from flask_login import login_required, current_user
 from sqlalchemy import or_
-from app.extensions import db
-from app.models import Player, Quest, RewardItem, QuestComment, PurchaseLog, Inventory, DailySnapshot, Notification, PushSubscription
+from app.extensions import db, csrf
+from app.models import Player, Quest, RewardItem, QuestComment, PurchaseLog, Inventory, DailySnapshot, Notification, PushSubscription, Title, Raid
 from app.services import (check_weekly_reset, check_daily_reset, get_categorized_quests, 
-                          calculate_rewards, process_quest_completion, 
-                          calculate_total_stats, extract_shadow, start_vacation, end_vacation, allocate_attributes)
+                          process_quest_completion, 
+                          calculate_total_stats, extract_shadow, start_vacation, end_vacation, allocate_attributes,
+                          normalize_stat, check_title_unlocks, get_arise_candidates,
+                          xp_multiplier, coin_multiplier, CONDITION_WELL_RESTED, CONDITION_NORMAL,
+                          CONDITION_TIRED)
 from datetime import datetime, timedelta, timezone
 
 def parse_datetime_input(dt_str):
@@ -21,13 +24,50 @@ def parse_datetime_input(dt_str):
         except ValueError:
             return None
 
+VALID_RANKS = ('E', 'D', 'C', 'B', 'A', 'S')
+
+def normalize_rank(rank, default='E'):
+    code = str(rank or '').strip().upper()
+    return code if code in VALID_RANKS else default
+
+def parse_priority(value, default=4):
+    try:
+        return min(4, max(1, int(value)))
+    except (TypeError, ValueError):
+        return default
+
+def parse_metric_fields(form):
+    """(target, unit) for a measured quest, or (None, None) when left blank / invalid."""
+    raw_target = (form.get('metric_target') or '').strip()
+    unit = (form.get('metric_unit') or '').strip()[:20]
+    if not raw_target:
+        return None, None
+    try:
+        target = float(raw_target)
+    except ValueError:
+        return None, None
+    if not (0 < target <= 1_000_000):
+        return None, None
+    return target, unit or 'units'
+
+def json_body():
+    """Request JSON as a dict; {} for missing, malformed or non-object bodies."""
+    data = request.get_json(silent=True)
+    return data if isinstance(data, dict) else {}
+
+def level_up_flash(player):
+    """'<new level>|<levels gained>': parsed by SystemUI for the level-up overlay."""
+    return f"{player.level}|{max(1, getattr(player, 'levels_gained', 1))}"
+
 bp = Blueprint('main', __name__)
 
 @bp.route('/')
 @login_required
 def dashboard():
     if check_weekly_reset(current_user):
-        flash("WEEKLY RESET: Gold has been reset to 0.", "system_popup")
+        before = getattr(current_user, 'weekly_gold_before', None)
+        flash(f"WEEKLY RESET: Gold halved ({before:,} → {current_user.gold:,} G)." if before is not None
+              else "WEEKLY RESET: Gold halved.", "system_popup")
     
     reset_occurred, msgs = check_daily_reset(current_user)
     if reset_occurred:
@@ -48,23 +88,57 @@ def dashboard():
     
 
     
+    # Catch up on titles earned outside a level-up (streaks, stats, coins)
+    for name in check_title_unlocks(player):
+        flash(f"TITLE UNLOCKED: {name}", "system_popup")
+
+    # Once a week: how last week's league ended
+    from app import league, kpi, social
+    social.finalize_expired_raids()
+    results = league.weekly_results_message(player)
+    if results:
+        flash(results, "system_popup")
+
     # Calculate Total Stats (Base + Equipment + Debuffs)
     total_stats = calculate_total_stats(player)
-    
+
+    # Shadow extraction: candidates for the Army panel, plus the prompt right after an S-Rank clear
+    arise_candidates = get_arise_candidates(player)
+    arise_quest = None
+    arise_id = request.args.get('arise', type=int)
+    if arise_id:
+        arise_quest = next((q for q in arise_candidates if q.id == arise_id), None)
+
     return render_template('dashboard.html', player=player, stats=total_stats,
-                           dailies=dailies, scheduled=scheduled, backlog=backlog)
+                           dailies=dailies, scheduled=scheduled, backlog=backlog,
+                           arise_candidates=arise_candidates, arise_quest=arise_quest,
+                           all_titles=Title.query.order_by(Title.id).all(),
+                           duel=league.rival_summary(player),
+                           active_raids=Raid.query.filter_by(status='active').order_by(Raid.ends_at).limit(3).all(),
+                           balance=kpi.life_balance(player),
+                           metric_totals={q.id: kpi.metric_total(player, q)
+                                          for q in dailies + scheduled + backlog if q.is_measured},
+                           fmt=kpi.format_amount,
+                           rank_slots=league.rank_slots_left(player),
+                           rank_caps=league.WEEKLY_RANK_CAPS)
 
 from app.ai_guardian import TheArchitect
+from app.league import claim_rank
 
 @bp.route('/add_quest', methods=['POST'])
 @login_required
 def add_quest():
-    title = request.form.get('title')
+    title = (request.form.get('title') or '').strip()
     description = request.form.get('description')
     rank = request.form.get('rank')
-    
+
+    if not title:
+        flash("Quest title required.", "error")
+        return redirect(url_for('main.dashboard'))
+    title = title[:100]
+
     # Optional inputs
-    stat = request.form.get('stat', 'INT') # Default if missing
+    stat = normalize_stat(request.form.get('stat'))
     is_daily = 'is_daily' in request.form
     
     start_date = None
@@ -75,19 +149,27 @@ def add_quest():
         due_date = parse_datetime_input(request.form.get('due_date'))
 
     # Auto-Evaluation Logic
-    if rank == 'Auto':
+    auto_ranked = rank == 'Auto'
+    if auto_ranked:
         analysis = TheArchitect.analyze_quest(title)
-        rank = analysis['rank']
-        xp = analysis['xp']
-        stat = analysis['stat']
-        flash(f"System Analysis: Rank {rank} | Stat {stat} | XP {xp}", "info")
+        rank = normalize_rank(analysis.get('rank'))
+        stat = normalize_stat(analysis.get('stat'))
+        flash(f"System Analysis: Rank {rank} | Stat {stat}", "info")
     else:
-        xp_map = {'E': 10, 'D': 20, 'C': 50, 'B': 100, 'A': 200, 'S': 500}
-        # Use centralized logic
-        xp, _, _ = calculate_rewards(rank)
-    
-    priority = int(request.form.get('priority', 4))
-    
+        rank = normalize_rank(rank)
+
+    # Weekly A/S caps (+ Architect second opinion on hand-picked A/S). Dailies give no rank XP: exempt.
+    if not is_daily:
+        rank, notes = claim_rank(current_user, rank, title, review=not auto_ranked)
+        for note in notes:
+            flash(note, "system_popup")
+
+    # XP comes from the rank at completion time (see RANK_XP); xp_reward is legacy and unused.
+    xp = 0
+
+    priority = parse_priority(request.form.get('priority'))
+    metric_target, metric_unit = parse_metric_fields(request.form)
+
     quest = Quest(
         title=title, 
         description=description,
@@ -98,7 +180,9 @@ def add_quest():
         is_daily=is_daily,
         start_date=start_date,
         due_date=due_date,
-        priority=priority
+        priority=priority,
+        metric_target=metric_target,
+        metric_unit=metric_unit,
     )
     
     db.session.add(quest)
@@ -109,36 +193,79 @@ def add_quest():
 
 @bp.route('/complete/<int:id>', methods=['GET', 'POST'])
 @login_required
-@login_required
 def complete_quest(id):
     quest = db.session.get(Quest, id)
     player = current_user
-    
-    if not quest:
+
+    if not quest or quest.player_id != player.id:
+        flash("Quest not found.", "error")
         return redirect(url_for('main.dashboard'))
         
-    # GET: Show Verification Page
+    if quest.is_completed:
+        flash(f"'{quest.title}' is already complete.", "info")
+        return redirect(url_for('main.dashboard'))
+
+    from app import kpi
+
+    # GET: Show Verification Page (measured quests ask how much was done)
     if request.method == 'GET':
-        return render_template('verify_completion.html', quest=quest)
-    
+        total = kpi.metric_total(player, quest) if quest.is_measured else 0
+        return render_template('verify_completion.html', quest=quest, metric_total=total,
+                               fmt=kpi.format_amount)
+
+    # Measured quest: log the amount; complete only once the target is reached
+    metric_note = None
+    if quest.is_measured:
+        try:
+            amount = float(request.form.get('amount', ''))
+        except ValueError:
+            amount = 0
+        if not (0 < amount <= 1_000_000):
+            flash(f"Enter how many {quest.metric_unit} you did.", "error")
+            return redirect(url_for('main.complete_quest', id=quest.id))
+        total, reached = kpi.log_metric(player, quest, amount)
+        progress = f"{kpi.format_amount(total)}/{kpi.format_amount(quest.metric_target)} {quest.metric_unit}"
+        if not reached:
+            db.session.commit()
+            flash(f"LOGGED: +{kpi.format_amount(amount)} {quest.metric_unit} · {progress}"
+                  f"{' today' if quest.is_daily else ''}", "success")
+            return redirect(url_for('main.dashboard'))
+        metric_note = progress
+
     # POST: Execute Completion
+    player.debt_paid = 0  # transient per-request counter (see services.add_xp)
     xp_gain, gold_gain, coin_gain, level_up, daily_bonus, can_arise = process_quest_completion(player, quest)
     
-    # Feedback
-    msg = f"COMPLETE: {quest.title} | +{xp_gain} XP"
+    # Feedback: only list what was actually gained
+    parts = [f"COMPLETE: {quest.title}"]
+    if metric_note:
+        parts.append(metric_note)
+    if quest.rank == 'S' and not quest.is_daily and not quest.is_penalty:
+        parts.append("INSTANT LEVEL UP")
+    elif xp_gain > 0:
+        parts.append(f"+{xp_gain} XP")
+    if getattr(player, 'debt_paid', 0):
+        parts.append(f"{player.debt_paid} XP to debt ({player.xp_debt:,} left)" if player.xp_debt
+                     else f"{player.debt_paid} XP to debt (DEBT CLEARED)")
     if gold_gain > 0:
-        msg += f" | +{gold_gain} G"
+        parts.append(f"+{gold_gain} G")
     if coin_gain > 0:
-        msg += f" | +{coin_gain} C"
-        
-    flash(msg, "quest_complete")
+        parts.append(f"+{coin_gain} C")
+    if quest.is_daily and not daily_bonus:
+        dailies = Quest.query.filter_by(player_id=player.id, is_daily=True).all()
+        parts.append(f"Dailies {sum(q.is_completed for q in dailies)}/{len(dailies)}")
+
+    flash(" | ".join(parts), "quest_complete")
     
     if daily_bonus:
-            flash("DAILY BONUS: All tasks completed! +100 Gold | +20 Coins | +50 XP", "system_popup")
+        bonus = getattr(player, 'daily_bonus_rewards', None) or {}
+        flash(f"DAILY BONUS: All tasks completed! +{bonus.get('gold', 100)} Gold | "
+              f"+{bonus.get('coins', 50)} Coins | +{bonus.get('xp', 0)} XP | "
+              f"+{bonus.get('points', 3)} Ability Points", "system_popup")
     
     if level_up:
-        flash("LEVEL UP!", "levelup")
-        
+        flash(level_up_flash(player), "levelup")
+
     # Check for Evolution (Service attaches this attribute temporarily)
     if hasattr(player, 'just_evolved') and player.just_evolved:
         flash(f"CLASS EVOLVED: You are now a {player.just_evolved}!", "system_popup")
@@ -149,6 +276,9 @@ def complete_quest(id):
         
     if quest.is_penalty:
         flash("PENALTY CLEARED. WELCOME BACK.", "system_popup")
+
+    for name in getattr(player, 'new_titles', []):
+        flash(f"TITLE UNLOCKED: {name}", "system_popup")
 
     if can_arise:
         # Trigger 'Arise' Interaction via URL Param for reliability
@@ -317,9 +447,124 @@ def calendar_view(year=None, month=None):
 @bp.route('/leaderboard')
 @login_required
 def leaderboard():
-    # Top 20 players by Level DESC, then XP DESC
-    leaderboard_data = Player.query.order_by(Player.level.desc(), Player.xp.desc()).limit(20).all()
-    return render_template('leaderboard.html', leaderboard=leaderboard_data)
+    from app import league, social
+    view = 'all' if request.args.get('view') == 'all' else 'week'
+    week = league.week_start_for()
+    all_time = Player.query.order_by(Player.level.desc(), Player.xp.desc()).limit(20).all()
+    last_week = [r for r in league.standings(week - timedelta(days=7)) if r['points'] > 0]
+    return render_template('leaderboard.html', view=view, leaderboard=all_time,
+                           weekly=league.standings(week), week_start=week,
+                           week_ends=league.week_ends_at(week),
+                           last_champion=last_week[0] if last_week else None,
+                           rival_id=current_user.rivalry.rival_id if current_user.rivalry else None,
+                           feats=social.recent_feats(), kudos_emoji=social.KUDOS_EMOJI)
+
+
+# --- Raids (shared goals) ---
+
+@bp.route('/raids')
+@login_required
+def raids():
+    from app import social
+    from app.models import Raid
+    social.finalize_expired_raids()
+    active = Raid.query.filter_by(status='active').order_by(Raid.ends_at).all()
+    past = Raid.query.filter(Raid.status != 'active').order_by(Raid.created_at.desc()).limit(20).all()
+    return render_template('raids.html', active=active, past=past, max_active=social.MAX_ACTIVE_RAIDS,
+                           max_days=social.MAX_RAID_DAYS, reward_xp=social.RAID_REWARD_XP,
+                           reward_coins=social.RAID_REWARD_COINS)
+
+
+@bp.route('/raids/new', methods=['POST'])
+@login_required
+def create_raid_route():
+    from app import social
+    try:
+        target = float(request.form.get('target', ''))
+        days = int(request.form.get('days', ''))
+    except ValueError:
+        flash("Target and duration must be numbers.", "error")
+        return redirect(url_for('main.raids'))
+    raid, msg = social.create_raid(current_user, request.form.get('title'), request.form.get('unit'),
+                                   target, days, request.form.get('stat', 'STR'))
+    flash(msg, "system_popup" if raid else "error")
+    return redirect(url_for('main.raid_detail', raid_id=raid.id) if raid else url_for('main.raids'))
+
+
+@bp.route('/raids/<int:raid_id>')
+@login_required
+def raid_detail(raid_id):
+    from app import social
+    from app.models import Raid
+    social.finalize_expired_raids()
+    raid = db.session.get(Raid, raid_id)
+    if not raid:
+        flash("Raid not found.", "error")
+        return redirect(url_for('main.raids'))
+    return render_template('raid_detail.html', raid=raid, ranking=social.raid_leaderboard(raid),
+                           reward_xp=social.RAID_REWARD_XP, reward_coins=social.RAID_REWARD_COINS)
+
+
+@bp.route('/raids/<int:raid_id>/log', methods=['POST'])
+@login_required
+def raid_log(raid_id):
+    from app import social
+    from app.models import Raid
+    raid = db.session.get(Raid, raid_id)
+    if not raid:
+        flash("Raid not found.", "error")
+        return redirect(url_for('main.raids'))
+    try:
+        amount = float(request.form.get('amount', ''))
+    except ValueError:
+        amount = 0
+    ok, msg = social.contribute(current_user, raid, amount)
+    flash(msg, ("system_popup" if raid.status == 'completed' else "success") if ok else "error")
+    return redirect(url_for('main.raid_detail', raid_id=raid.id))
+
+
+@bp.route('/raids/<int:raid_id>/cancel', methods=['POST'])
+@login_required
+def raid_cancel(raid_id):
+    from app import social
+    from app.models import Raid
+    raid = db.session.get(Raid, raid_id)
+    if not raid:
+        flash("Raid not found.", "error")
+        return redirect(url_for('main.raids'))
+    ok, msg = social.cancel_raid(current_user, raid)
+    flash(msg, "info" if ok else "error")
+    return redirect(url_for('main.raids') if ok else url_for('main.raid_detail', raid_id=raid.id))
+
+
+# --- Kudos on S-rank clears ---
+
+@bp.route('/kudos/<int:event_id>', methods=['POST'])
+@login_required
+def give_kudos_route(event_id):
+    from app import social
+    from app.models import ActivityEvent
+    ok, msg = social.give_kudos(current_user, db.session.get(ActivityEvent, event_id), request.form.get('emoji', ''))
+    flash(msg, "success" if ok else "error")
+    return redirect(url_for('main.leaderboard') + '#feats')
+
+
+@bp.route('/rival/<int:player_id>', methods=['POST'])
+@login_required
+def set_rival_route(player_id):
+    from app.league import set_rival
+    ok, msg = set_rival(current_user, db.session.get(Player, player_id))
+    flash(msg, "system_popup" if ok else "error")
+    return redirect(request.referrer or url_for('main.leaderboard'))
+
+
+@bp.route('/rival/clear', methods=['POST'])
+@login_required
+def clear_rival_route():
+    from app.league import clear_rival
+    _, msg = clear_rival(current_user)
+    flash(msg, "info")
+    return redirect(request.referrer or url_for('main.leaderboard'))
 
 @bp.route('/profile/<int:player_id>')
 @login_required
@@ -342,34 +587,43 @@ def history_log():
 @login_required
 def track_sleep():
     player = current_user
-    hours = float(request.form.get('hours'))
-    
-    player.last_sleep_duration = hours
-    
-    # Check for daily restriction
-    today = datetime.now(timezone.utc).date()
+    try:
+        hours = float(request.form.get('hours'))
+    except (TypeError, ValueError):
+        flash("Invalid sleep duration.", "error")
+        return redirect(url_for('main.dashboard'))
+    if not (0 <= hours <= 24):
+        flash("Sleep duration must be between 0 and 24 hours.", "error")
+        return redirect(url_for('main.dashboard'))
+
+    # One log per game day (01:00-01:00 in the player's timezone)
+    from app.services import get_latest_daily_reset_time, player_tz
+    today = get_latest_daily_reset_time(tz=player_tz(player)).date()
     if player.last_sleep_log_date == today:
         flash("You have already logged sleep for today.", "system_popup")
         return redirect(url_for('main.dashboard'))
-        
+
+    player.last_sleep_duration = hours
     player.last_sleep_log_date = today
+    from app.kpi import record_sleep
+    record_sleep(player, hours)
     
     # --- THE SYSTEM LOGIC ---
     if hours >= 7.5:
-        player.condition = "WELL RESTED"
+        player.condition = CONDITION_WELL_RESTED
         player.sleep_streak += 1
         # Buff: Restores HP/MP (Visual)
         flash(f"SLEEP: {hours}h. CONDITION: BEST. (XP GAIN +10%)", "system_popup")
         
     elif hours >= 6:
-        player.condition = "NORMAL"
+        player.condition = CONDITION_NORMAL
         flash(f"SLEEP: {hours}h. CONDITION: NORMAL.", "system_popup")
         
     else:
-        player.condition = "TIRED"
+        player.condition = CONDITION_TIRED
         player.sleep_streak = 0
         # Debuff: Warning
-        flash(f"SLEEP: {hours}h. WARNING: RECOVERY INCOMPLETE. (XP GAIN REDUCED)", "system_popup")
+        flash(f"SLEEP: {hours}h. WARNING: RECOVERY INCOMPLETE. (XP GAIN -50%)", "system_popup")
         
     db.session.commit()
     return redirect(url_for('main.dashboard'))
@@ -437,6 +691,10 @@ def edit_quest(id):
         new_description = request.form.get('description')
         new_rank = request.form.get('rank')
         new_stat = request.form.get('stat')
+        if new_rank is not None:
+            new_rank = normalize_rank(new_rank, default=quest.rank)
+        if new_stat is not None:
+            new_stat = normalize_stat(new_stat, default=quest.stat_reward or 'INT')
         
         start_str = request.form.get('start_date')
         due_str = request.form.get('due_date')
@@ -450,7 +708,7 @@ def edit_quest(id):
             if new_title is not None and new_title != quest.title: restricted_modified = True
             if new_rank is not None and new_rank != quest.rank: restricted_modified = True
             if new_stat is not None and new_stat != quest.stat_reward: restricted_modified = True
-            if new_priority_str is not None and int(new_priority_str) != quest.priority: restricted_modified = True
+            if new_priority_str is not None and parse_priority(new_priority_str, quest.priority) != quest.priority: restricted_modified = True
             
             if start_str is not None:
                 new_start = parse_datetime_input(start_str)
@@ -473,22 +731,30 @@ def edit_quest(id):
                 if new_title is not None: quest.title = new_title
                 if new_rank is not None: quest.rank = new_rank
                 if new_stat is not None: quest.stat_reward = new_stat
-                if new_priority_str is not None: quest.priority = int(new_priority_str)
+                if new_priority_str is not None: quest.priority = parse_priority(new_priority_str, quest.priority)
                 if start_str is not None: quest.start_date = parse_datetime_input(start_str)
                 if due_str is not None: quest.due_date = parse_datetime_input(due_str)
         else:
             # Normal Quest Logic
             if new_title is not None: quest.title = new_title
+            will_be_daily = bool(request.form.get('is_daily'))
+            if new_rank is not None and new_rank != quest.rank and not will_be_daily:
+                # Promotions to A/S use a weekly slot (and get the Architect's second opinion)
+                new_rank, notes = claim_rank(current_user, new_rank, quest.title)
+                for note in notes:
+                    flash(note, "system_popup")
             if new_rank is not None: quest.rank = new_rank
             if new_stat is not None: quest.stat_reward = new_stat
-            if new_priority_str is not None: quest.priority = int(new_priority_str)
+            if new_priority_str is not None: quest.priority = parse_priority(new_priority_str, quest.priority)
             if start_str is not None: quest.start_date = parse_datetime_input(start_str)
             if due_str is not None: quest.due_date = parse_datetime_input(due_str)
             quest.is_daily = True if request.form.get('is_daily') else False
 
-        # Non-restricted updates (ALWAYS updated)
+        # Non-restricted updates (ALWAYS updated, free even for dailies)
         if new_description is not None:
             quest.description = new_description
+        if 'metric_target' in request.form:
+            quest.metric_target, quest.metric_unit = parse_metric_fields(request.form)
 
         try:
              # Default to current progress if not provided
@@ -502,9 +768,8 @@ def edit_quest(id):
             comment = QuestComment(content=new_comment_text.strip(), quest_id=quest.id)
             db.session.add(comment)
         
-        # Recalculate XP if rank changes
-        xp_map = {'E': 10, 'D': 20, 'C': 50, 'B': 100, 'A': 200, 'S': 500}
-        quest.xp_reward = xp_map.get(quest.rank, 10)
+        # XP is scaled from rank + level at completion time
+        quest.xp_reward = 0
         
         db.session.commit()
         if not (quest.is_daily and restricted_modified and not can_rewrite_reality):
@@ -542,6 +807,7 @@ def architect_breakdown(quest_id):
         return redirect(url_for('main.dashboard'))
 
     created_count = 0
+    cap_notes = []
 
     for task_data in sub_tasks:
         # Extract data (handle both string list and dict list for backward compatibility)
@@ -551,15 +817,18 @@ def architect_breakdown(quest_id):
             priority = 4
         else:
             title = task_data.get('step', 'Unknown Task')
-            rank = task_data.get('rank', 'E')
-            priority = task_data.get('priority', 4)
+            rank = normalize_rank(task_data.get('rank', 'E'))
+            priority = parse_priority(task_data.get('priority', 4))
+        # AI-assigned sub-quest ranks still count toward the weekly A/S caps
+        rank, notes = claim_rank(current_user, rank, review=False)
+        cap_notes.extend(notes)
 
         # Create sub-quest with explicit properties
         new_quest = Quest(
-            title=title,
+            title=str(title)[:100],
             rank=rank,
-            xp_reward=10, # Could also ask AI for XP, but standard sub-task reward is fine
-            stat_reward=quest.stat_reward or 'INT',
+            xp_reward=0, # Scaled from rank + level at completion
+            stat_reward=normalize_stat(quest.stat_reward),
             player_id=current_user.id,
             is_daily=False, # Sub-tasks are usually one-off
             priority=priority
@@ -569,6 +838,8 @@ def architect_breakdown(quest_id):
     
     db.session.commit()
     flash(f"Decomposition Complete: {created_count} sub-quests created.", "success")
+    for note in dict.fromkeys(cap_notes):  # de-duplicated, in order
+        flash(note, "system_popup")
     return redirect(url_for('main.dashboard'))
 
 @bp.route('/claim_purchase/<int:log_id>', methods=['POST'])
@@ -587,8 +858,8 @@ def claim_purchase(log_id):
         buy_log.claimed_at = datetime.now(timezone.utc)
         db.session.commit()
         flash(f"Consumed: {buy_log.item_name}", "success")
-        
-    return redirect(url_for('main.dashboard'))
+
+    return redirect(request.referrer or url_for('main.dashboard'))
 
 from app.services import equip_title_service
 
@@ -618,40 +889,29 @@ def job_qualification():
 @bp.route('/job_test', methods=['GET', 'POST'])
 @login_required
 def job_test():
+    from app.job_trial import questions_for_display, score_answers, CLASS_PROFILES
+    from app.services import class_evolution_path
+
     if current_user.job_class != 'None':
         return redirect(url_for('main.dashboard'))
-    
-    if request.method == 'POST':
-        q1 = request.form.get('q1')
-        q2 = request.form.get('q2')
-        q3 = request.form.get('q3')
-        
-        # Simple Logic: Majority wins. Tie-break: Q3 (Weapon)
-        answers = [q1, q2, q3]
-        counts = {'A': answers.count('A'), 'B': answers.count('B'), 'C': answers.count('C')}
-        
-        # Determine winner
-        winner = max(counts, key=counts.get)
-        
-        # Handle Tie (if max count appears more than once, use Q3)
-        if list(counts.values()).count(counts[winner]) > 1:
-            winner = q3
-            
-        job_map = {
-            'A': 'Assassin',
-            'B': 'Mage',
-            'C': 'Tank'
-        }
-        
-        selected_class = job_map.get(winner, 'Fighter')
-        
-        current_user.job_class = selected_class
-        db.session.commit()
-        
-        flash(f"SYSTEM: Class Change Complete. You are now a {selected_class.upper()}.", "system_popup")
+    if current_user.level < 10:
+        flash("You are not yet ready. (Level 10 Required)", "error")
         return redirect(url_for('main.dashboard'))
-        
-    return render_template('job_test.html')
+
+    if request.method == 'POST':
+        chosen_class, _ = score_answers(request.form)
+        if chosen_class is None:
+            flash("The trial is incomplete. Answer every question.", "error")
+            return render_template('job_test.html', questions=questions_for_display())
+
+        current_user.job_class = chosen_class
+        db.session.commit()
+        # Reveal page (not a redirect): refreshing it just returns to the dashboard via the guard above
+        return render_template('job_result.html', job_class=chosen_class,
+                               profile=CLASS_PROFILES[chosen_class],
+                               evolution_path=class_evolution_path(chosen_class))
+
+    return render_template('job_test.html', questions=questions_for_display())
 
 from app.services import equip_item_service, unequip_item_service
 
@@ -725,11 +985,11 @@ def use_item_route(inv_id):
     
     # SPECIAL ITEMS
     if item_def.name == "Elixir of Life":
-        if current_user.condition == "WELL RESTED":
+        if current_user.condition == CONDITION_WELL_RESTED:
             flash("You are already fully rested. Save the Elixir.", "error")
             return redirect(url_for('main.inventory'))
             
-        current_user.condition = "WELL RESTED"
+        current_user.condition = CONDITION_WELL_RESTED
         current_user.last_sleep_duration = max(8.0, current_user.last_sleep_duration or 0)
         current_user.sleep_streak += 1
         
@@ -759,7 +1019,7 @@ def use_item_route(inv_id):
         if attr_name:
             current_val = getattr(current_user, attr_name)
             setattr(current_user, attr_name, current_val + item_def.stat_value)
-            flash(f"Effect: {item_def.stat_bonus} increased by {item_def.stat_value}!", "levelup")
+            flash(f"Effect: {item_def.stat_bonus} increased by {item_def.stat_value}!", "success")
             
     item_name = item_def.name
     db.session.delete(item_record)
@@ -791,17 +1051,20 @@ def shop():
     # Get IDs of owned items to handle "Sold Out" / "Owned" state
     owned_item_ids = {inv.item_id for inv in player.inventory}
          
-    return render_template('shop.html', player=player, shop_items=shop_items, purchase_history=purchase_history, owned_item_ids=owned_item_ids)
+    from app.models import PersonalReward
+    personal_rewards = PersonalReward.query.filter_by(player_id=player.id).order_by(PersonalReward.cost).all()
+    to_redeem = PurchaseLog.query.filter_by(player_id=player.id, is_claimed=False) \
+        .order_by(PurchaseLog.purchased_at.desc()).all()
+
+    return render_template('shop.html', player=player, shop_items=shop_items, purchase_history=purchase_history,
+                           owned_item_ids=owned_item_ids, personal_rewards=personal_rewards, to_redeem=to_redeem)
 
 @bp.route('/arise/<int:quest_id>', methods=['POST'])
 @login_required
 def arise_route(quest_id):
     success, msg = extract_shadow(current_user, quest_id)
     if success:
-        flash(msg, "success") 
-        flash(msg, "system_popup") 
-        # Add visual flare trigger
-        flash("shadow_born", "shadow_born")
+        flash(msg, "arise_trigger")  # Shown as a popup with the Arise sound/VFX
     else:
         flash(msg, "error")
     return redirect(url_for('main.dashboard'))
@@ -836,7 +1099,41 @@ def analytics():
         current_total = current_user.strength + current_user.intelligence + current_user.agility + current_user.vitality + current_user.sense
         growth_data = [current_total]
     
-    return render_template('analytics.html', dates=dates, growth_data=growth_data, activity_map=activity_map)
+    from app import kpi
+    now_utc = datetime.now(timezone.utc)
+    balance_now = kpi.area_scores(current_user, now_utc)
+    balance_month_ago = kpi.area_scores(current_user, now_utc - timedelta(days=30))
+    measures = []
+    for q in Quest.query.filter(Quest.player_id == current_user.id, Quest.metric_target.isnot(None)).order_by(Quest.id):
+        if q.is_measured:
+            history = kpi.metric_history(current_user, q, days=30, now=now_utc)
+            measures.append({'id': q.id, 'title': q.title, 'unit': q.metric_unit, 'target': q.metric_target,
+                             'daily': q.is_daily, 'labels': [d.strftime('%d/%m') for d, _ in history],
+                             'values': [v for _, v in history]})
+
+    return render_template('analytics.html', dates=dates, growth_data=growth_data, activity_map=activity_map,
+                           areas=list(kpi.AREAS), balance_now=[balance_now[a] for a in kpi.AREAS],
+                           balance_before=[balance_month_ago[a] for a in kpi.AREAS], measures=measures)
+
+
+@bp.route('/report')
+@bp.route('/report/<week>')
+@login_required
+def weekly_report(week=None):
+    """Weekly System Report. Default: last completed week; /report/YYYY-MM-DD for any week."""
+    from app import kpi, league
+    current_week = league.week_start_for()
+    try:
+        week_start = league.week_start_for(datetime.strptime(week, '%Y-%m-%d') + timedelta(hours=12)) if week \
+            else current_week - timedelta(days=7)
+    except ValueError:
+        flash("Unknown week.", "error")
+        return redirect(url_for('main.weekly_report'))
+    report = kpi.weekly_report(current_user, week_start)
+    return render_template('report.html', r=report,
+                           prev_week=week_start - timedelta(days=7),
+                           next_week=week_start + timedelta(days=7) if week_start < current_week else None,
+                           fmt=kpi.format_amount)
 
 @bp.route('/focus')
 @login_required
@@ -844,13 +1141,98 @@ def focus_mode():
     return render_template('focus.html')
 
 
+@bp.route('/settings/locale', methods=['POST'])
+@login_required
+def update_locale():
+    """Timezone (daily reset is 01:00 there) and daily reminder time."""
+    from app.services import is_valid_timezone
+    tz_name = (request.form.get('timezone') or '').strip()
+    reminder = (request.form.get('reminder_time') or '').strip()
+    if tz_name and not is_valid_timezone(tz_name):
+        flash(f"Unknown timezone: {tz_name}", "error")
+        return redirect(request.referrer or url_for('main.dashboard'))
+    if reminder:
+        try:
+            datetime.strptime(reminder, '%H:%M')
+        except ValueError:
+            flash("Reminder time must look like 21:00.", "error")
+            return redirect(request.referrer or url_for('main.dashboard'))
+    if tz_name:
+        current_user.timezone = tz_name
+    current_user.reminder_time = reminder or None
+    db.session.commit()
+    flash(f"Saved: timezone {current_user.timezone}, "
+          + (f"daily reminder at {reminder}." if reminder else "daily reminder off."), "success")
+    return redirect(request.referrer or url_for('main.dashboard'))
+
+
+@bp.route('/settings/hardcore', methods=['POST'])
+@login_required
+def toggle_hardcore():
+    from app.services import set_hardcore
+    ok, msg = set_hardcore(current_user, request.form.get('enable') == '1')
+    flash(msg, "system_popup" if ok else "error")
+    return redirect(request.referrer or url_for('main.dashboard'))
+
+
+# --- Personal real-life rewards (priced in Gold by the player) ---
+
+@bp.route('/rewards/add', methods=['POST'])
+@login_required
+def add_personal_reward():
+    from app.models import PersonalReward
+    name = (request.form.get('name') or '').strip()[:60]
+    try:
+        cost = int(request.form.get('cost', ''))
+    except ValueError:
+        cost = 0
+    if not name or not (1 <= cost <= 1_000_000):
+        flash("Give your reward a name and a Gold price (1 - 1,000,000).", "error")
+    elif len(current_user.personal_rewards) >= 30:
+        flash("You can have up to 30 personal rewards.", "error")
+    else:
+        db.session.add(PersonalReward(player_id=current_user.id, name=name, cost=cost))
+        db.session.commit()
+        flash(f"Reward added: {name} ({cost:,} G).", "success")
+    return redirect(url_for('main.shop') + '#my-rewards')
+
+
+@bp.route('/rewards/<int:reward_id>/delete', methods=['POST'])
+@login_required
+def delete_personal_reward(reward_id):
+    from app.models import PersonalReward
+    reward = db.session.get(PersonalReward, reward_id)
+    if reward and reward.player_id == current_user.id:
+        db.session.delete(reward)
+        db.session.commit()
+        flash(f"Removed: {reward.name}.", "info")
+    return redirect(url_for('main.shop') + '#my-rewards')
+
+
+@bp.route('/rewards/<int:reward_id>/buy', methods=['POST'])
+@login_required
+def buy_personal_reward(reward_id):
+    from app.models import PersonalReward
+    reward = db.session.get(PersonalReward, reward_id)
+    if not reward or reward.player_id != current_user.id:
+        flash("Reward not found.", "error")
+    elif current_user.gold < reward.cost:
+        flash(f"Not enough Gold: {reward.name} costs {reward.cost:,} G (you have {current_user.gold:,}).", "error")
+    else:
+        current_user.gold -= reward.cost
+        db.session.add(PurchaseLog(player_id=current_user.id, item_name=reward.name, cost=reward.cost, is_claimed=False))
+        db.session.commit()
+        flash(f"REWARD UNLOCKED: {reward.name}. Enjoy it, then tap MARK CLAIMED under Ready to Enjoy.", "system_popup")
+    return redirect(url_for('main.shop') + '#my-rewards')
+
+
 @bp.route('/update_settings', methods=['POST'])
 @login_required
 def update_settings():
-    audio = request.json.get('audio')
-    music = request.json.get('music')
-    volume = request.json.get('volume')
-    popups = request.json.get('popups')
+    audio = json_body().get('audio')
+    music = json_body().get('music')
+    volume = json_body().get('volume')
+    popups = json_body().get('popups')
     
     if audio is not None:
         current_user.settings_audio = audio
@@ -868,22 +1250,29 @@ def update_settings():
 @login_required
 def focus_complete():
     try:
-        minutes = int(request.json.get('minutes', 0))
+        minutes = int(json_body().get('minutes', 0))
     except (ValueError, TypeError):
         return jsonify({'success': False, 'msg': "Invalid duration."})
         
     if minutes < 1:
         return jsonify({'success': False, 'msg': "Too short."})
         
-    # Rewards: Coins scale to 1 per 6 mins (10/hr). XP scales to ~2.5% of level cap per hour.
-    coins = int(minutes / 6.0)
+    # Rewards: 10 Coins/hour, 600 XP/hour (before bonuses).
+    coins = int(minutes / 6.0 * coin_multiplier(current_user))
     
-    xp_scaling_factor = 0.025
-    xp_cap = current_user.xp_required if current_user.xp_required > 0 else 100
-    xp = max(1, int((minutes / 60.0) * (xp_scaling_factor * xp_cap)))
+    from app.services import FOCUS_XP_PER_MINUTE
+    base_xp = minutes * FOCUS_XP_PER_MINUTE
+    xp = max(1, int(base_xp * xp_multiplier(current_user)))
     
+    from app.league import record_points
+    from app.kpi import record_focus_effort
+    record_points(current_user, 'focus', base_xp, minutes=minutes)
+    record_focus_effort(current_user, minutes)
+
+    from app.services import add_xp
+    current_user.debt_paid = 0  # transient per-request counter (see services.add_xp)
     current_user.coins += coins
-    current_user.xp += xp
+    add_xp(current_user, xp)
     current_user.daily_focus_duration += minutes
     
     from app.services import process_level_up
@@ -892,15 +1281,21 @@ def focus_complete():
     db.session.commit()
     
     if level_up:
-        flash("LEVEL UP!", "levelup")
-        
+        flash(level_up_flash(current_user), "levelup")
+
     if hasattr(current_user, 'just_evolved') and current_user.just_evolved:
         flash(f"CLASS EVOLVED: You are now a {current_user.just_evolved}!", "system_popup")
         
     if hasattr(current_user, 'just_ranked_up') and current_user.just_ranked_up:
         flash(f"RANK UP: You have reached {current_user.just_ranked_up}-Rank!", "system_popup")
     
+    for name in getattr(current_user, 'new_titles', []):
+        flash(f"TITLE UNLOCKED: {name}", "system_popup")
+
     msg = f"FOCUS COMPLETE: {minutes}m. +{coins} Coins, +{xp} XP."
+    if getattr(current_user, 'debt_paid', 0):
+        msg += f" ({current_user.debt_paid} XP paid off debt)"
+    flash(msg, "system_popup")  # Shown on the next page load (focus page reloads / redirects)
     return jsonify({'success': True, 'msg': msg})
 @bp.route('/setup', methods=['GET', 'POST'])
 @login_required
@@ -931,16 +1326,13 @@ def setup_page():
             {'title': q4, 'rank': request.form.get('quest4_rank', 'E'), 'stat': request.form.get('quest4_stat', 'STR'), 'desc': request.form.get('quest4_description')},
         ]
 
-        xp_map = {'E': 10, 'D': 20, 'C': 50, 'B': 100, 'A': 200, 'S': 500}
-
         for q_data in quests_data:
-            xp_reward = xp_map.get(q_data['rank'], 10)
             quest = Quest(
-                title=q_data['title'],
+                title=q_data['title'][:100],
                 description=q_data['desc'],
-                rank=q_data['rank'],
-                xp_reward=xp_reward,
-                stat_reward=q_data['stat'],
+                rank=normalize_rank(q_data['rank']),
+                xp_reward=0,  # Dailies award no XP; kept at 0 for consistency
+                stat_reward=normalize_stat(q_data['stat'], default='STR'),
                 player_id=current_user.id,
                 is_daily=True
             )
@@ -953,7 +1345,7 @@ def setup_page():
         
         db.session.commit()
         
-        flash("SYSTEM INITIALIZATION COMPLETE. WELCOME, PLAYER.", "levelup")
+        flash("SYSTEM INITIALIZATION COMPLETE. WELCOME, PLAYER.", "system_popup")
         return redirect(url_for('main.dashboard'))
         
     return render_template('setup.html')
@@ -961,7 +1353,13 @@ def setup_page():
 @bp.route('/vacation/start', methods=['POST'])
 @login_required
 def start_vacation_route():
-    days = int(request.form.get('days', 7))
+    try:
+        days = int(request.form.get('days', 7))
+    except (TypeError, ValueError):
+        days = 0
+    if not (1 <= days <= 30):
+        flash("Vacation length must be 1-30 days.", "error")
+        return redirect(url_for('main.dashboard'))
     success, msg = start_vacation(current_user, days)
     if success:
         flash(msg, "system_popup")
@@ -998,7 +1396,8 @@ def get_all_notifications():
 @bp.route('/api/notifications/mark_read', methods=['POST'])
 @login_required
 def mark_notifications_read():
-    ids = request.json.get('ids', [])
+    ids = json_body().get('ids', [])
+    ids = [i for i in ids if isinstance(i, int)] if isinstance(ids, list) else []
     if ids:
         Notification.query.filter(Notification.id.in_(ids), Notification.player_id == current_user.id).update({Notification.is_read: True}, synchronize_session=False)
         db.session.commit()
@@ -1027,6 +1426,62 @@ def service_worker():
     # Service worker needs to be at the root scope
     return send_from_directory('static', 'service-worker.js', mimetype='application/javascript')
 
+@bp.route('/tasks/run', methods=['GET', 'POST'])
+@csrf.exempt
+def run_tasks_endpoint():
+    """
+    Wake-up hook for external cron services (free hosts sleep, and nothing runs while asleep).
+    Disabled unless CRON_SECRET is set; the secret must be sent as the X-Cron-Secret header
+    (or "Authorization: Bearer <secret>"), never in the URL.
+    """
+    import hmac
+    from flask import current_app
+    from app.tasks import run_due_tasks
+    secret = os.environ.get('CRON_SECRET', '')
+    if not secret:
+        return jsonify({'error': 'not found'}), 404
+    sent = request.headers.get('X-Cron-Secret', '')
+    auth = request.headers.get('Authorization', '')
+    if not sent and auth.startswith('Bearer '):
+        sent = auth[len('Bearer '):]
+    if not hmac.compare_digest(sent.encode(), secret.encode()):
+        return jsonify({'error': 'forbidden'}), 403
+    return jsonify({'ok': True, 'results': run_due_tasks(current_app._get_current_object())})
+
+
+@bp.route('/manifest.webmanifest')
+def web_manifest():
+    """Installable app (PWA) manifest."""
+    icon = lambda name, size, purpose='any': {'src': url_for('static', filename=f'icons/{name}'),
+                                             'sizes': f'{size}x{size}', 'type': 'image/png', 'purpose': purpose}
+    manifest = {
+        'name': 'Shadow OS',
+        'short_name': 'Shadow OS',
+        'description': 'Gamified self-improvement: quests, streaks, leagues and raids.',
+        'id': '/',
+        'start_url': '/',
+        'scope': '/',
+        'display': 'standalone',
+        'background_color': '#050505',
+        'theme_color': '#050505',
+        'icons': [icon('icon-192.png', 192), icon('icon-512.png', 512), icon('maskable-512.png', 512, 'maskable')],
+        'shortcuts': [
+            {'name': 'Focus', 'url': '/focus', 'icons': [icon('icon-192.png', 192)]},
+            {'name': 'Leaderboard', 'url': '/leaderboard', 'icons': [icon('icon-192.png', 192)]},
+            {'name': 'Raids', 'url': '/raids', 'icons': [icon('icon-192.png', 192)]},
+        ],
+    }
+    response = jsonify(manifest)
+    response.mimetype = 'application/manifest+json'
+    return response
+
+
+@bp.route('/offline')
+def offline():
+    """Shown by the service worker when there is no connection."""
+    return render_template('offline.html')
+
+
 @bp.route('/api/vapid_public_key')
 def vapid_public_key():
     return jsonify({'public_key': os.getenv('VAPID_PUBLIC_KEY')})
@@ -1035,13 +1490,15 @@ def vapid_public_key():
 @bp.route('/api/notifications/subscribe', methods=['POST'])
 @login_required
 def subscribe_push():
-    sub_data = request.json
-    if not sub_data or 'endpoint' not in sub_data or 'keys' not in sub_data:
+    sub_data = json_body()
+    keys = sub_data.get('keys')
+    endpoint = sub_data.get('endpoint')
+    if not isinstance(endpoint, str) or not endpoint or not isinstance(keys, dict) \
+            or not isinstance(keys.get('p256dh'), str) or not isinstance(keys.get('auth'), str):
         return jsonify({'error': 'Invalid subscription data'}), 400
 
-    endpoint = sub_data['endpoint']
-    p256dh = sub_data['keys'].get('p256dh')
-    auth = sub_data['keys'].get('auth')
+    p256dh = keys['p256dh']
+    auth = keys['auth']
 
     # Check if this endpoint is already registered
     existing_sub = PushSubscription.query.filter_by(endpoint=endpoint).first()
@@ -1066,14 +1523,14 @@ def subscribe_push():
 @bp.route('/api/notifications/unsubscribe', methods=['POST'])
 @login_required
 def unsubscribe_push():
-    sub_data = request.json
+    sub_data = json_body()
     if not sub_data or 'endpoint' not in sub_data:
         return jsonify({'error': 'Invalid unsubscribe data'}), 400
 
     endpoint = sub_data['endpoint']
     
     # Check if this endpoint is registered and delete it
-    existing_sub = PushSubscription.query.filter_by(endpoint=endpoint).first()
+    existing_sub = PushSubscription.query.filter_by(endpoint=endpoint, player_id=current_user.id).first()
     if existing_sub:
         db.session.delete(existing_sub)
         db.session.commit()
@@ -1087,7 +1544,7 @@ def allocate_points():
     try:
         # Expecting JSON: {"STR": 1, "INT": 2, ...}
         # Or Form data if simpler? Let's support both but assume JSON for dynamic UI.
-        data = request.json or request.form
+        data = request.get_json(silent=True) or request.form
         
         distribution = {
             'STR': int(data.get('STR', 0)),
@@ -1098,14 +1555,14 @@ def allocate_points():
         }
         
     except (ValueError, TypeError):
-        if request.json:
+        if request.is_json:
             return jsonify({'success': False, 'msg': "Invalid input."})
         flash("Invalid input.", "error")
         return redirect(url_for('main.dashboard'))
         
     success, msg = allocate_attributes(current_user, distribution)
     
-    if request.json or request.is_json:
+    if request.is_json:
         return jsonify({'success': success, 'msg': msg})
         
     flash(msg, "success" if success else "error")

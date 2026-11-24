@@ -1,0 +1,69 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/social.css') }}">
+
+<div class="social-page">
+    <p class="raid-back"><a href="{{ url_for('main.raids') }}">← All raids</a></p>
+
+    <header class="social-header">
+        <p class="social-system">[ RAID · {{ raid.status | upper }} ]</p>
+        <h1 class="social-title">{{ icon('swords') }} {{ raid.title }}</h1>
+        <p class="social-lead">Started by {{ raid.creator.name if raid.creator else 'a former hunter' }} ·
+            counts toward {{ raid.stat }} in Life Balance</p>
+    </header>
+
+    <section class="raid-hero">
+        <div class="raid-big">{{ '%g' | format(raid.total) }}<small> / {{ '%g' | format(raid.target) }} {{ raid.unit }}</small></div>
+        <div class="raid-bar raid-bar-lg"><div class="raid-fill" style="width: {{ raid.percent }}%;"></div></div>
+        <p class="raid-meta">
+            {% if raid.status == 'active' %}{{ raid.percent }}% · <span data-ends="{{ raid.ends_at | utc_iso }}"></span>
+            {% elif raid.status == 'completed' %}{{ icon('trophy', 'icon-gold') }} Cleared! Contributors earned +{{ reward_xp }} XP and +{{ reward_coins }} Coins.
+            {% elif raid.status == 'failed' %}{{ icon('skull', 'icon-danger') }} Time ran out.
+            {% else %}{{ icon('x') }} Cancelled.{% endif %}
+        </p>
+
+        {% if raid.status == 'active' %}
+        <form action="{{ url_for('main.raid_log', raid_id=raid.id) }}" method="POST" class="raid-log">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label for="raidAmount">How many {{ raid.unit }} did you add?</label>
+            <div class="raid-log-row">
+                <input id="raidAmount" type="number" name="amount" min="0" step="any" inputmode="decimal" required>
+                <button type="submit" class="btn-complete">CONTRIBUTE</button>
+            </div>
+        </form>
+        {% endif %}
+    </section>
+
+    <section class="raid-list">
+        <h2 class="social-h2">CONTRIBUTORS</h2>
+        {% for p, amount in ranking %}
+        <div class="raid-contributor{{ ' me' if p.id == current_user.id }}">
+            <span>{{ icon('crown', 'icon-gold', label='Top contributor') if loop.first else '#' ~ loop.index }} {{ p.name }}</span>
+            <span>{{ '%g' | format(amount) }} {{ raid.unit }}</span>
+        </div>
+        {% else %}
+        <p class="social-empty">No contributions yet. Be the first.</p>
+        {% endfor %}
+    </section>
+
+    {% if raid.contributions %}
+    <section class="raid-list">
+        <h2 class="social-h2">LOG</h2>
+        {% for c in raid.contributions[:20] %}
+        <div class="raid-log-entry">
+            <span>{{ c.player.name }} +{{ '%g' | format(c.amount) }} {{ raid.unit }}</span>
+            <span class="social-dim">{{ c.created_at | game_time('%d/%m %H:%M') }}</span>
+        </div>
+        {% endfor %}
+    </section>
+    {% endif %}
+
+    {% if raid.status == 'active' and raid.created_by == current_user.id %}
+    <form action="{{ url_for('main.raid_cancel', raid_id=raid.id) }}" method="POST" class="raid-cancel">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn-small">CANCEL RAID</button>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}

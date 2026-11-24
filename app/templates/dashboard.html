@@ -1,616 +1,28 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<!-- Level Up Overlay -->
-<style>
-    /* PRECISE DASHBOARD OVERRIDES */
-    .dashboard-grid {
-        display: grid;
-        grid-template-columns: 260px 1fr !important;
-        gap: 25px;
-        max-width: 1500px;
-        margin: 0 auto;
-        align-items: start;
-    }
-
-    #sleepModal .modal-content {
-        max-width: 600px !important;
-        padding: 40px !important;
-    }
-
-    .btn-sleep-log {
-        background: rgba(255, 255, 255, 0.1);
-        width: 100%;
-        border: 1px solid #444;
-        color: #aaa;
-        padding: 5px;
-        font-size: 0.8em;
-        transition: all 0.2s;
-        cursor: pointer;
-    }
-
-    .btn-cancel {
-        background: transparent;
-        border: 1px solid #555;
-        color: #888;
-        padding: 10px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-family: var(--font-heading);
-        transition: all 0.2s;
-        width: 100%;
-    }
-
-    .btn-cancel:hover {
-        border-color: #aaa;
-        color: #fff;
-        background: rgba(255, 255, 255, 0.05);
-    }
-
-    .btn-sleep-log:hover {
-        background: var(--color-primary);
-        color: black;
-        border-color: var(--color-primary);
-    }
-
-    @media (max-width: 900px) {
-
-        /* Increased breakpoint to catch tablets */
-        .dashboard-grid {
-            grid-template-columns: 1fr !important;
-        }
-
-        .system-header {
-            flex-direction: column !important;
-            text-align: center !important;
-            gap: 20px;
-            margin-top: 80px;
-            /* Clear fixed buttons */
-        }
-
-        .profile-info,
-        .level-info {
-            width: 100%;
-            text-align: center !important;
-            align-items: center !important;
-            justify-content: center !important;
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* Ensure Level Info is definitely centered */
-        .level-info {
-            margin-top: 10px;
-        }
-
-        .level-info .xp-bar-container {
-            margin: 5px auto !important;
-        }
-
-        /* Quest Header Buttons */
-        .panel .u-flex.u-gap-10 {
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-
-        .btn-small {
-            flex-grow: 1;
-            text-align: center;
-            margin-bottom: 5px;
-        }
-    }
-
-    /* GLOBAL MODAL SYSTEM */
-    .modal-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        background: rgba(0, 0, 0, 0.9);
-        display: none;
-        justify-content: center;
-        align-items: center;
-        z-index: 9000;
-        backdrop-filter: blur(5px);
-    }
-
-    /* LEVEL UP UI */
-    .levelup-title {
-        font-size: 5rem;
-        font-weight: 900;
-        color: var(--color-primary);
-        text-shadow: 0 0 20px var(--color-primary-glow);
-        letter-spacing: 10px;
-        text-align: center;
-    }
-
-    .levelup-subtitle {
-        font-size: 1.5rem;
-        color: #fff;
-        letter-spacing: 5px;
-        margin-top: 10px;
-        text-align: center;
-    }
-
-    @media (max-width: 600px) {
-        .levelup-title {
-            font-size: 3rem;
-            letter-spacing: 4px;
-        }
-        .levelup-subtitle {
-            font-size: 1rem;
-            letter-spacing: 2px;
-        }
-    }
-
-    /* PENALTY UI ENHANCEMENTS */
-    .system-lockdown-overlay {
-        background: radial-gradient(circle, rgba(20, 0, 0, 0.95) 0%, rgba(0, 0, 0, 1) 100%) !important;
-        border: 5px solid var(--color-danger);
-    }
-
-    .penalty-quest-card {
-        background: rgba(50, 0, 0, 0.6) !important;
-        border: 2px solid var(--color-danger) !important;
-        box-shadow: 0 0 20px rgba(255, 0, 0, 0.2);
-        padding: 30px !important;
-        transform: scale(1.05);
-        animation: pulse-border 2s infinite;
-        margin-top: 50px !important;
-    }
-
-    @keyframes pulse-border {
-        0% {
-            box-shadow: 0 0 10px rgba(255, 0, 0, 0.2);
-        }
-
-        50% {
-            box-shadow: 0 0 25px rgba(255, 0, 0, 0.5);
-        }
-
-        100% {
-            box-shadow: 0 0 10px rgba(255, 0, 0, 0.2);
-        }
-    }
-
-    .btn-complete-penalty {
-        background: var(--color-danger);
-        color: white;
-        font-weight: bold;
-        padding: 15px 30px;
-        border: none;
-        text-transform: uppercase;
-        letter-spacing: 2px;
-        cursor: pointer;
-        width: 100%;
-        margin-top: 20px;
-        transition: all 0.2s;
-        border: 1px solid #ff5555;
-    }
-
-    .btn-complete-penalty:hover {
-        background: #ff0000;
-        box-shadow: 0 0 15px #ff0000;
-        transform: scale(1.02);
-    }
-
-    /* Mobile overrides for penalty UI */
-    @media (max-width: 600px) {
-        .system-lockdown-overlay .glitch-text {
-            font-size: 2.2rem !important;
-            letter-spacing: 5px !important;
-        }
-        .system-lockdown-overlay .u-font-size-1-2rem {
-            font-size: 1rem !important;
-            letter-spacing: 2px !important;
-        }
-        .system-lockdown-overlay .u-padding-20 {
-            padding: 15px !important;
-        }
-        .system-lockdown-overlay .u-width-80 {
-            width: 95% !important;
-        }
-        .system-lockdown-overlay h3 {
-            font-size: 1.2rem !important;
-        }
-        .penalty-quest-card {
-            transform: scale(1) !important;
-            padding: 15px !important;
-            margin-top: 25px !important;
-        }
-        .penalty-quest-card .u-font-size-2rem {
-            font-size: 1.3rem !important;
-            letter-spacing: 2px !important;
-        }
-        .btn-complete-penalty {
-            padding: 12px 15px !important;
-            font-size: 0.9rem !important;
-        }
-    }
-
-    .modal-content.system-alert {
-        width: 90%;
-        max-width: 500px;
-        padding: 40px;
-        border: 2px solid var(--color-primary);
-        text-align: center;
-        box-shadow: 0 0 30px var(--color-primary-dim);
-    }
-
-    .modal-content.warning-alert {
-        width: 90%;
-        max-width: 400px;
-        padding: 30px;
-        border: 2px solid var(--color-danger);
-        text-align: center;
-    }
-
-    /* SHADOW ARMY ITEMS */
-    .shadow-item {
-        background: rgba(100, 0, 255, 0.1);
-        border: 1px solid #b19cd9;
-        padding: 15px;
-        text-align: center;
-        border-radius: 5px;
-    }
-
-    .shadow-item .shadow-icon {
-        font-size: 2em;
-        margin-bottom: 10px;
-    }
-
-    .shadow-item .shadow-name {
-        color: #fff;
-        font-weight: bold;
-        font-size: 0.9em;
-        margin-bottom: 5px;
-    }
-
-    .shadow-item .shadow-rank {
-        color: #b19cd9;
-        font-size: 0.8em;
-    }
-
-    .shadow-item .shadow-bonus {
-        color: #aaa;
-        font-size: 0.7em;
-        margin-top: 5px;
-    }
-
-    .shadow-item .shadow-date {
-        color: #666;
-        font-size: 0.7em;
-        margin-top: 2px;
-    }
-
-    /* PLAYER TITLE */
-    .player-title-link:hover {
-        text-shadow: 0 0 8px #fff;
-        color: var(--color-primary) !important;
-    }
-
-    /* ACTION BUTTONS */
-    .btn-action {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        padding: 15px 5px;
-        border-radius: 8px;
-        transition: all 0.2s;
-        cursor: pointer;
-        font-weight: bold;
-        font-size: 0.8em;
-        text-align: center;
-    }
-
-    .btn-action:hover {
-        filter: brightness(1.2);
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-    }
-
-    /* UTILITIES */
-    .u-width-100 {
-        width: 100%;
-    }
-
-    .u-text-center {
-        text-align: center;
-    }
-
-    .u-text-strikethrough {
-        text-decoration: line-through;
-    }
-
-    .u-flex {
-        display: flex;
-    }
-
-    .u-flex-column {
-        display: flex;
-        flex-direction: column;
-    }
-
-    .u-align-center {
-        align-items: center;
-    }
-
-    .u-justify-between {
-        justify-content: space-between;
-    }
-
-    .u-gap-10 {
-        gap: 10px;
-    }
-
-    .u-gap-15 {
-        gap: 15px;
-    }
-
-    .u-mt-5 {
-        margin-top: 5px;
-    }
-
-    .u-mt-10 {
-        margin-top: 10px;
-    }
-
-    .u-mt-20 {
-        margin-top: 20px;
-    }
-
-    .u-mt-30 {
-        margin-top: 30px;
-    }
-
-    .u-mt-50 {
-        margin-top: 50px;
-    }
-
-    .u-mb-5 {
-        margin-bottom: 5px;
-    }
-
-    .u-mb-10 {
-        margin-bottom: 10px;
-    }
-
-    .u-mb-20 {
-        margin-bottom: 20px;
-    }
-
-    .u-font-small {
-        font-size: 0.8em;
-    }
-
-    .u-font-bold {
-        font-weight: bold;
-    }
-
-    .u-color-gold {
-        color: var(--color-gold);
-    }
-
-    .u-color-purple {
-        color: var(--color-purple-light);
-    }
-
-    .u-color-cyan {
-        color: cyan;
-    }
-
-    .u-color-white {
-        color: #fff;
-    }
-
-    .u-color-muted {
-        color: #888;
-    }
-
-    .u-color-danger {
-        color: var(--color-danger);
-    }
-
-    .u-color-ccc {
-        color: #ccc;
-    }
-
-    .u-opacity-05 {
-        opacity: 0.5;
-    }
-
-    .xp-bar-container {
-        background: #111;
-        border: 1px solid #333;
-        height: 10px;
-        border-radius: 5px;
-        overflow: hidden;
-    }
-
-    .js-fill {
-        height: 100%;
-        background: var(--color-primary);
-        transition: width 0.5s ease;
-        width: 0;
-    }
-
-    .quest-progress-container {
-        flex-grow: 1;
-        height: 10px;
-        background: rgba(0, 0, 0, 0.4);
-        border: 1px solid #333;
-        border-radius: 5px;
-        overflow: hidden;
-        position: relative;
-    }
-
-    .quest-progress-fill {
-        height: 100%;
-        background: linear-gradient(90deg, var(--color-primary-dim), var(--color-primary));
-        box-shadow: 0 0 10px var(--color-primary-glow);
-        width: 0;
-        transition: width 0.8s ease-in-out;
-    }
-
-    .quest-progress-text {
-        min-width: 45px;
-        text-align: right;
-        font-weight: bold;
-        color: var(--color-primary);
-        font-size: 0.85em;
-        text-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
-    }
-
-    @media (max-width: 600px) {
-        .quest-progress-wrapper {
-            flex-direction: column !important;
-            align-items: stretch !important;
-            gap: 8px !important;
-        }
-
-        .quest-progress-text {
-            text-align: right;
-            width: 100%;
-        }
-    }
-
-    /* EQUIPMENT SLOTS */
-    .slot-box {
-        background: rgba(0, 0, 0, 0.3);
-        border: 1px dashed #444;
-        padding: 10px;
-        border-radius: 5px;
-        min-height: 60px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        position: relative;
-    }
-
-    .slot-box.equipped {
-        background: var(--color-primary-dim);
-        border: 1px solid var(--color-primary);
-        box-shadow: 0 0 10px var(--color-primary-glow);
-    }
-
-    .slot-label {
-        font-size: 0.7em;
-        color: #666;
-        text-transform: uppercase;
-        position: absolute;
-        top: 5px;
-        left: 5px;
-    }
-
-    /* QUEST PRIORITY & STATE */
-    .priority-1 {
-        border-left: 4px solid #f44336 !important;
-    }
-
-    .priority-2 {
-        border-left: 4px solid #ff9800 !important;
-    }
-
-    .priority-3 {
-        border-left: 4px solid #ffeb3b !important;
-    }
-
-    .priority-4 {
-        border-left: 4px solid #2196f3 !important;
-    }
-
-    .quest-card.completed {
-        opacity: 0.6;
-        filter: grayscale(1);
-    }
-
-    .quest-title.completed {
-        text-decoration: line-through;
-    }
-
-    /* CONDITION COLORS */
-    .condition-well-rested {
-        color: var(--color-primary);
-    }
-
-    .condition-tired {
-        color: orange;
-    }
-
-    .condition-normal {
-        color: #ccc;
-    }
-
-    /* TOOLTIPS */
-    .tooltip {
-        position: relative;
-        display: inline-block;
-        cursor: help;
-    }
-
-    .tooltip .tooltiptext {
-        visibility: hidden;
-        width: 140px;
-        background-color: rgba(0, 0, 0, 0.95);
-        color: #fff;
-        text-align: center;
-        border-radius: 6px;
-        padding: 8px;
-        position: absolute;
-        z-index: 1;
-        bottom: 125%;
-        /* Position above */
-        left: 50%;
-        margin-left: -70px;
-        /* Center */
-        opacity: 0;
-        transition: opacity 0.3s;
-        border: 1px solid var(--color-primary);
-        box-shadow: 0 0 10px var(--color-primary-dim);
-        font-size: 0.8rem;
-        pointer-events: none;
-    }
-
-    .tooltip:hover .tooltiptext {
-        visibility: visible;
-        opacity: 1;
-    }
-</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
 
 {% if player.is_on_vacation %}
-<div class="vacation-overlay"
-    style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,188,212,0.1); backdrop-filter:blur(2px); z-index:50; pointer-events:none; border:10px solid rgba(0,188,212,0.2); box-sizing:border-box;">
+<div class="vacation-overlay vacation-frame">
 </div>
-<div class="vacation-banner"
-    style="position:fixed; top:20px; left:50%; transform:translateX(-50%); background:#00bcd4; color:black; padding:5px 30px; font-weight:900; font-size:1.2rem; letter-spacing:5px; z-index:100; box-shadow:0 0 20px rgba(0,188,212,0.5); clip-path:polygon(10% 0, 90% 0, 100% 100%, 0 100%);">
+<div class="vacation-banner vacation-banner">
     SYSTEM FROZEN
 </div>
 
-<div class="vacation-controls" style="position:fixed; top:80px; left:50%; transform:translateX(-50%); z-index:100;">
+<div class="vacation-controls vacation-controls-bar">
     <form action="{{ url_for('main.end_vacation_route') }}" method="POST">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" class="btn-action"
-            style="background:rgba(0,188,212,0.8); color:black; font-weight:bold; border:2px solid #fff; padding:10px 20px; cursor:pointer; box-shadow:0 0 15px #00bcd4;">
+        <button type="submit" class="btn-action btn-vacation-end">
             RESUME OPERATIONS
         </button>
     </form>
 </div>
 {% endif %}
 
-<div id="levelUpOverlay" onclick="this.style.display='none'"
-    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:10000; justify-content:center; align-items:center; flex-direction:column; padding: 20px; box-sizing: border-box;">
-    <div class="levelup-title">
-        LEVEL UP!</div>
-    <div class="levelup-subtitle">SYSTEM
-        LIMITS INCREASED</div>
-</div>
 
 {% if player.in_penalty_zone %}
-<div class="system-lockdown-overlay"
-    style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:#000; z-index:8000; display:flex; flex-direction:column; justify-content:center; align-items:center; color:red; box-sizing: border-box;">
+<div class="system-lockdown-overlay penalty-screen">
     
     <script>
         // Force the viewport to the top and lock scrolling so the penalty screen stays perfectly centered
@@ -618,29 +30,29 @@
         window.scrollTo(0, 0);
     </script>
 
-    <div class="glitch-text"
-        style="font-size:4rem; font-weight:900; letter-spacing:20px; text-align: center; margin-bottom: 20px;">SYSTEM
+    <div class="glitch-text penalty-title">SYSTEM
         FAILURE</div>
-    <p class="u-mt-20 u-font-size-1-2rem u-color-white" style="letter-spacing: 5px; text-transform: uppercase;">PENALTY
+    <p class="u-mt-20 u-font-size-1-2rem u-color-white penalty-subtitle">PENALTY
         QUEST REQUIRED</p>
     <div class="u-border-danger u-padding-20 u-mt-30 u-width-80 u-max-width-500">
-        <h3 class="u-color-danger" style="letter-spacing: 3px; font-size: 1.5rem; margin-bottom: 15px;">OBJECTIVE:
+        <h3 class="u-color-danger penalty-objective-heading">OBJECTIVE:
             SURVIVE</h3>
-        <p class="u-color-ccc u-margin-10-0" style="letter-spacing: 1px; line-height: 1.5;">Complete the specific
+        <p class="u-color-ccc u-margin-10-0 penalty-objective-text">Complete the specific
             Penalty Quest to restore system functionality.</p>
         {% set penalty_quest = scheduled | selectattr('is_penalty', 'equalto', true) | first %}
         {% if penalty_quest %}
         <div class="penalty-quest-card">
-            <div class="u-font-bold u-font-size-2rem u-mb-20"
-                style="color: #fff; text-transform: uppercase; letter-spacing: 4px; line-height: 1.6;">{{
+            <div class="u-font-bold u-font-size-2rem u-mb-20 penalty-quest-title">{{
                 penalty_quest.title }}</div>
-            <div id="penalty-timer" class="u-mt-5 u-font-small u-mb-20"
-                style="color: #ff6666; letter-spacing: 2px; font-weight: bold;"
-                data-due="{{ penalty_quest.due_date.isoformat() if penalty_quest.due_date else '' }}">
+            <div id="penalty-timer" class="u-mt-5 u-font-small u-mb-20 penalty-timer"
+
+                data-due="{{ penalty_quest.due_date | utc_iso }}">
                 TIME REMAINING: CALCULATING...</div>
+            {% if penalty_quest.due_date %}
+            <div class="u-font-small u-color-muted u-mb-20">DEADLINE: {{ penalty_quest.due_date | game_time('%d/%m %H:%M') }} (your time)</div>
+            {% endif %}
             <a href="/complete/{{ penalty_quest.id }}"
-                class="btn-complete-penalty u-text-decoration-none u-display-block"
-                style="letter-spacing: 4px;">COMPLETE
+                class="btn-complete-penalty u-text-decoration-none u-display-block btn-penalty-spaced">COMPLETE
                 PENALTY</a>
         </div>
         <script>
@@ -684,15 +96,13 @@
 </div>
 {% endif %}
 
-<header class="system-header"
-    style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px; padding:20px; border-bottom:1px solid #333;">
+<header class="system-header dashboard-header">
     <div class="profile-info">
         <div class="u-flex u-align-center u-gap-10">
-            <h1 class="player-name" style="margin:0; font-size:2rem; letter-spacing:2px; color:#fff;">{{ player.name }}
+            <h1 class="player-name player-name-base">{{ player.name }}
             </h1>
-            <span
-                style="border:1px solid var(--color-gold); padding:3px 10px; border-radius:4px; font-weight:800; color:var(--color-gold); font-size:0.9em; background:rgba(255,215,0,0.1);">RANK
-                {{ player.rank }}</span>
+            <span class="rank-chip">RANK&nbsp;{{ player.rank }}</span>
+            {% if player.hardcore %}<span class="hardcore-chip" title="Hardcore since {{ player.hardcore_since.strftime('%d/%m/%Y') if player.hardcore_since }}">{{ icon('skull') }} HARDCORE</span>{% endif %}
         </div>
         <div class="u-flex u-align-center u-gap-10 u-mt-5">
             <span class="u-color-purple u-font-small u-text-transform-uppercase">{{ player.job_class if player.job_class
@@ -700,19 +110,23 @@
             <span class="u-color-muted">//</span>
             <span class="player-title player-title-link"
                 onclick="document.getElementById('titleModal').style.display='block'">
-                {{ player.title_display }} <span class="u-font-small u-color-muted">✎</span>
+                {{ player.title_display }} <span class="u-font-small u-color-muted">{{ icon('pencil') }}</span>
             </span>
         </div>
     </div>
 
-    <div class="level-info" style="text-align:right;">
-        <div class="level-circle" style="font-size:1.5rem; font-weight:900; color:var(--color-primary);">LVL {{
+    <div class="level-info level-info-right">
+        <div class="level-circle level-display">LVL {{
             player.level }}</div>
-        <div class="xp-bar-container" style="width:200px; margin-top:5px;">
+        <div class="xp-bar-container xp-bar-sized">
             {% set xp_percent = (player.xp / player.xp_required * 100) if player.xp_required > 0 else 0 %}
             <div class="js-fill" data-width="{{ xp_percent }}"></div>
         </div>
-        <span class="u-font-small u-mt-5 u-display-block">XP: {{ player.xp }} / {{ player.xp_required }}</span>
+        <span class="u-font-small u-mt-5 u-display-block">XP: {{ "{:,}".format(player.xp) }} / {{ "{:,}".format(player.xp_required) }}</span>
+        {% if player.xp_debt %}
+        <span class="xp-debt" title="A failed penalty left XP debt. New XP pays it off before filling your bar.">
+            DEBT {{ "{:,}".format(player.xp_debt) }} XP</span>
+        {% endif %}
     </div>
 </header>
 
@@ -721,7 +135,7 @@
     <div class="u-flex u-flex-column u-gap-20">
         <div class="panel inventory-section u-padding-15">
             <h3 class="u-font-small u-color-muted u-mb-10">EQUIPMENT</h3>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px;">
+            <div class="equipment-grid">
                 {% for slot in ['head', 'body', 'weapon', 'accessory'] %}
                 {% set ns = namespace(found=None) %}
                 {% for item in player.inventory if item.is_equipped and item.item.slot == slot %}
@@ -741,9 +155,8 @@
                         </form>
                     </div>
                     {% else %}
-                    <span style="color:#444; font-size:2em; margin-top:10px;">
-                        {% if slot=='weapon' %}⚔️{% elif slot=='head' %}🪖{% elif slot=='body' %}👕{% elif
-                        slot=='accessory' %}💍{% endif %}
+                    <span class="equipment-slot-icon">
+                        {{ icon({'weapon': 'sword', 'head': 'hard-hat', 'body': 'shirt', 'accessory': 'gem'}.get(slot, 'gem')) }}
                     </span>
                     {% endif %}
                 </div>
@@ -762,81 +175,97 @@
             <div class="u-flex u-gap-10 u-flex-wrap u-mb-10">
                 {% if player.is_on_vacation %}
                 <div class="tooltip">
-                    🌴
+                    {{ icon('tree-palm', 'icon-frost') }}
                     <span class="tooltiptext">VACATION: Stat decay halted.</span>
                 </div>
                 {% endif %}
 
                 {% if player.condition == 'WELL RESTED' %}
                 <div class="tooltip">
-                    ⚡
+                    {{ icon('zap', 'icon-gold icon-glow') }}
                     <span class="tooltiptext">WELL RESTED: +10% XP Gain.</span>
+                </div>
+                {% elif player.condition == 'TIRED' %}
+                <div class="tooltip">
+                    {{ icon('battery-low', 'icon-fire') }}
+                    <span class="tooltiptext">TIRED: -50% XP Gain. Log 7.5h+ sleep or use an Elixir of Life.</span>
                 </div>
                 {% endif %}
 
                 {% if player.intelligence >= 10 %}
                 <div class="tooltip">
-                    🧠
-                    <span class="tooltiptext">INT BONUS: +5% XP Gain.</span>
+                    {{ icon('brain', 'icon-frost') }}
+                    <span class="tooltiptext">INT BONUS: +{{ ((player.intelligence / 10) * 5) | round(1) }}% XP Gain.</span>
+                </div>
+                {% endif %}
+
+                {% if player.current_title and player.current_title.buff_description %}
+                <div class="tooltip">
+                    {{ icon('tag', 'icon-purple') }}
+                    <span class="tooltiptext">TITLE ({{ player.current_title.name }}): {{ player.current_title.buff_description }}.</span>
                 </div>
                 {% endif %}
             </div>
-            <button onclick="document.getElementById('sleepModal').style.display='flex'" class="btn-sleep-log">☾ LOG
+            <button onclick="document.getElementById('sleepModal').style.display='flex'" class="btn-sleep-log">{{ icon('moon') }} LOG
                 SLEEP</button>
         </div>
     </div>
 
     <!-- Main Section -->
     <div class="u-flex u-flex-column u-gap-20">
-        <section class="panel u-padding-0" style="overflow: hidden;">
+        <section class="panel u-padding-0 panel-clip">
             <div class="u-flex u-flex-wrap">
                 <!-- Left: Job & Status -->
-                <div
-                    style="flex: 1; min-width: 150px; background: rgba(0,0,0,0.2); padding: 20px; display: flex; flex-direction: column; justify-content: center; align-items: center; border-right: 1px solid #333;">
-                    <h2 style="margin:0; font-size:1.2rem; letter-spacing:2px; color:#888;">STATUS</h2>
-                    <div class="u-color-purple u-font-bold u-mt-10"
-                        style="font-size: 1.4rem; text-shadow: 0 0 10px rgba(157, 78, 221, 0.5);">
-                        {{ player.job_class|upper }}
+                <div class="status-column">
+                    <h2 class="status-heading">STATUS</h2>
+                    {% set has_class = player.job_class and player.job_class != 'None' %}
+                    <div class="u-color-purple u-font-bold u-mt-10 status-class">
+                        {{ player.job_class|upper if has_class else 'CIVILIAN' }}
                     </div>
+                    {% if not has_class %}
+                    {% if player.level >= 10 %}
+                    <a href="{{ url_for('main.job_qualification') }}" class="btn-choose-class u-mt-10">CHOOSE CLASS</a>
+                    {% else %}
+                    <div class="u-font-small u-color-muted u-mt-10 status-hint">Class unlocks at Lv 10</div>
+                    {% endif %}
+                    {% endif %}
                 </div>
 
                 <!-- Right: Stats & Currency -->
-                <div style="flex: 3; padding: 20px;">
+                <div class="stats-column">
                     <!-- Currency -->
-                    <div class="u-flex u-justify-between u-align-center u-mb-20"
-                        style="background: rgba(0,0,0,0.2); padding: 10px 15px; border-radius: 5px; border: 1px solid #333;">
+                    <div class="u-flex u-justify-between u-align-center u-mb-20 currency-bar">
                         <div class="u-flex u-align-center u-gap-10">
-                            <span style="font-size: 1.2rem;">💰</span>
-                            <span class="u-color-gold u-font-bold" style="font-size: 1.2rem;">{{
+                            <span class="currency-text icon-gold">{{ icon('coins') }}</span>
+                            <span class="u-color-gold u-font-bold currency-text">{{
                                 "{:,}".format(player.gold) }} G</span>
                         </div>
                         <div class="u-flex u-align-center u-gap-10">
-                            <span style="font-size: 1.2rem;">⭐</span>
-                            <span class="u-color-purple u-font-bold" style="font-size: 1.2rem;">{{
+                            <span class="currency-text u-color-purple">{{ icon('star') }}</span>
+                            <span class="u-color-purple u-font-bold currency-text">{{
                                 "{:,}".format(player.coins) }} C</span>
                         </div>
                     </div>
 
                     <!-- AVAILABLE POINTS -->
                     {% if player.attribute_points > 0 %}
-                    <div class="u-mb-20 u-text-center" style="animation: pulse-gold 2s infinite;">
-                        <span class="u-color-gold u-font-bold" style="font-size: 1.1rem; letter-spacing: 2px;">AVAILABLE
+                    <div class="u-mb-20 u-text-center points-pulse">
+                        <span class="u-color-gold u-font-bold points-label">AVAILABLE
                             POINTS: <span id="available-points">{{ player.attribute_points }}</span></span>
-                        <button onclick="commitPoints()" id="btn-commit-points" class="btn-small u-ml-10"
-                            style="display:none; background:var(--color-gold); color:black; border-color:var(--color-gold); font-weight:bold;">CONFIRM</button>
+                        <button onclick="commitPoints()" id="btn-commit-points" class="btn-small u-ml-10 btn-commit-points-style"
+                            style="display: none;">CONFIRM</button>
                     </div>
                     {% endif %}
 
                     <!-- Attributes Grid -->
-                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(70px, 1fr)); gap:10px;">
+                    <div class="stat-grid">
                         {% for label, val, color in [('STR', stats.strength, '#ff5555'), ('AGI', stats.agility,
                         '#50fa7b'), ('SNS', stats.sense, '#f1fa8c'), ('VIT', stats.vitality, '#ffb86c'), ('INT',
                         stats.intelligence, '#8be9fd')] %}
-                        <div
-                            style="background: rgba(255,255,255,0.05); padding: 10px 5px; border-radius: 5px; text-align: center; border-bottom: 2px solid {{ color }}; position:relative;">
-                            <div class="u-font-small u-color-muted" style="font-size: 0.7em; letter-spacing: 1px;">{{
+                        <div class="stat-card" style="--stat-color: {{ color }};">
+                            <div class="u-font-small u-color-muted stat-label">{{
                                 label }}</div>
-                            <div style="font-size: 1.1rem; font-weight: bold; margin-top: 5px; color: #fff;">
+                            <div class="stat-value">
                                 <span id="val-{{ label }}">{{ val }}</span>
                                 {% if player.attribute_points > 0 %}
                                 <span id="added-{{ label }}" class="u-color-gold u-font-small"
@@ -845,10 +274,9 @@
                             </div>
 
                             {% if player.attribute_points > 0 %}
-                            <button onclick="removePoint('{{ label }}')" id="btn-sub-{{ label }}" class="btn-sub-point"
-                                style="position:absolute; top:-5px; left:-5px; background:rgba(255,85,85,0.8); color:#fff; border:none; border-radius:50%; width:20px; height:20px; font-weight:bold; cursor:pointer; font-size:0.8em; display:none;">-</button>
-                            <button onclick="addPoint('{{ label }}')" class="btn-add-point"
-                                style="position:absolute; top:-5px; right:-5px; background:{{ color }}; color:#000; border:none; border-radius:50%; width:20px; height:20px; font-weight:bold; cursor:pointer; font-size:0.8em;">+</button>
+                            <button onclick="removePoint('{{ label }}')" id="btn-sub-{{ label }}" class="btn-sub-point btn-stat-sub"
+                                style="display: none;">-</button>
+                            <button onclick="addPoint('{{ label }}')" class="btn-add-point btn-stat-add">+</button>
                             {% endif %}
                         </div>
                         {% endfor %}
@@ -857,18 +285,84 @@
             </div>
         </section>
 
+        <section class="panel u-padding-15 balance-panel">
+            <div class="duel-header">
+                <h2 class="u-font-small u-color-muted">LIFE BALANCE</h2>
+                <span class="balance-overall" title="Average of your five areas">{{ balance.overall }}<small>/100</small></span>
+            </div>
+            <div class="balance-rows">
+                {% for a in balance.areas %}
+                <div class="balance-row{{ ' balance-weakest' if a.code == balance.weakest.code and a.score < 60 }}"
+                    title="{{ a.name }}: {{ a.hint }}">
+                    <span class="balance-code">{{ a.code }}</span>
+                    <div class="balance-bar"><div class="balance-fill balance-{{ a.code | lower }}" data-width="{{ a.score }}"></div></div>
+                    <span class="balance-score">{{ a.score }}</span>
+                    <span class="balance-trend {{ 'up' if a.trend > 0 else 'down' if a.trend < 0 else 'flat' }}"
+                        aria-label="{{ a.trend }} over 7 days">{{ '▲' if a.trend > 0 else '▼' if a.trend < 0 else '•' }}{{ a.trend | abs if a.trend }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% if balance.weakest.score < 60 %}
+            <p class="balance-tip">Neglected: <strong>{{ balance.weakest.name }}</strong>. Try a quest in {{ balance.weakest.hint }}.</p>
+            {% endif %}
+            <p class="balance-footnote">Based on what you did recently (rank-weighted quests incl. dailies, focus, sleep). Fades with a 2-week half-life.</p>
+        </section>
+
+        {% if active_raids %}
+        <section class="panel u-padding-15 raids-panel">
+            <div class="duel-header">
+                <h2 class="u-font-small u-color-muted">ACTIVE RAIDS</h2>
+                <a href="{{ url_for('main.raids') }}" class="u-font-small u-color-primary">ALL →</a>
+            </div>
+            {% for raid in active_raids %}
+            <a class="raid-mini" href="{{ url_for('main.raid_detail', raid_id=raid.id) }}">
+                <span class="raid-mini-name">{{ icon('swords') }} {{ raid.title }}</span>
+                <span class="raid-mini-progress">{{ '%g' | format(raid.total) }}/{{ '%g' | format(raid.target) }} {{ raid.unit }}</span>
+                <span class="raid-mini-bar"><span style="width: {{ raid.percent }}%;"></span></span>
+            </a>
+            {% endfor %}
+        </section>
+        {% endif %}
+
+        <section class="panel u-padding-15 duel-panel">
+            <div class="duel-header">
+                <h2 class="u-font-small u-color-muted">WEEKLY DUEL</h2>
+                {% if duel %}<span class="duel-ends" data-ends="{{ duel.week_ends | utc_iso }}"></span>{% endif %}
+            </div>
+            {% if duel %}
+            {% set total = duel.me.points + duel.them.points %}
+            {% set share = (duel.me.points / total * 100) if total else 50 %}
+            <div class="duel-names">
+                <span class="duel-me">YOU <b>{{ '%.0f' | format(duel.me.points) }}</b></span>
+                <span class="duel-status duel-{{ duel.leading }}">
+                    {{ 'LEADING' if duel.leading == 'me' else 'TRAILING' if duel.leading == 'them' else 'TIED' }}
+                </span>
+                <span class="duel-them"><b>{{ '%.0f' | format(duel.them.points) }}</b>
+                    <a href="{{ url_for('main.public_profile', player_id=duel.rival.id) }}">{{ duel.rival.name }}</a></span>
+            </div>
+            <div class="duel-bar" role="img"
+                aria-label="You {{ '%.0f' | format(duel.me.points) }} points, {{ duel.rival.name }} {{ '%.0f' | format(duel.them.points) }} points">
+                <div class="duel-bar-me" data-width="{{ share | round }}"></div>
+            </div>
+            <div class="duel-stats">
+                <span>Dailies {{ duel.me.daily_rate }}% vs {{ duel.them.daily_rate }}%</span>
+                <span>Record {{ duel.record.wins }}W-{{ duel.record.losses }}L{% if duel.record.draws %}-{{ duel.record.draws }}D{% endif %}</span>
+            </div>
+            {% else %}
+            <p class="u-font-small u-color-muted">No rival yet. Pick one on the
+                <a href="{{ url_for('main.leaderboard') }}" class="u-color-primary">leaderboard</a> to start a weekly head-to-head.</p>
+            {% endif %}
+        </section>
+
         <section class="panel u-padding-15">
             <h2 class="u-font-small u-color-muted u-mb-10">SYSTEM COMMANDS</h2>
-            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px;">
-                <button onclick="document.getElementById('shadowArmyModal').style.display='flex'" class="btn-action"
-                    style="background:rgba(157,78,221,0.1); border:1px solid #9d4edd; color:#9d4edd;">ARMY</button>
-                <a href="{{ url_for('main.shop') }}" class="btn-action u-text-decoration-none"
-                    style="background:rgba(255,215,0,0.1); border:1px solid var(--color-gold); color:var(--color-gold);">STORE</a>
-                <a href="{{ url_for('main.analytics') }}" class="btn-action u-text-decoration-none"
-                    style="background:rgba(0,255,255,0.1); border:1px solid cyan; color:cyan;">LOGS</a>
+            <div class="commands-grid">
+                <button onclick="document.getElementById('shadowArmyModal').style.display='flex'" class="btn-action cmd-army">ARMY</button>
+                <a href="{{ url_for('main.shop') }}" class="btn-action u-text-decoration-none cmd-store">STORE</a>
+                <a href="{{ url_for('main.analytics') }}" class="btn-action u-text-decoration-none cmd-analytics">ANALYTICS</a>
 
-                <button onclick="document.getElementById('vacationModal').style.display='flex'" class="btn-action"
-                    style="background:rgba(0,188,212,0.1); border:1px solid #00bcd4; color:#00bcd4;">VACATION</button>
+                <a href="{{ url_for('main.weekly_report') }}" class="btn-action u-text-decoration-none cmd-report">REPORT</a>
+                <button onclick="document.getElementById('vacationModal').style.display='flex'" class="btn-action cmd-vacation">VACATION</button>
             </div>
         </section>
     </div>
@@ -876,70 +370,76 @@
 
 <div class="u-mt-20">
     <section class="panel u-padding-20">
-        <div class="u-flex u-justify-between u-align-center u-mb-20 u-border-bottom-primary-dim u-padding-bottom-10px"
-            style="flex-wrap: wrap; gap: 15px;">
-            <h2 style="margin:0;">QUESTS</h2>
-            <div class="u-flex u-gap-10" style="flex-wrap: wrap;">
-                <a href="{{ url_for('main.focus_mode') }}" class="btn-small" style="color:#ccc;">VOID</a>
-                <a href="{{ url_for('main.calendar_view') }}" class="btn-small" style="color:#00bcd4;">CALENDAR</a>
-                <a href="{{ url_for('main.leaderboard') }}" class="btn-small u-color-gold">LEADERBOARD</a>
-                <button class="btn-small"
-                    onclick="document.getElementById('addQuestModal').style.display='flex'; document.getElementById('addQuestModal').scrollTop=0;">+
-                    NEW
-                    QUEST</button>
-            </div>
+        <div class="u-flex u-justify-between u-align-center u-mb-20 u-border-bottom-primary-dim u-padding-bottom-10px quest-header-wrap">
+            <h2 class="heading-flush">QUESTS</h2>
+            <button class="btn-new-quest"
+                onclick="SystemUI.openModal('addQuestModal'); document.getElementById('addQuestModal').scrollTop=0;">+ NEW QUEST</button>
         </div>
 
         <div class="quest-list">
             {% for category, items in [('DAILY ROUTINE', dailies), ('SCHEDULED', scheduled), ('BACKLOG', backlog)] %}
-            <h3 class="u-font-small u-mt-20 u-mb-10 u-color-muted"
-                style="border-bottom:1px solid #333; padding-bottom:5px;">{{ category }}</h3>
+            <div class="quest-section-header">
+                <h3 class="u-font-small u-color-muted">{{ category }}</h3>
+                {% if category == 'DAILY ROUTINE' %}
+                <span class="streak-info" title="Earn a ❄️ Streak Freeze every 7-day streak (max 2). A freeze automatically saves your streak on a missed day.">
+                    {{ icon('flame') }} {{ player.current_streak }} day{{ 's' if player.current_streak != 1 }}
+                    <span class="streak-freezes{{ ' none' if not player.streak_freezes }}">{{ icon('snowflake') }} {{ player.streak_freezes or 0 }}</span>
+                </span>
+                {% endif %}
+                {% if category == 'DAILY ROUTINE' and items %}
+                {% set done = items | selectattr('is_completed') | list | length %}
+                <div class="daily-progress" title="Complete every daily for the daily bonus">
+                    <div class="daily-progress-bar"><div class="daily-progress-fill" data-width="{{ (done / items|length * 100) | round }}"></div></div>
+                    <span class="{{ 'u-color-gold' if done == items|length else 'u-color-muted' }}">{{ done }}/{{ items|length }}{{ ' · BONUS CLAIMED' if done == items|length }}</span>
+                </div>
+                {% endif %}
+            </div>
             {% if not items %}
             <p class="u-color-555 u-font-small u-font-style-italic">No tasks found.</p>
             {% else %}
             {% for quest in items %}
-            <div class="quest-card priority-{{ quest.priority }} {{ 'completed' if quest.is_completed }}"
-                style="display:flex; flex-direction:column; background:rgba(255,255,255,0.03); padding:15px; margin-bottom:10px; border-radius:5px;">
-                <div style="display:flex; justify-content:space-between; align-items:flex-start; width: 100%;">
-                    <div class="u-flex-grow-1" style="min-width: 0; padding-right: 15px;">
-                        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
-                            <span class="rank-badge rank-{{ quest.rank.lower() }}"
-                                style="background:rgba(255,255,255,0.1); padding:2px 8px; border-radius:3px; font-weight:bold; font-size:0.8em; margin: 0;">{{
+            <div class="quest-card priority-{{ quest.priority }} {{ 'completed' if quest.is_completed }} quest-card-body">
+                <div class="quest-card-row">
+                    <div class="u-flex-grow-1 quest-main">
+                        <div class="quest-meta">
+                            <span class="rank-badge rank-{{ quest.rank.lower() }} rank-badge-pill">{{
                                 quest.rank }}</span>
-                            <span class="quest-title {{ 'completed' if quest.is_completed }}"
-                                style="font-weight:bold; word-wrap: break-word; margin: 0;">{{
+                            <span class="quest-title {{ 'completed' if quest.is_completed }} quest-title-text">{{
                                 quest.title }}</span>
-                            {% if quest.start_date and quest.due_date %}
-                            <span
-                                style="color: #00bcd4; font-size: 0.8em; font-weight: normal; margin: 0; white-space: nowrap;">
-                                📅 {{ quest.start_date.strftime('%d/%m %H:%M') if quest.start_date.hour != 0 else
+                            {% if quest.is_measured %}
+                            <span class="quest-metric" title="Measured quest">{{ icon('ruler') }} {{ fmt(metric_totals.get(quest.id, 0)) }}/{{ fmt(quest.metric_target) }} {{ quest.metric_unit }}</span>
+                            {% endif %}
+                            {% if quest.is_penalty and quest.due_date %}
+                            <span class="quest-date quest-date-penalty" title="Your local time">
+                                {{ icon('hourglass') }} Deadline: {{ quest.due_date | game_time('%d/%m %H:%M') }}
+                            </span>
+                            {% elif quest.start_date and quest.due_date %}
+                            <span class="quest-date">
+                                {{ icon('calendar') }} {{ quest.start_date.strftime('%d/%m %H:%M') if quest.start_date.hour != 0 else
                                 quest.start_date.strftime('%d/%m') }}
-                                <span style="color: #666;">to</span>
+                                <span class="quest-date-sep">to</span>
                                 {{ quest.due_date.strftime('%d/%m %H:%M') if quest.due_date.hour != 0 else
                                 quest.due_date.strftime('%d/%m') }}
                             </span>
                             {% elif quest.start_date %}
-                            <span
-                                style="color: #00bcd4; font-size: 0.8em; font-weight: normal; margin: 0; white-space: nowrap;">
-                                📅 Starts: {{ quest.start_date.strftime('%d/%m/%Y %H:%M') if quest.start_date.hour != 0
+                            <span class="quest-date">
+                                {{ icon('calendar') }} Starts: {{ quest.start_date.strftime('%d/%m/%Y %H:%M') if quest.start_date.hour != 0
                                 else quest.start_date.strftime('%d/%m/%Y') }}
                             </span>
                             {% elif quest.due_date %}
-                            <span
-                                style="color: #00bcd4; font-size: 0.8em; font-weight: normal; margin: 0; white-space: nowrap;">
-                                📅 Due: {{ quest.due_date.strftime('%d/%m/%Y %H:%M') if quest.due_date.hour != 0 else
+                            <span class="quest-date">
+                                {{ icon('calendar') }} Due: {{ quest.due_date.strftime('%d/%m/%Y %H:%M') if quest.due_date.hour != 0 else
                                 quest.due_date.strftime('%d/%m/%Y') }}
                             </span>
                             {% endif %}
                             {% if quest.description %}
-                            <button
-                                onclick="const d=document.getElementById('desc-{{quest.id}}'); d.style.display=d.style.display==='none'?'block':'none'; this.innerText=d.style.display==='none'?'SHOW MORE':'SHOW LESS';"
-                                style="background:transparent; border:1px solid #555; border-radius:3px; color:#aaa; padding:2px 6px; font-size:0.7em; cursor:pointer; margin: 0; min-width: fit-content;">SHOW
+                            <button class="btn-desc-toggle"
+                                onclick="const d=document.getElementById('desc-{{quest.id}}'); d.style.display=d.style.display==='none'?'block':'none'; this.innerText=d.style.display==='none'?'SHOW MORE':'SHOW LESS';">SHOW
                                 MORE</button>
                             {% endif %}
                         </div>
                         {% if quest.progress > 0 %}
-                        <div class="quest-progress-wrapper u-flex u-align-center u-gap-10 u-mt-15" style="width: 100%;">
+                        <div class="quest-progress-wrapper u-flex u-align-center u-gap-10 u-mt-15 full-width">
                             <div class="quest-progress-container">
                                 <div class="quest-progress-fill" data-width="{{ quest.progress }}"></div>
                             </div>
@@ -947,17 +447,17 @@
                         </div>
                         {% endif %}
                     </div>
-                    <div class="u-flex u-gap-10 u-align-center" style="white-space: nowrap; flex-shrink: 0;">
-                        {% if not quest.is_completed %}<a href="{{ url_for('main.architect_breakdown', quest_id=quest.id) }}" class="u-color-purple u-text-decoration-none" title="Architect Breakdown">⚡</a>{% endif %}
-                        <a href="/edit_quest/{{ quest.id }}" class="u-color-muted u-text-decoration-none">✎</a>
-                        <a href="/delete_quest/{{ quest.id }}" class="u-color-danger u-text-decoration-none">✖</a>
-                        {% if not quest.is_completed %}<a href="/complete/{{ quest.id }}" class="btn-complete">✓</a>{%
+                    <div class="quest-actions">
+                        {% if not quest.is_completed %}<a href="{{ url_for('main.architect_breakdown', quest_id=quest.id) }}" class="quest-action quest-action-ai" title="Break down with the Architect" aria-label="Break down {{ quest.title }}">{{ icon('zap') }}</a>{% endif %}
+                        <a href="{{ url_for('main.edit_quest', id=quest.id) }}" class="quest-action" title="Edit" aria-label="Edit {{ quest.title }}">{{ icon('pencil') }}</a>
+                        <a href="{{ url_for('main.delete_quest', id=quest.id) }}" class="quest-action quest-action-danger" title="Abandon" aria-label="Abandon {{ quest.title }}">{{ icon('x') }}</a>
+                        {% if not quest.is_completed %}<a href="{{ url_for('main.complete_quest', id=quest.id) }}" class="quest-action quest-action-complete" title="Complete" aria-label="Complete {{ quest.title }}">{{ icon('check') }}</a>{%
                         endif %}
                     </div>
                 </div>
                 {% if quest.description %}
-                <div id="desc-{{quest.id}}"
-                    style="display:none; margin-top:10px; padding:10px 15px; background:rgba(0,0,0,0.5); border-left:2px solid var(--color-primary); border-radius:0 4px 4px 0; color:#ddd; font-size:0.9em; white-space:pre-wrap; text-align: left; width: 100%; box-sizing: border-box; line-height: 1.4;">
+                <div class="quest-description" id="desc-{{quest.id}}"
+                    style="display: none;">
                     {{- quest.description.strip() }}</div>
                 {% endif %}
             </div>
@@ -969,9 +469,8 @@
 </div>
 
 <!-- MODALS -->
-<div id="systemModal" class="modal-overlay">
-    <!-- POINTS ALLOCATION LOGIC -->
-    <script>
+<!-- POINTS ALLOCATION LOGIC -->
+<script>
         const csrfToken = "{{ csrf_token() }}";
         let currentPoints = {{ player.attribute_points }};
         let allocated = {
@@ -1049,22 +548,14 @@
                         if (window.audioManager) window.audioManager.play('quest_complete');
                         setTimeout(() => location.reload(), 500); // Allow sound to play before reload
                     } else {
-                        alert(data.msg);
+                        SystemUI.toast(data.msg, 'error');
                     }
                 });
         }
-    </script>
-
-    <div class="panel modal-content system-alert">
-        <h2 class="u-color-primary u-mb-10">SYSTEM NOTIFICATION</h2>
-        <div id="systemModalText" class="u-mb-20 u-color-white"></div>
-        <button onclick="document.getElementById('systemModal').style.display='none'"
-            class="btn-complete u-width-100">ACKNOWLEDGE</button>
-    </div>
-</div>
+</script>
 
 <div id="statAllocationModal" class="modal-overlay">
-    <div class="panel modal-content" style="max-width:500px;">
+    <div class="panel modal-content modal-narrow">
         <h2 class="u-mb-20 u-text-center">CONFIRM ALLOCATION</h2>
         <p class="u-mb-20 u-text-center">Confirm stat allocation? This cannot be undone.</p>
         <div class="u-flex u-gap-10 u-mt-20">
@@ -1075,24 +566,15 @@
     </div>
 </div>
 
-<div id="warningModal" class="modal-overlay">
-    <div class="panel modal-content warning-alert">
-        <h2 class="u-color-danger u-mb-10">WARNING</h2>
-        <p id="warningText" class="u-mb-20"></p>
-        <button onclick="document.getElementById('warningModal').style.display='none'"
-            class="btn-complete u-width-100">CLOSE</button>
-    </div>
-</div>
 
 <div id="sleepModal" class="modal-overlay">
-    <div class="panel modal-content" style="max-width:500px;">
+    <div class="panel modal-content modal-narrow">
         <h2 class="u-mb-20 u-text-center">LOG SLEEP</h2>
         <form action="/track_sleep" method="POST">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="range" name="hours" min="0" max="12" step="0.5" value="7"
-                oninput="this.nextElementSibling.innerText = this.value + 'h'"
-                style="width:100%; accent-color:var(--color-primary);">
-            <div class="u-text-center u-font-bold u-mt-10" style="font-size:1.5rem;">7h</div>
+            <input class="sleep-slider" type="range" name="hours" min="0" max="12" step="0.5" value="7"
+                oninput="this.nextElementSibling.innerText = this.value + 'h'">
+            <div class="u-text-center u-font-bold u-mt-10 sleep-value">7h</div>
             <div class="u-flex u-gap-10 u-mt-20">
                 <button type="button" class="btn-cancel"
                     onclick="document.getElementById('sleepModal').style.display='none'">CANCEL</button>
@@ -1103,21 +585,33 @@
 </div>
 
 <div id="shadowArmyModal" class="modal-overlay" onclick="if(event.target===this)this.style.display='none'">
-    <div class="panel modal-content" style="max-width:600px; width:90%;">
+    <div class="panel modal-content modal-army">
         <div class="u-flex u-justify-between u-align-center u-mb-20 u-border-bottom-primary-dim u-padding-bottom-10px">
-            <h2 style="color:#9d4edd; margin:0;">SHADOW ARMY</h2>
-            <span onclick="document.getElementById('shadowArmyModal').style.display='none'"
-                style="cursor:pointer; color:#888; font-size:1.5em;">&times;</span>
+            <h2 class="army-title">SHADOW ARMY</h2>
+            <span class="modal-close-x" onclick="document.getElementById('shadowArmyModal').style.display='none'">&times;</span>
         </div>
 
+        {% if arise_candidates %}
+        <div class="u-mb-20">
+            <h3 class="u-font-small u-mb-10 army-subheading">AWAITING EXTRACTION</h3>
+            {% for q in arise_candidates %}
+            <form action="{{ url_for('main.arise_route', quest_id=q.id) }}" method="POST"
+                class="u-flex u-justify-between u-align-center u-gap-10 u-mb-10 arise-candidate">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <span>{{ q.title }}</span>
+                <button type="submit" class="btn-small btn-arise-small">ARISE</button>
+            </form>
+            {% endfor %}
+        </div>
+        {% endif %}
+
         {% if not player.shadows %}
-        <p class="u-text-center u-color-muted u-padding-20">No shadows extracted yet.</p>
+        <p class="u-text-center u-color-muted u-padding-20">No shadows extracted yet. Clear an S-Rank quest to extract one.</p>
         {% else %}
-        <div
-            style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:15px; max-height:60vh; overflow-y:auto;">
+        <div class="shadow-grid">
             {% for shadow in player.shadows %}
             <div class="shadow-item">
-                <div class="shadow-icon">👻</div>
+                <div class="shadow-icon">{{ icon('ghost') }}</div>
                 <div class="shadow-name">{{ shadow.original_quest_name }}</div>
                 <div class="shadow-rank">RANK {{ shadow.rank }}</div>
                 <div class="shadow-bonus">{{ shadow.buff_type.replace('_', ' ') }} +{{ shadow.buff_value }}%</div>
@@ -1135,13 +629,32 @@
 </div>
 
 
+{% if arise_quest %}
+<div id="ariseModal" class="modal-overlay">
+    <div class="panel modal-content u-text-center arise-panel">
+        <h2 class="arise-title">EXTRACTION AVAILABLE</h2>
+        <p class="u-color-muted u-mb-10">A shadow lingers over your conquest:</p>
+        <p class="u-font-bold u-mb-20 arise-quest-name">{{ arise_quest.title }}</p>
+        <p class="u-font-small u-color-muted u-mb-20">Each shadow grants a permanent +1% to all stats.</p>
+        <form action="{{ url_for('main.arise_route', quest_id=arise_quest.id) }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn-complete u-width-100 u-mb-10 btn-arise">ARISE</button>
+        </form>
+        <button type="button" class="btn-cancel u-width-100"
+            onclick="SystemUI.closeModal('ariseModal')">LATER</button>
+    </div>
+</div>
+<script>
+    // Queued after the level-up overlay and system popup for this page load
+    window.addEventListener('load', () => SystemUI.enqueueModal('ariseModal'));
+</script>
+{% endif %}
+
 <div id="vacationModal" class="modal-overlay">
-    <div class="panel modal-content"
-        style="max-width:450px; background: rgba(0,20,30,0.95); border: 1px solid #00bcd4;">
+    <div class="panel modal-content vacation-panel">
         <div class="u-text-center u-mb-20">
-            <h2 class="u-color-cyan" style="letter-spacing: 2px;">VACATION PROTOCOL</h2>
-            <div
-                style="height: 2px; background: linear-gradient(90deg, transparent, #00bcd4, transparent); margin: 10px auto; width: 80%;">
+            <h2 class="u-color-cyan vacation-title">VACATION PROTOCOL</h2>
+            <div class="vacation-divider">
             </div>
             <p class="u-font-small u-color-muted">System Freeze Authorization</p>
         </div>
@@ -1149,15 +662,14 @@
         <form action="{{ url_for('main.start_vacation_route') }}" method="POST" id="vacationForm">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-            <div class="u-mb-30"
-                style="background: rgba(0,0,0,0.3); padding: 20px; border-radius: 8px; border: 1px solid #333;">
+            <div class="u-mb-30 vacation-box">
                 <div class="u-flex u-justify-between u-align-center u-mb-10">
                     <span class="u-color-white u-font-bold">DURATION</span>
                     <span id="dayDisplay" class="u-color-cyan u-font-size-2rem u-font-bold">7</span>
                 </div>
 
-                <input type="range" name="days" id="vacationDays" min="1" max="30" value="7"
-                    style="width: 100%; accent-color: #00bcd4; cursor: pointer;"
+                <input class="vacation-slider" type="range" name="days" id="vacationDays" min="1" max="30" value="7"
+
                     oninput="document.getElementById('dayDisplay').innerText = this.value + ' DAYS'">
 
                 <div class="u-flex u-justify-between u-mt-5 u-font-small u-color-muted">
@@ -1166,8 +678,7 @@
                 </div>
             </div>
 
-            <div class="u-mb-20"
-                style="font-size: 0.9em; line-height: 1.4; color: #aaa; border-left: 2px solid #00bcd4; padding-left: 10px;">
+            <div class="u-mb-20 vacation-note">
                 <strong class="u-color-white">Warning:</strong>
                 System pause will prevent daily stat decay, but streak bonuses may be reset if duration exceeds 7 days.
             </div>
@@ -1175,8 +686,7 @@
             <div class="u-flex u-gap-10">
                 <button type="button" class="btn-cancel"
                     onclick="document.getElementById('vacationModal').style.display='none'">CANCEL</button>
-                <button type="submit" class="btn-complete u-width-100"
-                    style="background: linear-gradient(45deg, #00bcd4, #008ba3); border: none; color: white; text-shadow: 0 1px 2px black;">INITIATE
+                <button type="submit" class="btn-complete u-width-100 btn-vacation-start">INITIATE
                     FREEZE</button>
             </div>
         </form>
@@ -1190,38 +700,8 @@
 
 
     document.addEventListener("DOMContentLoaded", function () {
-        // Flash Messages
-        const errorFlashes = document.querySelectorAll('.flash-msg.error_modal');
-        if (errorFlashes.length > 0) {
-            document.getElementById('warningText').innerText = errorFlashes[0].innerText;
-            document.getElementById('warningModal').style.display = 'flex';
-        }
-
-        const popupsEnabled = (typeof window.popupsEnabled !== 'undefined') ? window.popupsEnabled : {{ 'true' if (current_user.settings_popups if current_user.is_authenticated and current_user.settings_popups is not none else True) else 'false' }};
-
-        if (popupsEnabled) {
-            const systemFlashes = document.querySelectorAll('.flash-msg.system_popup');
-            const completionFlashes = document.querySelectorAll('.flash-msg.quest_complete');
-            if (systemFlashes.length > 0 || completionFlashes.length > 0) {
-                let html = "";
-                [...systemFlashes, ...completionFlashes].forEach(f => {
-                    html += `<p class="u-mb-10">${f.innerText}</p>`;
-                });
-                document.getElementById('systemModalText').innerHTML = html;
-                document.getElementById('systemModal').style.display = 'flex';
-                if (window.audioManager) window.audioManager.play('notification');
-            }
-        }
-
-        const lvlFlashes = document.querySelectorAll('.flash-msg.levelup');
-        if (lvlFlashes.length > 0) {
-            document.getElementById('levelUpOverlay').style.display = 'flex';
-            if (window.audioManager) window.audioManager.play('level_up');
-            setTimeout(() => { document.getElementById('levelUpOverlay').style.display = 'none'; }, 4000);
-        }
-
         // Progress Bars
-        document.querySelectorAll('.js-fill, .js-prog-fill, .quest-progress-fill').forEach(el => {
+        document.querySelectorAll('.js-fill, .js-prog-fill, .quest-progress-fill, .daily-progress-fill, .duel-bar-me, .balance-fill').forEach(el => {
             const w = el.getAttribute('data-width');
             if (w) el.style.width = w + '%';
         });

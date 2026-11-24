@@ -1,0 +1,77 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/social.css') }}">
+
+<div class="social-page">
+    <header class="social-header">
+        <p class="social-system">[ RAID BOARD ]</p>
+        <h1 class="social-title">RAIDS</h1>
+        <p class="social-lead">Shared goals everyone chips in to. Clear the target before the deadline and every
+            contributor earns <strong>+{{ reward_xp }} XP</strong> and <strong>+{{ reward_coins }} Coins</strong>.</p>
+    </header>
+
+    <section class="raid-list">
+        <h2 class="social-h2">ACTIVE ({{ active | length }}/{{ max_active }})</h2>
+        {% for raid in active %}
+        <a class="raid-card" href="{{ url_for('main.raid_detail', raid_id=raid.id) }}">
+            <div class="raid-card-top">
+                <span class="raid-name">{{ icon('swords') }} {{ raid.title }}</span>
+                <span class="raid-ends" data-ends="{{ raid.ends_at | utc_iso }}"></span>
+            </div>
+            <div class="raid-bar"><div class="raid-fill" style="width: {{ raid.percent }}%;"></div></div>
+            <div class="raid-card-bottom">
+                <span>{{ '%g' | format(raid.total) }} / {{ '%g' | format(raid.target) }} {{ raid.unit }}</span>
+                <span>{{ raid.contributions | map(attribute='player_id') | unique | list | length }} hunter(s)</span>
+            </div>
+        </a>
+        {% else %}
+        <p class="social-empty">No active raids. Start one below.</p>
+        {% endfor %}
+    </section>
+
+    {% if active | length < max_active %}
+    <section class="raid-new">
+        <h2 class="social-h2">START A RAID</h2>
+        <form action="{{ url_for('main.create_raid_route') }}" method="POST" class="raid-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label>Goal <input type="text" name="title" maxlength="80" placeholder="Run 100 km together" required></label>
+            <div class="raid-form-row">
+                <label>Target <input type="number" name="target" min="0" step="any" placeholder="100" required></label>
+                <label>Unit <input type="text" name="unit" maxlength="20" placeholder="km" required></label>
+            </div>
+            <div class="raid-form-row">
+                <label>Days <input type="number" name="days" min="1" max="{{ max_days }}" value="30" required></label>
+                <label>Area
+                    <select name="stat">
+                        <option value="STR">STR · Strength</option>
+                        <option value="INT">INT · Intelligence</option>
+                        <option value="AGI">AGI · Agility</option>
+                        <option value="VIT">VIT · Vitality</option>
+                        <option value="SNS">SNS · Sense</option>
+                    </select>
+                </label>
+            </div>
+            <button type="submit" class="btn-complete">START RAID</button>
+        </form>
+    </section>
+    {% endif %}
+
+    {% if past %}
+    <section class="raid-list">
+        <h2 class="social-h2">HISTORY</h2>
+        {% for raid in past %}
+        <a class="raid-card raid-{{ raid.status }}" href="{{ url_for('main.raid_detail', raid_id=raid.id) }}">
+            <div class="raid-card-top">
+                <span class="raid-name">{{ icon({'completed': 'trophy', 'failed': 'skull', 'cancelled': 'x'}[raid.status]) }} {{ raid.title }}</span>
+                <span class="raid-status">{{ raid.status | upper }}</span>
+            </div>
+            <div class="raid-card-bottom">
+                <span>{{ '%g' | format(raid.total) }} / {{ '%g' | format(raid.target) }} {{ raid.unit }}</span>
+            </div>
+        </a>
+        {% endfor %}
+    </section>
+    {% endif %}
+</div>
+{% endblock %}

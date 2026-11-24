@@ -1,0 +1,42 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/job_trial.css') }}">
+
+<div class="reveal" style="--class-color: {{ profile.color }};">
+    <p class="reveal-system">[ SYSTEM MESSAGE ]</p>
+    <p class="reveal-kicker">JOB CHANGE COMPLETE</p>
+
+    <div class="reveal-sigil">{{ icon(profile.sigil) }}</div>
+    <h1 class="reveal-class">{{ job_class | upper }}</h1>
+    <p class="reveal-tagline">"{{ profile.tagline }}"</p>
+    <p class="reveal-description">{{ profile.description }}</p>
+
+    <div class="reveal-bonus">
+        <span class="reveal-label">CLASS BONUS</span>
+        <span>{{ profile.bonus }}</span>
+    </div>
+
+    <div class="reveal-path">
+        <span class="reveal-label">EVOLUTION PATH</span>
+        <ol>
+            <li class="current">{{ job_class }} <small>Lv 10</small></li>
+            {% for name, level in evolution_path %}
+            <li>{{ name }} <small>Lv {{ level }}</small></li>
+            {% endfor %}
+        </ol>
+    </div>
+
+    <a href="{{ url_for('main.dashboard') }}" class="trial-begin reveal-continue">ARISE, {{ job_class | upper }}</a>
+</div>
+
+<script>
+    window.addEventListener('load', () => {
+        if (window.audioManager) window.audioManager.play('arise');
+        if (window.confetti) {
+            const color = getComputedStyle(document.querySelector('.reveal')).getPropertyValue('--class-color').trim();
+            window.confetti({ particleCount: 160, spread: 110, origin: { y: 0.45 }, colors: [color, '#ffffff', '#00eaff'] });
+        }
+    });
+</script>
+{% endblock %}

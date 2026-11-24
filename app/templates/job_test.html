@@ -1,0 +1,113 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/job_trial.css') }}">
+
+{#
+  Progressive enhancement: without JS every trial is visible and the form submits normally.
+  With JS (class "trial-js" on the container) it becomes an intro -> one trial at a time -> judgement sequence.
+  Options are shuffled server-side and never name a class; the scoring lives in app/job_trial.py.
+#}
+<div class="trial" id="trial">
+    <form action="{{ url_for('main.job_test') }}" method="POST" id="trialForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <section class="trial-screen trial-intro" data-screen="intro">
+            <div class="trial-glyph" aria-hidden="true">⟁</div>
+            <p class="trial-system">[ SYSTEM MESSAGE ]</p>
+            <h1 class="trial-heading">JOB CHANGE QUEST</h1>
+            <p class="trial-lead">You have reached the threshold. The System will now observe how you act when it matters.</p>
+            <p class="trial-lead trial-dim">There are no right answers. There is only what you would do.</p>
+            <button type="button" class="trial-begin" data-action="begin">ENTER THE TRIAL</button>
+            <a href="{{ url_for('main.dashboard') }}" class="trial-later">Not yet</a>
+        </section>
+
+        {% for q in questions %}
+        <fieldset class="trial-screen trial-question" data-screen="q" data-index="{{ loop.index0 }}">
+            <div class="trial-progress" aria-hidden="true">
+                {% for _ in questions %}<span class="trial-pip"></span>{% endfor %}
+            </div>
+            <legend class="trial-title">{{ q.title }}</legend>
+            <p class="trial-prompt">{{ q.prompt }}</p>
+            <div class="trial-options">
+                {% for opt in q.options %}
+                <label class="trial-option">
+                    <input type="radio" name="{{ q.id }}" value="{{ opt.id }}" required>
+                    <span class="trial-option-mark" aria-hidden="true"></span>
+                    <span class="trial-option-text">{{ opt.text }}</span>
+                </label>
+                {% endfor %}
+            </div>
+        </fieldset>
+        {% endfor %}
+
+        <section class="trial-screen trial-judging" data-screen="judging" aria-live="assertive">
+            <div class="trial-scanner" aria-hidden="true"></div>
+            <p class="trial-judging-line" data-line="0">ANALYZING COMBAT INSTINCTS...</p>
+            <p class="trial-judging-line" data-line="1">CROSS-REFERENCING SOUL RESONANCE...</p>
+            <p class="trial-judging-line" data-line="2">THE SYSTEM HAS REACHED A VERDICT.</p>
+        </section>
+
+        <div class="trial-nojs-submit">
+            <button type="submit" class="trial-begin">SUBMIT TO THE SYSTEM</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    (function () {
+        const root = document.getElementById('trial');
+        const form = document.getElementById('trialForm');
+        const questions = [...root.querySelectorAll('[data-screen="q"]')];
+        const total = questions.length;
+        root.classList.add('trial-js');
+
+        const show = el => {
+            root.querySelectorAll('.trial-screen.active').forEach(s => s.classList.remove('active'));
+            el.classList.add('active');
+            // Focus the panel itself (not an answer, which would look pre-selected) and bring it into view
+            el.setAttribute('tabindex', '-1');
+            el.focus({ preventScroll: true });
+            const top = root.getBoundingClientRect().top + window.scrollY - 110;  // below the sticky nav
+            window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+        };
+
+        // Progress pips reflect the current trial
+        questions.forEach((q, i) => {
+            q.querySelectorAll('.trial-pip').forEach((pip, j) => {
+                pip.classList.toggle('done', j < i);
+                pip.classList.toggle('current', j === i);
+            });
+        });
+
+        root.querySelector('[data-action="begin"]').addEventListener('click', () => {
+            if (window.audioManager) window.audioManager.play('notification');
+            show(questions[0]);
+        });
+
+        questions.forEach((q, i) => {
+            q.addEventListener('change', e => {
+                if (e.target.type !== 'radio') return;
+                const label = e.target.closest('.trial-option');
+                q.querySelectorAll('.trial-option').forEach(o => o.classList.toggle('chosen', o === label));
+                q.classList.add('locked');  // brief "the System records your answer" beat
+                setTimeout(() => {
+                    q.classList.remove('locked');
+                    if (i + 1 < total) show(questions[i + 1]);
+                    else judge();
+                }, 650);
+            });
+        });
+
+        function judge() {
+            const screen = root.querySelector('[data-screen="judging"]');
+            show(screen);
+            const lines = [...screen.querySelectorAll('.trial-judging-line')];
+            lines.forEach((line, i) => setTimeout(() => line.classList.add('visible'), 300 + i * 900));
+            setTimeout(() => form.submit(), 300 + lines.length * 900 + 400);
+        }
+
+        show(root.querySelector('[data-screen="intro"]'));
+    })();
+</script>
+{% endblock %}

@@ -22,7 +22,17 @@ if database_url:
         if database_url.endswith('?'): database_url = database_url[:-1]
 
 
+_secret_key = os.environ.get('SECRET_KEY')
+if not _secret_key:
+    # Never fall back to a key committed to the repo. A random key keeps the app
+    # running locally, but sessions are invalidated on every restart and are not
+    # shared between gunicorn workers — always set SECRET_KEY in production.
+    import secrets
+    _secret_key = secrets.token_hex(32)
+    print(">> WARNING: SECRET_KEY not set. Using a random per-process key; sessions will not persist.")
+
+
 class Config:
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'system_access_key_123'
+    SECRET_KEY = _secret_key
     SQLALCHEMY_DATABASE_URI = database_url or 'sqlite:///system.db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False

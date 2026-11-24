@@ -2,74 +2,148 @@
 
 {% block content %}
 <div class="dashboard-grid">
-    <div class="panel" style="grid-column: 1 / -1;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h2 style="margin: 0;">HUNTER LEADERBOARD</h2>
-            <a href="{{ url_for('main.dashboard') }}" class="btn-small">BACK TO DASHBOARD</a>
+    <div class="panel lb-panel">
+        <div class="lb-div">
+            <h2 class="lb-h2-hunter-leaderboard">HUNTER LEADERBOARD</h2>
+            <span class="lb-countdown" data-ends="{{ week_ends | utc_iso }}"></span>
         </div>
 
-        <div style="overflow-x: auto; width: 100%; padding-bottom: 10px;">
-            <table style="width: 100%; border-collapse: collapse; color: #eee; min-width: 900px;">
+        <nav class="lb-tabs" aria-label="Leaderboard view">
+            <a href="{{ url_for('main.leaderboard') }}" class="lb-tab{{ ' active' if view == 'week' }}"
+                {% if view == 'week' %}aria-current="page"{% endif %}>THIS WEEK</a>
+            <a href="{{ url_for('main.leaderboard', view='all') }}" class="lb-tab{{ ' active' if view == 'all' }}"
+                {% if view == 'all' %}aria-current="page"{% endif %}>ALL TIME</a>
+        </nav>
+
+        {% if view == 'week' %}
+        {% if last_champion %}
+        <div class="lb-champion">{{ icon('crown') }} Last week's champion: <strong>{{ last_champion.player.name }}</strong>
+            ({{ '%.0f' | format(last_champion.points) }} pts)</div>
+        {% endif %}
+        <p class="lb-explainer">League points = base XP earned this week ÷ 10 (before personal bonuses), so the same
+            effort scores the same at every level. S-Rank = 100 pts. Resets Monday 01:00.</p>
+
+        <div class="lb-div-2">
+            <table class="lb-table">
                 <thead>
-                    <tr style="border-bottom: 2px solid var(--color-primary);">
-                        <th style="text-align: left; padding: 10px;">RANK</th>
-                        <th style="text-align: left; padding: 10px;">NAME</th>
-                        <th style="text-align: left; padding: 10px;">TITLE</th>
-                        <th style="text-align: right; padding: 10px;">LEVEL</th>
-                        <th style="text-align: left; padding: 10px;">CLASS</th>
-                        <th style="text-align: center; padding: 10px;">STREAK</th>
-                        <th style="text-align: center; padding: 10px;">BEST</th>
-                        <th style="text-align: center; padding: 10px;">FAILS</th>
-                        <th style="text-align: center; padding: 10px;">AWAY</th>
-                        <th style="text-align: right; padding: 10px;">JOINED</th>
+                    <tr class="lb-tr">
+                        <th class="lb-th-rank">#</th>
+                        <th class="lb-th-rank">HUNTER</th>
+                        <th class="lb-th-level">POINTS</th>
+                        <th class="lb-th-streak">DAILIES</th>
+                        <th class="lb-th-streak">FOCUS</th>
+                        <th class="lb-th-streak">RIVAL</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for player in leaderboard %}
-                    <tr style="border-bottom: 1px solid #333;">
-                        <td style="padding: 15px; width: 50px; font-weight: bold; color: var(--color-accent);">#{{
-                            loop.index }}</td>
-                        <td style="padding: 15px; white-space: nowrap;">
-                            <a href="{{ url_for('main.public_profile', player_id=player.id) }}"
-                                style="color: white; text-decoration: none; font-weight: bold; transition: color 0.2s;">
-                                {{ player.name }}
-                            </a>
-                            <!-- Add 'YOU' marker -->
-                            {% if player.id == current_user.id %}
-                            <span
-                                style="margin-left: 10px; font-size: 0.8em; color: var(--color-primary); border: 1px solid var(--color-primary); padding: 2px 5px; border-radius: 4px;">YOU</span>
+                    {% for row in weekly %}
+                    {% set p = row.player %}
+                    <tr class="lb-tr-2{{ ' lb-row-me' if p.id == current_user.id }}{{ ' lb-row-rival' if p.id == rival_id }}">
+                        <td class="lb-td">{{ icon('crown', 'icon-gold icon-glow', label='Leader') if row.position == 1 and row.points > 0 else '#' ~ row.position }}</td>
+                        <td class="lb-td-2">
+                            <a class="lb-a" href="{{ url_for('main.public_profile', player_id=p.id) }}">{{ p.name }}</a>
+                            {% if p.hardcore %}<span class="hardcore-tag" title="Hardcore mode">{{ icon('skull', label='Hardcore') }}</span>{% endif %}
+                            {% if p.id == current_user.id %}<span class="lb-span-you">YOU</span>{% endif %}
+                            {% if p.id == rival_id %}<span class="lb-rival-tag">RIVAL</span>{% endif %}
+                        </td>
+                        <td class="lb-td-lvl">{{ '%.0f' | format(row.points) }}</td>
+                        <td class="lb-td-5">{{ row.daily_rate }}%</td>
+                        <td class="lb-td-6">{{ row.focus_hours }}h</td>
+                        <td class="lb-td-7">
+                            {% if p.id == current_user.id %}
+                            -
+                            {% elif p.id == rival_id %}
+                            <form action="{{ url_for('main.clear_rival_route') }}" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="lb-rival-btn lb-rival-btn-clear">DROP</button>
+                            </form>
+                            {% else %}
+                            <form action="{{ url_for('main.set_rival_route', player_id=p.id) }}" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="lb-rival-btn">CHALLENGE</button>
+                            </form>
                             {% endif %}
-                        </td>
-                        <td style="padding: 15px; color: #aaa; white-space: nowrap;">
-                            {{ player.title_display or 'None' }}
-                        </td>
-                        <td
-                            style="padding: 15px; text-align: right; font-family: 'Courier New', monospace; font-size: 1.2em; color: var(--color-gold); white-space: nowrap;">
-                            LVL {{ player.level }}
-                        </td>
-                        <td style="padding: 15px; color: #b19cd9; white-space: nowrap;">
-                            {{ player.job_class if player.job_class != 'None' else '-' }}
-                        </td>
-                        <td style="padding: 15px; color: #4CAF50; font-weight: bold; text-align: center;">
-                            {{ player.current_streak }} 🔥
-                        </td>
-                        <td style="padding: 15px; color: #FFD700; font-weight: bold; text-align: center;">
-                            {{ player.highest_streak }} 🏆
-                        </td>
-                        <td style="padding: 15px; color: red; font-weight: bold; text-align: center;">
-                            {{ player.penalties_count }}
-                        </td>
-                        <td style="padding: 15px; color: cyan; font-weight: bold; text-align: center;">
-                            {{ player.vacation_count }}
-                        </td>
-                        <td style="padding: 15px; color: #aaa; text-align: right; font-size: 0.9em; white-space: nowrap;">
-                            {{ player.created_at.strftime('%d/%m/%Y') if player.created_at else '-' }}
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
+        {% else %}
+        <div class="lb-div-2">
+            <table class="lb-table">
+                <thead>
+                    <tr class="lb-tr">
+                        <th class="lb-th-rank">RANK</th>
+                        <th class="lb-th-rank">NAME</th>
+                        <th class="lb-th-rank">TITLE</th>
+                        <th class="lb-th-level">LEVEL</th>
+                        <th class="lb-th-rank">CLASS</th>
+                        <th class="lb-th-streak">STREAK</th>
+                        <th class="lb-th-streak">BEST</th>
+                        <th class="lb-th-streak">FAILS</th>
+                        <th class="lb-th-streak">AWAY</th>
+                        <th class="lb-th-level">JOINED</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for player in leaderboard %}
+                    <tr class="lb-tr-2{{ ' lb-row-me' if player.id == current_user.id }}">
+                        <td class="lb-td">#{{ loop.index }}</td>
+                        <td class="lb-td-2">
+                            <a class="lb-a" href="{{ url_for('main.public_profile', player_id=player.id) }}">
+                                {{ player.name }}
+                            </a>
+                            {% if player.hardcore %}<span class="hardcore-tag" title="Hardcore mode">{{ icon('skull', label='Hardcore') }}</span>{% endif %}
+                            {% if player.id == current_user.id %}
+                            <span class="lb-span-you">YOU</span>
+                            {% endif %}
+                        </td>
+                        <td class="lb-td-3">{{ player.title_display or 'None' }}</td>
+                        <td class="lb-td-lvl">LVL {{ player.level }}</td>
+                        <td class="lb-td-4">{{ player.job_class if player.job_class != 'None' else '-' }}</td>
+                        <td class="lb-td-5">{{ player.current_streak }} {{ icon('flame', 'icon-fire') }}</td>
+                        <td class="lb-td-6">{{ player.highest_streak }} {{ icon('trophy', 'icon-gold') }}</td>
+                        <td class="lb-td-7">{{ player.penalties_count }}</td>
+                        <td class="lb-td-8">{{ player.vacation_count }}</td>
+                        <td class="lb-td-9">{{ player.created_at.strftime('%d/%m/%Y') if player.created_at else '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <section class="feats" id="feats">
+            <h3 class="feats-title">{{ icon('landmark') }} HALL OF FEATS <small>S-rank clears, last 30 days</small></h3>
+            {% for f in feats %}
+            <div class="feat">
+                <div class="feat-main">
+                    <span class="feat-who">{{ f.player.name }}{% if f.player.hardcore %} {{ icon('skull', 'icon-danger', label='Hardcore') }}{% endif %}</span>
+                    <span class="feat-what">cleared <strong>{{ f.title }}</strong></span>
+                    <span class="feat-when">{{ f.when | game_time('%d %b') }}</span>
+                </div>
+                <div class="feat-kudos">
+                    {% for e in kudos_emoji %}
+                    {% set n = f.counts.get(e, 0) %}
+                    {% set mine = f.givers.get(current_user.id) == e %}
+                    {% if f.player.id == current_user.id %}
+                    {% if n %}<span class="kudos-count">{{ e }} {{ n }}</span>{% endif %}
+                    {% else %}
+                    <form action="{{ url_for('main.give_kudos_route', event_id=f.event.id) }}" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="emoji" value="{{ e }}">
+                        <button type="submit" class="kudos-btn{{ ' mine' if mine }}" aria-pressed="{{ 'true' if mine else 'false' }}"
+                            aria-label="React {{ e }}">{{ e }}{% if n %} {{ n }}{% endif %}</button>
+                    </form>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <p class="lb-explainer">No S-rank clears in the last 30 days. Be the first legend.</p>
+            {% endfor %}
+        </section>
     </div>
 </div>
 {% endblock %}

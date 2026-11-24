@@ -7,6 +7,14 @@ class TestConfig(Config):
     TESTING = True
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:' # Use in-memory DB for tests
     WTF_CSRF_ENABLED = True # Enable CSRF to replicate production environment
+    PASSWORD_HASH_METHOD = 'pbkdf2:sha256:1000'  # fast hashing for tests only (production uses scrypt)
+
+@pytest.fixture(autouse=True)
+def _no_external_services(monkeypatch):
+    """Tests never call Gemini or Web Push, even if the developer's shell has real keys set."""
+    for var in ('GEMINI_API_KEY', 'VAPID_PRIVATE_KEY', 'VAPID_PUBLIC_KEY'):
+        monkeypatch.delenv(var, raising=False)
+
 
 @pytest.fixture
 def app():

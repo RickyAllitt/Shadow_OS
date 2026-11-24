@@ -1,59 +1,52 @@
 <!-- Shop History Modal -->
-<div id="shopHistoryModal" class="modal"
-    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; justify-content: center; align-items: center;">
-    <div class="modal-content system-panel" style="width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto;">
+<div id="shopHistoryModal" class="modal shist-shop-history-modal"
+    style="display: none;">
+    <div class="modal-content system-panel shist-modal-content">
 
-        <div
-            style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--color-primary); padding-bottom: 10px; margin-bottom: 20px;">
-            <h2 style="margin: 0; color: var(--color-primary);">WEEKLY EXPENSES</h2>
-            <span onclick="document.getElementById('shopHistoryModal').style.display='none'"
-                style="cursor: pointer; font-size: 1.5em; color: #888;">&times;</span>
+        <div class="shist-div">
+            <h2 class="shist-h2-weekly-expenses">WEEKLY EXPENSES</h2>
+            <span class="shist-span-times" onclick="document.getElementById('shopHistoryModal').style.display='none'">&times;</span>
         </div>
 
         {% if not purchase_history %}
-        <p style="text-align: center; color: #666; font-style: italic;">No purchases this week.</p>
+        <p class="shist-p-purchases-this">No purchases this week.</p>
         {% else %}
         {% set total_spent = namespace(value=0) %}
 
-        <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div class="shist-div-2">
             {% for purchase in purchase_history %}
             {% set total_spent.value = total_spent.value + purchase.cost %}
-            <div
-                style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 5px;">
+            <div class="shist-div-3">
                 <div>
-                    <span
-                        style="color: white; display: block; {% if purchase.is_claimed %}text-decoration: line-through; color: #888;{% endif %}">{{
+                    <span class="shist-item-name{{ ' shist-item-claimed' if purchase.is_claimed }}">{{
                         purchase.item_name }}</span>
-                    <span style="font-size: 0.8em; color: #666;">{{ purchase.purchased_at.strftime('%a %H:%M') }}</span>
+                    <span class="shist-span">{{ purchase.purchased_at.strftime('%a %H:%M') }}</span>
                 </div>
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span style="color: var(--color-gold); font-weight: bold;">-{{ purchase.cost }} G</span>
+                <div class="shist-div-4">
+                    <span class="shist-span-2">-{{ purchase.cost }} G</span>
                     {% if not purchase.is_claimed %}
-                    <form action="/claim_purchase/{{ purchase.id }}" method="POST" style="margin: 0;">
+                    <form class="shist-form" action="/claim_purchase/{{ purchase.id }}" method="POST">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button type="submit" class="btn-small"
-                            style="font-size: 0.7em; padding: 2px 5px; background: var(--color-primary); color: black;">CLAIM</button>
+                        <button type="submit" class="btn-small shist-button-claim">CLAIM</button>
                     </form>
                     {% else %}
-                    <span style="font-size: 0.7em; color: #444; border: 1px solid #444; padding: 2px 5px;">USED</span>
+                    <span class="shist-span-used">USED</span>
                     {% endif %}
                 </div>
             </div>
             {% endfor %}
         </div>
 
-        <div
-            style="margin-top: 20px; border-top: 2px solid #444; padding-top: 15px; display: flex; justify-content: space-between; font-size: 1.2em;">
+        <div class="shist-div-5">
             <span>TOTAL SPENT:</span>
-            <span style="color: var(--color-danger); font-weight: bold;">{{ total_spent.value }} G</span>
+            <span class="shist-span-3">{{ total_spent.value }} G</span>
         </div>
 
-        <div style="margin-top: 10px; font-size: 0.8em; color: #555; text-align: center;">
+        <div class="shist-div-resets-monday">
             resets Monday at 01:00
         </div>
         {% endif %}
 
-        <button onclick="document.getElementById('shopHistoryModal').style.display='none'" class="btn-complete"
-            style="width: 100%; margin-top: 20px;">CLOSE</button>
+        <button onclick="document.getElementById('shopHistoryModal').style.display='none'" class="btn-complete shist-button-close">CLOSE</button>
     </div>
 </div>

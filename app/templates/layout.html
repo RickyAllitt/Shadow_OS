@@ -3,63 +3,99 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SYSTEM INTERFACE</title>
+    <!-- Installable app (PWA) -->
+    <link rel="manifest" href="{{ url_for('main.web_manifest') }}">
+    <meta name="theme-color" content="#050505">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='icons/favicon-32.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Shadow OS">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') }}">
 
     <!-- VFX & Audio -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="{{ url_for('static', filename='js/audio_manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/system_ui.js') }}"></script>
 </head>
 
 <body
     class="{% if current_user.is_authenticated and current_user.has_debuff and request.endpoint == 'main.dashboard' %}glitch-theme{% endif %}">
 
+    {# Flash messages are data: SystemUI (static/js/system_ui.js) turns them into toasts / popups #}
     {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
-    <div class="flash-container">
-        {% set popups_on = (current_user.settings_popups if current_user.is_authenticated and current_user.settings_popups is not none else True) %}
+    <div id="flashData" hidden>
         {% for category, message in messages %}
-        {% if category == 'system_popup' and popups_on %}
-        <div class="flash-msg {{ category }}" style="display: none;">
-            {{ message }}
-        </div>
-        {% else %}
-        <div class="flash-msg {{ category }}">
-            {{ message }}
-        </div>
-        {% endif %}
+        <div class="flash-data" data-category="{{ category }}">{{ message }}</div>
         {% endfor %}
     </div>
     {% endif %}
     {% endwith %}
 
     {% if current_user.is_authenticated %}
-    <div class="top-nav-bar" style="position: fixed; top: 20px; right: 20px; z-index: 100; display: flex; gap: 10px;">
-        <!-- NOTIFICATIONS BELL -->
-        <button onclick="openNotificationInbox()"
-            style="position: relative; background: rgba(0,0,0,0.5); border: 1px solid #aaa; color: #ffeb3b; padding: 5px 10px; cursor: pointer; font-family: 'Courier New', monospace; font-weight: bold; margin-right: 5px;">
-            🔔 LOGS
-            <span id="unreadBadge"
-                style="display: none; position: absolute; top: -8px; right: -8px; background: red; color: white; border-radius: 50%; padding: 2px 6px; font-size: 0.7em;">0</span>
-        </button>
-
-        <button onclick="document.getElementById('guideModal').style.display='flex'"
-            style="background: rgba(0,0,0,0.5); border: 1px solid #aaa; color: cyan; padding: 5px 10px; cursor: pointer; font-family: 'Courier New', monospace; font-weight: bold; margin-right: 5px;">
-            GUIDE
-        </button>
-        <button onclick="document.getElementById('settingsModal').style.display='flex'"
-            style="background: rgba(0,0,0,0.5); border: 1px solid #aaa; color: #ddd; padding: 5px 10px; cursor: pointer; font-family: 'Courier New', monospace; font-weight: bold;">
-            SETTINGS
-        </button>
-        <a href="{{ url_for('auth.logout') }}"
-            style="display: block; background: rgba(0,0,0,0.5); color: var(--color-danger); text-decoration: none; border: 1px solid var(--color-danger); padding: 5px 10px; font-family: 'Courier New', monospace; font-weight: bold;">
-            LOGOUT
-        </a>
-    </div>
+    {% set nav_links = [
+        ('main.dashboard', 'Dashboard'),
+        ('main.focus_mode', 'Focus'),
+        ('main.calendar_view', 'Calendar'),
+        ('main.shop', 'Shop'),
+        ('main.inventory', 'Inventory'),
+        ('main.analytics', 'Analytics'),
+        ('main.history_log', 'History'),
+        ('main.leaderboard', 'Leaderboard'),
+        ('main.raids', 'Raids'),
+    ] %}
+    <header class="app-nav">
+        <div class="app-nav-top">
+            <a class="app-brand" href="{{ url_for('main.dashboard') }}">SHADOW<span>OS</span></a>
+            <div class="app-nav-actions">
+                <button type="button" class="app-nav-btn app-nav-alerts" onclick="openNotificationInbox()"
+                    aria-label="Notifications">
+                    {{ icon('bell') }}<span class="app-nav-label"> ALERTS</span>
+                    <span id="unreadBadge" class="app-nav-badge" style="display: none;">0</span>
+                </button>
+                <button type="button" class="app-nav-btn" onclick="SystemUI.openModal('guideModal')"
+                    aria-label="Guide"><span class="app-nav-icon">?</span><span class="app-nav-label">GUIDE</span></button>
+                <button type="button" class="app-nav-btn" onclick="SystemUI.openModal('settingsModal')"
+                    aria-label="Settings">{{ icon('settings') }}<span class="app-nav-label"> SETTINGS</span></button>
+                <a class="app-nav-btn app-nav-logout" href="{{ url_for('auth.logout') }}" aria-label="Log out"><span class="app-nav-icon">{{ icon('power') }}</span><span class="app-nav-label">LOGOUT</span></a>
+            </div>
+        </div>
+        <nav class="app-nav-links" aria-label="Main">
+            {% for endpoint, label in nav_links %}
+            <a href="{{ url_for(endpoint) }}" class="app-nav-link{{ ' active' if request.endpoint == endpoint }}"
+                {% if request.endpoint == endpoint %}aria-current="page"{% endif %}>{{ label }}</a>
+            {% endfor %}
+        </nav>
+    </header>
     {% endif %}
+
+    <!-- GLOBAL POPUPS (populated from flash messages on any page) -->
+    <div id="systemModal" class="modal-overlay">
+        <div class="panel modal-content system-alert">
+            <h2 id="systemModalTitle" class="u-color-primary u-mb-10">SYSTEM NOTIFICATION</h2>
+            <div id="systemModalText" class="u-mb-20 u-color-white"></div>
+            <button onclick="SystemUI.closeModal('systemModal')" class="btn-complete u-width-100">ACKNOWLEDGE</button>
+        </div>
+    </div>
+    <div id="levelUpOverlay" class="levelup-overlay" aria-label="Level up">
+        <div class="levelup-title">LEVEL UP!</div>
+        <div id="levelUpDetail" class="levelup-subtitle">SYSTEM LIMITS INCREASED</div>
+        <div class="levelup-hint">tap to continue</div>
+    </div>
+    <div id="warningModal" class="modal-overlay">
+        <div class="panel modal-content warning-alert">
+            <h2 class="u-color-danger u-mb-10">WARNING</h2>
+            <p id="warningText" class="u-mb-20"></p>
+            <button onclick="document.getElementById('warningModal').style.display='none'"
+                class="btn-complete u-width-100">CLOSE</button>
+        </div>
+    </div>
 
     <div
         class="system-container {% if current_user.is_authenticated and current_user.in_penalty_zone and request.endpoint == 'main.dashboard' %}penalty-mode{% endif %}">
@@ -69,57 +105,76 @@
 
     {% if current_user.is_authenticated %}
     <div id="settingsModal" class="modal-overlay">
-        <div class="panel modal-content" style="max-width:400px;">
+        <div class="panel modal-content modal-w400">
             <h2 class="u-color-white u-mb-20">SYSTEM SETTINGS</h2>
 
-            <div class="u-flex u-justify-between u-align-center u-mb-20 u-padding-10"
-                style="background:rgba(255,255,255,0.05);">
+            <div class="u-flex u-justify-between u-align-center u-mb-20 u-padding-10 settings-row">
                 <span>Sound Effects</span>
                 <input type="checkbox" id="settingAudio" {{ 'checked' if current_user.settings_audio else '' }}
                     onchange="updateSettings()">
             </div>
 
-            <div class="u-flex u-justify-between u-align-center u-mb-20 u-padding-10"
-                style="background:rgba(255,255,255,0.05);">
+            <div class="u-flex u-justify-between u-align-center u-mb-20 u-padding-10 settings-row">
                 <span>Music</span>
                 <input type="checkbox" id="settingMusic" {{ 'checked' if current_user.settings_music else '' }}
                     onchange="updateSettings()">
             </div>
 
-            <div class="u-flex u-justify-between u-align-center u-mb-20 u-padding-10"
-                style="background:rgba(255,255,255,0.05);">
+            <div class="u-flex u-justify-between u-align-center u-mb-20 u-padding-10 settings-row">
                 <span>Volume</span>
                 {% set js_vol = current_user.settings_volume if current_user.settings_volume is not none else 0.5 %}
-                <input type="range" id="settingVolume" min="0" max="1" step="0.05" value="{{ js_vol }}"
+                <input class="volume-slider" type="range" id="settingVolume" min="0" max="1" step="0.05" value="{{ js_vol }}"
                     onchange="updateSettings(); if(window.audioManager) window.audioManager.play('notification');"
-                    oninput="updateVolumeLabel(this.value)" style="width: 100px;">
-                <span id="volumeLabel" style="width: 30px; text-align: right;">{{ (js_vol * 100) | int }}%</span>
+                    oninput="updateVolumeLabel(this.value)">
+                <span class="volume-label" id="volumeLabel">{{ (js_vol * 100) | int }}%</span>
             </div>
 
-            <div class="u-flex u-justify-between u-align-center u-mb-20 u-padding-10"
-                style="background:rgba(255,255,255,0.05);">
+            <div class="u-flex u-justify-between u-align-center u-mb-20 u-padding-10 settings-row">
                 <span>System Pop-ups</span>
                 {% set js_popups = current_user.settings_popups if current_user.settings_popups is not none else True %}
                 <input type="checkbox" id="settingPopups" {{ 'checked' if js_popups else '' }}
                     onchange="updateSettings()">
             </div>
 
-            <div class="u-flex u-justify-between u-align-center u-mb-20 u-padding-10"
-                style="background:rgba(255,255,255,0.05);">
+            <form action="{{ url_for('main.update_locale') }}" method="POST" class="u-mb-20 u-padding-10 settings-row locale-setting">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <label class="locale-label" for="settingTimezone">{{ icon('globe') }} Timezone <small>(daily reset at 01:00 there)</small></label>
+                <select id="settingTimezone" name="timezone" data-current="{{ current_user.timezone or 'Europe/Madrid' }}">
+                    <option value="{{ current_user.timezone or 'Europe/Madrid' }}" selected>{{ current_user.timezone or 'Europe/Madrid' }}</option>
+                </select>
+                <p class="locale-detected" id="timezoneDetected" hidden></p>
+                <label class="locale-label" for="settingReminder">{{ icon('alarm-clock') }} Daily reminder <small>(if dailies are unfinished; empty = off)</small></label>
+                <input type="time" id="settingReminder" name="reminder_time" value="{{ current_user.reminder_time or '' }}">
+                <button type="submit" class="btn-small locale-save">SAVE</button>
+            </form>
+
+            <div class="u-mb-20 u-padding-10 settings-row hardcore-setting">
+                <div class="u-flex u-justify-between u-align-center">
+                    <span>{{ icon('skull', 'icon-danger') }} Hardcore Mode</span>
+                    <form action="{{ url_for('main.toggle_hardcore') }}" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="enable" value="{{ '0' if current_user.hardcore else '1' }}">
+                        <button type="submit" class="btn-small hardcore-toggle{{ ' on' if current_user.hardcore }}">
+                            {{ 'ON · DISABLE' if current_user.hardcore else 'ENABLE' }}</button>
+                    </form>
+                </div>
+                <p class="hardcore-note">+10% XP and a {{ icon('skull') }} badge. A failed Penalty Quest costs one level instead of
+                    XP debt. Turning it off ends your Hardcore streak.</p>
+            </div>
+
+            <div class="u-flex u-justify-between u-align-center u-mb-20 u-padding-10 settings-row">
                 <span>System Notifications</span>
-                <button id="btnEnableNotifications" onclick="requestNotificationPermission()" class="btn-small"
-                    style="font-family: 'Courier New', monospace; border-color: #00acc1; color: #00acc1;">ENABLE</button>
+                <button id="btnEnableNotifications" onclick="requestNotificationPermission()" class="btn-small btn-notify-toggle">ENABLE</button>
             </div>
 
             <div class="u-text-center">
                 <button onclick="document.getElementById('settingsModal').style.display='none'"
                     class="btn-complete u-width-100">CLOSE</button>
 
-                <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); margin: 20px 0;">
+                <hr class="settings-divider">
 
                 <button onclick="document.getElementById('deleteAccountModal').style.display='flex'"
-                    class="btn-danger u-width-100"
-                    style="background-color: #ff4444; color: white; border: none; padding: 10px; font-weight: bold; cursor: pointer;">
+                    class="btn-danger u-width-100 btn-danger-solid">
                     DELETE ACCOUNT
                 </button>
             </div>
@@ -128,8 +183,8 @@
 
     <!-- DELETE ACCOUNT CONFIRMATION MODAL -->
     <div id="deleteAccountModal" class="modal-overlay">
-        <div class="panel modal-content" style="max-width:400px; border: 2px solid #ff4444;">
-            <h2 class="u-color-danger u-mb-20" style="color: #ff4444;">⚠ WARNING ⚠</h2>
+        <div class="panel modal-content modal-delete-account">
+            <h2 class="u-color-danger u-mb-20 delete-account-title">{{ icon('triangle-alert') }} WARNING {{ icon('triangle-alert') }}</h2>
             <p class="u-mb-20">
                 Are you sure you want to delete your account? <br><br>
                 <strong>This action is irreversible.</strong><br>
@@ -142,8 +197,7 @@
 
                 <form action="{{ url_for('auth.delete_account') }}" method="POST" class="u-width-50">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="btn-danger u-width-100"
-                        style="background-color: #ff4444; color: white; border: none; padding: 10px; font-weight: bold; cursor: pointer;">
+                    <button type="submit" class="btn-danger u-width-100 btn-danger-solid">
                         CONFIRM DELETE
                     </button>
                 </form>
@@ -153,22 +207,18 @@
 
     <!-- NOTIFICATION INBOX MODAL -->
     <div id="notificationInboxModal" class="modal-overlay">
-        <div class="panel modal-content"
-            style="max-width:500px; padding: 20px; flex-direction: column; max-height: 80vh;">
-            <div
-                style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 25px; margin-bottom: 25px;">
-                <h2 class="u-color-white" style="margin: 0; color: #ffeb3b !important; padding-right: 20px;">SYSTEM LOGS
+        <div class="panel modal-content inbox-panel">
+            <div class="inbox-header">
+                <h2 class="u-color-white inbox-title">SYSTEM LOGS
                 </h2>
-                <button onclick="clearNotifications()" class="btn-small"
-                    style="color: #ff4444; border-color: #ff4444;">CLEAR ALL</button>
+                <button onclick="clearNotifications()" class="btn-small btn-clear-logs">CLEAR ALL</button>
             </div>
 
-            <div id="inboxList"
-                style="overflow-y: auto; flex-grow: 1; padding-right: 10px; display: flex; flex-direction: column; gap: 10px; min-height: 200px;">
+            <div class="inbox-list" id="inboxList">
                 <!-- Populated via JS -->
             </div>
 
-            <div style="margin-top: 20px; text-align: center;">
+            <div class="inbox-footer">
                 <button onclick="document.getElementById('notificationInboxModal').style.display='none'"
                     class="btn-complete u-width-100">CLOSE</button>
             </div>
@@ -176,52 +226,53 @@
     </div>
 
     <!-- CLEAR LOGS CONFIRMATION MODAL -->
-    <div id="clearLogsModal" class="modal-overlay" style="z-index: 2500;">
-        <div class="panel modal-content" style="max-width:350px; border: 1px solid #00acc1;">
-            <h2 class="u-mb-20" style="color: #00acc1;">ERASE LOGS</h2>
-            <p class="u-mb-20 u-text-center" style="color: #ddd;">
+    <div id="clearLogsModal" class="modal-overlay clear-logs-overlay">
+        <div class="panel modal-content clear-logs-panel">
+            <h2 class="u-mb-20 clear-logs-title">ERASE LOGS</h2>
+            <p class="u-mb-20 u-text-center clear-logs-text">
                 Erase all system logs?
             </p>
-            <div class="u-flex u-justify-between u-gap-20" style="margin-top: 20px;">
+            <div class="u-flex u-justify-between u-gap-20 clear-logs-actions">
                 <button
                     onclick="document.getElementById('clearLogsModal').style.display='none'; document.getElementById('notificationInboxModal').style.display='flex';"
-                    class="btn-complete u-width-50"
-                    style="background-color: #333; border-color: #555; color: white;">CANCEL</button>
-                <button onclick="executeClearNotifications()" class="btn-complete u-width-50"
-                    style="background-color: #00acc1; color: #000; border: none; font-weight: bold;">OK</button>
+                    class="btn-complete u-width-50 btn-clear-cancel">CANCEL</button>
+                <button onclick="executeClearNotifications()" class="btn-complete u-width-50 btn-clear-ok">OK</button>
             </div>
         </div>
     </div>
 
     <!-- GUIDE MODAL -->
     <div id="guideModal" class="modal-overlay">
-        <div class="panel modal-content" style="max-width:500px; padding: 30px;">
-            <h2 class="u-color-white u-mb-20"
-                style="color: cyan !important; border-bottom: 1px solid #333; padding-bottom: 10px;">SYSTEM GUIDE:
+        <div class="panel modal-content guide-panel">
+            <h2 class="u-color-white u-mb-20 guide-title">SYSTEM GUIDE:
                 ECONOMY</h2>
-            <div
-                style="text-align: left; font-size: 0.9rem; line-height: 1.5; color: #ddd; max-height: 60vh; overflow-y: auto; padding-right: 10px;">
-                <p style="color: cyan; font-weight: bold; margin-top: 10px;">XP & PROGRESSION</p>
-                <p>• The XP requirement curve is exponential. However, all rewards mathematically scale to your current
-                    level so progression speed remains static.</p>
-                <p>• Earning Level 100 will take an active player roughly <strong>2 Years</strong> of consistency.</p>
-                <ul style="margin-bottom: 15px; padding-left: 20px; color: #aaa;">
-                    <li><strong>Dailies:</strong> 10% Level Cap / day</li>
-                    <li><strong>A-Rank Quest:</strong> 12% Level Cap</li>
-                    <li><strong>Void Focus:</strong> 2.5% Level Cap / hour</li>
+            <div class="guide-body">
+                <p class="guide-h-xp">XP & PROGRESSION</p>
+                <p>• Each level needs a little more XP than the last (Lv 1: 160 XP, Lv 15: 2,760, Lv 50: 14,450,
+                    Lv 100: 37,960). Rewards are fixed, so early levels fly by and later ones take dedication.</p>
+                <p>• An active player (dailies, an hour or two of focus, a couple of quests) reaches Level 100 in
+                    roughly <strong>2 Years</strong>.</p>
+                <ul class="guide-list">
+                    <li><strong>Quests:</strong> E 40 · D 80 · C 150 · B 300 · A 600 XP. Non-daily B and A grow with you
+                        (at least 5% / 15% of your level). S-Rank = instant level up (1/week).</li>
+                    <li><strong>Dailies:</strong> each daily pays its rank XP, plus <strong>+500 XP</strong> when all are done.</li>
+                    <li><strong>Void Focus:</strong> 600 XP / hour of deep work.</li>
+                    <li><strong>Bonuses:</strong> INT (+5% per 10), class bonuses, titles and sleep condition boost your XP
+                        (but not league points, which use base XP so the league stays fair).</li>
                 </ul>
 
-                <p style="color: gold; font-weight: bold; margin-top: 15px;">CURRENCIES</p>
-                <ul style="margin-bottom: 15px; padding-left: 20px; color: #aaa;">
+                <p class="guide-h-currency">CURRENCIES</p>
+                <ul class="guide-list">
                     <li><strong>Coins (C):</strong> Used exclusively for System Shop artifacts. Earned via Void Focus
                         (10/hr) and B+ Rank Quests. Endgame gear costs up to 15,000 C.</li>
-                    <li><strong>Gold (G):</strong> Earned exclusively via completing all sequence dailies (100/day).
-                        Used for real-world rewards like a "Night Out" (600G).</li>
+                    <li><strong>Gold (G):</strong> Earned by completing all dailies (100/day) and from B+ Rank Quests.
+                        Spend it on real-life rewards you price yourself in the Shop (My Rewards) or a "Night Out" (600G).
+                        Gold is halved every Monday at 1:00 AM, so you can save, but not hoard.</li>
                 </ul>
 
-                <p style="color: #4CAF50; font-weight: bold; margin-top: 15px;">ATTRIBUTES (LIFE AREAS)</p>
+                <p class="guide-h-attributes">ATTRIBUTES (LIFE AREAS)</p>
                 <p>• Allocate points upon leveling up to permanently increase your capabilities.</p>
-                <ul style="margin-bottom: 15px; padding-left: 20px; color: #aaa;">
+                <ul class="guide-list">
                     <li><strong>Strength:</strong> Physical fitness, gym consistency, and diet adherence.</li>
                     <li><strong>Intelligence:</strong> University work, coding, reading, and learning.</li>
                     <li><strong>Agility:</strong> Speed of task completion and defeating procrastination.</li>
@@ -229,32 +280,48 @@
                     <li><strong>Vitality:</strong> Sleep consistency, health, and energy preservation.</li>
                 </ul>
 
-                <p style="color: var(--color-danger); font-weight: bold; margin-top: 15px;">THE PENALTY SYSTEM</p>
-                <div style="margin-bottom: 15px; color: #aaa;">
-                    <p>• Missing daily quests triggers the Penalty Zone.</p>
-                    <p>• Your UI will turn red, you cannot buy from the shop, and you receive a <strong>-20% Stat
-                            Debuff</strong>.</p>
-                    <p>• Clear the penalty immediately by completing a grueling <strong>Survival Quest</strong>.</p>
+                <p class="guide-h-penalty">THE PENALTY SYSTEM</p>
+                <div class="guide-block">
+                    <p>• Dailies reset at 1:00 AM. Missing them for 1 day applies a <strong>-20% Stat Debuff</strong>
+                        (reduced by STR) and glitches your UI.</p>
+                    <p>• Missing 2 days in a row enters the <strong>Penalty Zone</strong>: your UI turns red and a
+                        <strong>Survival Quest</strong> is issued. Completing it (or all your dailies) clears the penalty.</p>
+                    <p>• Miss its deadline and you take on <strong>XP debt</strong> (half a level, capped at one level):
+                        new XP pays it off before filling your bar. You never lose levels or stats.</p>
+                    <p>• <strong>{{ icon('snowflake', 'icon-frost') }} Streak Freezes:</strong> earn one every 7-day streak (max 2). A missed day uses one
+                        automatically: no streak loss, no debuff, no penalty progress.</p>
+                    <p>• <strong>{{ icon('skull', 'icon-danger') }} Hardcore Mode</strong> (Settings, opt-in): +10% XP and a badge, but a failed
+                        Penalty Quest costs one level instead of XP debt.</p>
                 </div>
 
-                <p style="color: #03A9F4; font-weight: bold; margin-top: 15px;">RECOVERY & SLEEP</p>
+                <p class="guide-h-recovery">RECOVERY & SLEEP</p>
                 <p>• The system monitors your physical condition.</p>
-                <ul style="margin-bottom: 15px; padding-left: 20px; color: #aaa;">
-                    <li><strong>Well Rested:</strong> Log 7+ hours of sleep to gain a 1.1x (+10%) XP multiplier.</li>
-                    <li><strong>Exhausted:</strong> Sleeping less than 6 hours breaks your streak and ruins your
-                        conditioning, applying a 0.5x (-50%) XP multiplier.</li>
-                    <li>Use the <em>Elixir of Life</em> from the shop to purge exhaustion.</li>
+                <ul class="guide-list">
+                    <li><strong>Well Rested:</strong> Log 7.5+ hours of sleep to gain a 1.1x (+10%) XP multiplier.</li>
+                    <li><strong>Normal:</strong> 6 to 7.5 hours. No modifier.</li>
+                    <li><strong>Tired:</strong> Sleeping less than 6 hours breaks your sleep streak and applies a
+                        0.5x (-50%) XP multiplier until you log a better night.</li>
+                    <li>Use the <em>Elixir of Life</em> from the shop to cure fatigue instantly.</li>
                 </ul>
 
-                <p style="color: #9C27B0; font-weight: bold; margin-top: 15px;">TITLES & SHADOWS</p>
-                <div style="margin-bottom: 15px; color: #aaa;">
-                    <p>• <strong>Titles:</strong> Unlockable achievements (e.g., "The One Who Overcame Adversity") that
-                        provide unique XP or stat modifiers when equipped.</p>
-                    <p>• <strong>The Shadow Army:</strong> Completing S-Rank quests allows you to "Arise" the challenge,
-                        granting a permanent, stacking passive buff.</p>
+                <p class="guide-h-recovery">FRIENDS & DAILY LIFE</p>
+                <ul class="guide-list">
+                    <li><strong>Raids:</strong> shared goals (e.g. 100 km together). Clear them in time: every contributor gets +500 XP, +100 Coins.</li>
+                    <li><strong>Hall of Feats:</strong> cheer friends' S-rank clears with 🔥 👏 💪 👑 on the Leaderboard.</li>
+                    <li><strong>Your clock:</strong> resets follow your timezone. Set it and your daily reminder time in Settings.</li>
+                    <li><strong>Install:</strong> add Shadow OS to your home screen to use it like an app.</li>
+                </ul>
+
+                <p class="guide-h-titles">TITLES & SHADOWS</p>
+                <div class="guide-block">
+                    <p>• <strong>Titles:</strong> Unlocked by level, streaks, stats and wealth (e.g., "The One Who
+                        Overcame Adversity"). The equipped title grants its bonus (XP, Coins or stats). Tap your title
+                        under your name to see them all.</p>
+                    <p>• <strong>The Shadow Army:</strong> Clearing an S-Rank quest lets you "Arise" it into a shadow,
+                        granting a permanent, stacking +1% to all stats (boosted by SNS). Unclaimed shadows wait in ARMY.</p>
                 </div>
             </div>
-            <div style="margin-top: 25px;">
+            <div class="guide-footer">
                 <button onclick="document.getElementById('guideModal').style.display='none'"
                     class="btn-complete u-width-100">CLOSE GUIDE</button>
             </div>
@@ -305,127 +372,70 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-            // 3. System Notifications (Flash Messages)
-            const flashes = document.querySelectorAll('.flash-msg');
-            if (flashes.length > 0) {
-                // Audio is handled by page-specific scripts if needed, or we can check global
-                if (window.audioManager) {
-                    const majorEvent = document.querySelector('.flash-msg.levelup') || document.querySelector('.flash-msg.arise_trigger');
-                    if (!majorEvent) window.audioManager.play('notification');
-                }
-
-                // Auto-Dismiss
-                setTimeout(() => {
-                    flashes.forEach(el => {
-                        el.style.transition = "opacity 0.5s ease";
-                        el.style.opacity = "0";
-                        setTimeout(() => el.remove(), 500);
-                    });
-                }, 2500);
-            }
-
             // --- NOTIFICATION POLLING SYSTEM ---
             const POLL_INTERVAL = 30000; // 30 seconds
-            let shownNotifications = new Set();
+            // Remember which notifications were already toasted so they don't reappear on every page load
+            const TOASTED_KEY = 'shadowos.toastedNotifications';
+            const loadToasted = () => {
+                try { return new Set(JSON.parse(localStorage.getItem(TOASTED_KEY) || '[]')); } catch (e) { return new Set(); }
+            };
+            const saveToasted = set => {
+                try { localStorage.setItem(TOASTED_KEY, JSON.stringify([...set].slice(-200))); } catch (e) { }
+            };
 
             async function checkNotifications() {
+                if (document.visibilityState === 'hidden') return;
                 try {
-                    const response = await fetch('/api/notifications/all'); // We need a new route!
+                    const response = await fetch('/api/notifications/all');
                     if (!response.ok) return;
-
                     const data = await response.json();
                     const unread = data.filter(n => !n.is_read);
 
-                    // Update Badge
                     const badge = document.getElementById('unreadBadge');
                     if (badge) {
-                        if (unread.length > 0) {
-                            badge.innerText = unread.length;
-                            badge.style.display = 'block';
-                        } else {
-                            badge.style.display = 'none';
-                        }
+                        badge.textContent = unread.length;
+                        badge.style.display = unread.length > 0 ? 'block' : 'none';
                     }
 
-                    // Show new Toasts
-                    const newUnread = unread.filter(n => !shownNotifications.has(n.id));
-                    if (newUnread.length > 0) {
+                    const toasted = loadToasted();
+                    const fresh = unread.filter(n => !toasted.has(n.id));
+                    if (fresh.length > 0) {
                         if (window.popupsEnabled !== false) {
-                            showToasts(newUnread);
+                            fresh.forEach((n, i) => SystemUI.toast(n.message, n.category, { sound: i === 0 }));
                         }
-                        newUnread.forEach(n => shownNotifications.add(n.id));
+                        fresh.forEach(n => toasted.add(n.id));
+                        saveToasted(toasted);
                     }
 
-                    // Always refresh the Inbox content
                     populateInbox(data);
-
                 } catch (e) {
                     console.log("Notification poll failed:", e);
                 }
             }
 
-            function showToasts(notifications) {
-                const container = document.querySelector('.flash-container') || createFlashContainer();
-
-                notifications.forEach(n => {
-                    const msgDiv = document.createElement('div');
-                    msgDiv.className = `flash-msg ${n.category}`;
-                    msgDiv.innerHTML = `
-                        <div style="display: flex; justify-content: space-between; align-items: start;">
-                            <span>${n.message}</span>
-                            <span onclick="this.parentElement.parentElement.remove()" style="cursor: pointer; padding-left: 10px; opacity: 0.7;">✖</span>
-                        </div>
-                    `;
-                    container.appendChild(msgDiv);
-
-                    // Trigger sound
-                    if (window.audioManager) window.audioManager.play('notification');
-
-                    // Auto-Dismiss after 8 seconds conditionally
-                    setTimeout(() => {
-                        if (msgDiv.parentElement) {
-                            msgDiv.style.transition = "opacity 0.5s ease, transform 0.5s ease";
-                            msgDiv.style.opacity = "0";
-                            msgDiv.style.transform = "translateY(20px)";
-                            setTimeout(() => msgDiv.remove(), 500);
-                        }
-                    }, 8000);
-                });
-            }
-
-            function createFlashContainer() {
-                const div = document.createElement('div');
-                div.className = 'flash-container';
-                document.body.appendChild(div);
-                return div;
-            }
-
             function populateInbox(notifications) {
                 const inbox = document.getElementById('inboxList');
                 if (!inbox) return;
-
-                inbox.innerHTML = '';
+                inbox.replaceChildren();
                 if (notifications.length === 0) {
-                    inbox.innerHTML = '<p style="color: #666; text-align: center;">No system logs found.</p>';
+                    const empty = document.createElement('p');
+                    empty.style.cssText = 'color: #666; text-align: center;';
+                    empty.textContent = 'No system logs found.';
+                    inbox.appendChild(empty);
                     return;
                 }
-
                 notifications.forEach(n => {
-                    const div = document.createElement('div');
-                    const isUnread = !n.is_read;
-                    div.style.padding = '10px';
-                    div.style.background = isUnread ? 'rgba(255, 235, 59, 0.1)' : 'rgba(255,255,255,0.05)';
-                    div.style.borderLeft = isUnread ? '3px solid #ffeb3b' : '3px solid #666';
-                    div.style.borderRadius = '3px';
-
-                    const dateObj = new Date(n.created_at + 'Z');
-                    const dStr = dateObj.toLocaleDateString() + ' ' + dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-                    div.innerHTML = `
-                        <div style="font-size: 0.8em; color: #888; margin-bottom: 5px;">${dStr}</div>
-                        <div style="color: ${isUnread ? '#fff' : '#aaa'};">${n.message}</div>
-                    `;
-                    inbox.appendChild(div);
+                    const item = document.createElement('div');
+                    item.className = `inbox-item ${n.category}${n.is_read ? '' : ' unread'}`;
+                    const dateObj = new Date(n.created_at.endsWith('Z') || n.created_at.includes('+') ? n.created_at : n.created_at + 'Z');
+                    const when = document.createElement('div');
+                    when.className = 'inbox-date';
+                    when.textContent = dateObj.toLocaleDateString() + ' ' + dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    const msg = document.createElement('div');
+                    msg.className = 'inbox-message';
+                    msg.textContent = n.message;
+                    item.append(when, msg);
+                    inbox.appendChild(item);
                 });
             }
 
@@ -466,11 +476,14 @@
             // Initial Fetch & Start Polling
             checkNotifications();
             setInterval(checkNotifications, POLL_INTERVAL);
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') checkNotifications();
+            });
 
             // --- WEB PUSH REGISTRATION ---
             window.requestNotificationPermission = function () {
                 if (!('Notification' in window)) {
-                    alert("This browser does not support system notifications.");
+                    SystemUI.toast("This browser does not support system notifications.", "warning");
                     return;
                 }
 
@@ -497,7 +510,7 @@
                         swReg.pushManager.getSubscription().then(function (subscription) {
                             if (subscription) {
                                 subscription.unsubscribe().then(function (successful) {
-                                    alert("Push Subscription disabled locally.");
+                                    SystemUI.toast("Push notifications disabled on this device.", "success");
                                     updateNotificationButton();
 
                                     // Inform backend to drop endpoint
@@ -510,10 +523,10 @@
                                         body: JSON.stringify({ endpoint: subscription.endpoint })
                                     });
                                 }).catch(function (e) {
-                                    alert("Unsubscription failed: " + e);
+                                    SystemUI.toast("Could not disable push notifications: " + e, "error");
                                 })
                             } else {
-                                alert("No active subscription found.");
+                                SystemUI.toast("No active push subscription found.", "info");
                                 updateNotificationButton();
                             }
                         })
@@ -604,7 +617,7 @@
             function subscribeUser(swRegistration, isManual = false) {
                 if (!window.isSecureContext) {
                     if (isManual) {
-                        alert("System Interface requires a secure HTTPS connection for Push Notifications. They will not function on this protocol.");
+                        SystemUI.toast("Push notifications need a secure HTTPS connection.", "warning");
                     } else {
                         console.warn("Push Notifications require a secure HTTPS connection.");
                     }
@@ -643,7 +656,7 @@
                     .catch(function (err) {
                         console.warn('Failed to subscribe the user: ', err);
                         if (isManual) {
-                            alert("Push Subscription Failed: " + err.message + "\nEnsure your browser permits background notifications for this site.");
+                            SystemUI.toast("Push subscription failed: " + err.message + ". Check that this site may send notifications.", "error");
                         }
                     });
             }

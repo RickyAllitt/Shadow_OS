@@ -1,0 +1,196 @@
+/* Raids (raids.html, raid_detail.html) */
+
+.social-page {
+    max-width: 760px;
+    margin: 30px auto;
+    padding: 0 16px;
+}
+
+.social-header {
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+.social-system {
+    font-family: var(--font-heading);
+    font-size: 0.75rem;
+    letter-spacing: 4px;
+    color: var(--color-primary);
+}
+
+.social-title {
+    font-size: clamp(1.4rem, 5vw, 2.2rem);
+    letter-spacing: 3px;
+    margin: 8px 0;
+    text-shadow: 0 0 14px var(--color-primary-glow);
+    overflow-wrap: anywhere;
+}
+
+.social-lead,
+.social-empty,
+.social-dim {
+    color: #999;
+    font-size: 0.9rem;
+}
+
+.social-h2 {
+    font-size: 0.8rem;
+    letter-spacing: 3px;
+    color: var(--color-primary);
+    margin: 24px 0 10px;
+}
+
+.raid-card {
+    display: block;
+    padding: 14px;
+    margin-bottom: 10px;
+    border: 1px solid #2a2a2a;
+    background: rgba(255, 255, 255, 0.03);
+    color: inherit;
+}
+
+.raid-card:hover {
+    border-color: var(--color-primary);
+}
+
+.raid-card-top,
+.raid-card-bottom {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 0.85rem;
+}
+
+.raid-card-bottom {
+    color: #999;
+}
+
+.raid-name {
+    font-weight: bold;
+    color: #fff;
+}
+
+.raid-ends,
+.raid-status {
+    color: #888;
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+.raid-completed .raid-status { color: var(--color-gold); }
+.raid-failed .raid-status { color: #ff4d6d; }
+
+.raid-bar {
+    height: 8px;
+    background: #1c1c1c;
+    margin: 10px 0 6px;
+    overflow: hidden;
+}
+
+.raid-bar-lg {
+    height: 14px;
+}
+
+.raid-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #00eaff, #50fa7b);
+    box-shadow: 0 0 10px rgba(0, 234, 255, 0.6);
+}
+
+.raid-hero {
+    border: 1px solid rgba(0, 234, 255, 0.35);
+    padding: 20px;
+    text-align: center;
+}
+
+.raid-big {
+    font-size: 2.6rem;
+    font-weight: 700;
+    color: var(--color-primary);
+}
+
+.raid-big small {
+    font-size: 1rem;
+    color: #888;
+}
+
+.raid-meta {
+    color: #ccc;
+    margin-bottom: 14px;
+}
+
+.raid-log label {
+    display: block;
+    color: #aaa;
+    margin-bottom: 6px;
+}
+
+.raid-log-row {
+    display: flex;
+    gap: 10px;
+}
+
+.raid-log-row input {
+    flex: 1;
+    min-width: 0;
+    padding: 12px;
+    font-size: 1.2rem;
+    text-align: center;
+    background: #000;
+    color: #fff;
+    border: 1px solid var(--color-primary);
+}
+
+.raid-contributor,
+.raid-log-entry {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 4px;
+    border-bottom: 1px solid #1c1c1c;
+    font-size: 0.9rem;
+}
+
+.raid-contributor.me {
+    color: var(--color-primary);
+}
+
+.raid-back a {
+    color: #888;
+    font-size: 0.85rem;
+}
+
+.raid-cancel {
+    text-align: center;
+    margin-top: 24px;
+}
+
+.raid-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    border: 1px dashed #333;
+}
+
+.raid-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    color: #aaa;
+    font-size: 0.85rem;
+    flex: 1;
+    min-width: 0;
+}
+
+.raid-form input,
+.raid-form select {
+    padding: 10px;
+    background: #000;
+    color: #fff;
+    border: 1px solid #444;
+}
+
+.raid-form-row {
+    display: flex;
+    gap: 12px;
+}

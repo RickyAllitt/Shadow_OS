@@ -1,0 +1,107 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/report.css') }}">
+
+<div class="report">
+    <header class="report-header">
+        <p class="report-system">[ SYSTEM REPORT ]</p>
+        <h1 class="report-title">WEEK OF {{ r.week_start.strftime('%d %b %Y') | upper }}</h1>
+        <nav class="report-nav" aria-label="Report weeks">
+            <a href="{{ url_for('main.weekly_report', week=prev_week.isoformat()) }}">← Previous week</a>
+            {% if next_week %}<a href="{{ url_for('main.weekly_report', week=next_week.isoformat()) }}">Next week →</a>{% endif %}
+        </nav>
+        {% if r.is_current %}<p class="report-live">This week is still in progress. Numbers update as you go.</p>{% endif %}
+    </header>
+
+    {% if not r.has_activity %}
+    <section class="report-card report-empty">
+        <p>No activity recorded this week.</p>
+        <p class="report-dim">League and KPI tracking started when this feature was installed, so earlier weeks are empty.</p>
+    </section>
+    {% else %}
+
+    <section class="report-grid">
+        <div class="report-stat">
+            <span class="report-label">LEAGUE</span>
+            <span class="report-big">{{ '%.0f' | format(r.points) }}<small> pts</small></span>
+            <span class="report-sub">
+                {% if r.placing %}#{{ r.placing }} of {{ r.competitors }}{% if r.placing == 1 %} {{ icon('crown', 'icon-gold', label='Winner') }}{% endif %}
+                {% else %}unranked{% endif %}
+            </span>
+        </div>
+        <div class="report-stat">
+            <span class="report-label">PERFECT DAYS</span>
+            <span class="report-big">{{ r.perfect_days }}<small>/{{ r.days_tracked or 7 }}</small></span>
+            <span class="report-sub">all dailies done</span>
+        </div>
+        <div class="report-stat">
+            <span class="report-label">QUESTS</span>
+            <span class="report-big">{{ r.quests_completed }}</span>
+            <span class="report-sub">
+                {% for rank, n in r.rank_counts.items() if n %}{{ n }}×{{ rank }}{{ ' · ' if not loop.last }}{% endfor %}
+            </span>
+        </div>
+        <div class="report-stat">
+            <span class="report-label">FOCUS</span>
+            <span class="report-big">{{ r.focus_hours }}<small>h</small></span>
+            <span class="report-sub">in the Void</span>
+        </div>
+        <div class="report-stat">
+            <span class="report-label">SLEEP</span>
+            <span class="report-big">{{ r.sleep_avg if r.sleep_avg is not none else '–' }}<small>{{ 'h' if r.sleep_avg is not none }}</small></span>
+            <span class="report-sub">avg over {{ r.sleep_nights }} logged night{{ 's' if r.sleep_nights != 1 }}</span>
+        </div>
+        {% if r.duel %}
+        <div class="report-stat report-duel report-duel-{{ r.duel.result | lower }}">
+            <span class="report-label">DUEL VS {{ r.duel.rival.name | upper }}</span>
+            <span class="report-big">{{ r.duel.result }}</span>
+            <span class="report-sub">{{ '%.0f' | format(r.duel.me) }} – {{ '%.0f' | format(r.duel.them) }}</span>
+        </div>
+        {% endif %}
+    </section>
+
+    <section class="report-card">
+        <h2 class="report-h2">LIFE BALANCE</h2>
+        <div class="report-areas">
+            {% for a in r.areas %}
+            <div class="report-area">
+                <span class="report-area-code">{{ a.code }}</span>
+                <span class="report-area-name">{{ a.name }}</span>
+                <span class="report-area-score">{{ a.start }} → <strong>{{ a.end }}</strong></span>
+                <span class="report-change {{ 'up' if a.change > 0 else 'down' if a.change < 0 else 'flat' }}">
+                    {{ '+' if a.change > 0 }}{{ a.change }}
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+        <p class="report-focus">Focus next week: <strong>{{ r.weakest.name }}</strong> ({{ r.weakest.end }}). It's your lowest area.</p>
+    </section>
+
+    {% if r.measures %}
+    <section class="report-card">
+        <h2 class="report-h2">MEASURES</h2>
+        <table class="report-table">
+            <thead><tr><th>Quest</th><th>Logged</th><th>On target</th></tr></thead>
+            <tbody>
+                {% for m in r.measures %}
+                <tr>
+                    <td>{{ m.quest.title }}</td>
+                    <td>{{ fmt(m.total) }} {{ m.quest.metric_unit }}</td>
+                    <td>{% if m.days_on_target is not none %}{{ m.days_on_target }}/7 days
+                        {% else %}{{ fmt(m.total) }} / {{ fmt(m.quest.metric_target) }}{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endif %}
+
+    {% if r.winner and r.placing != 1 %}
+    <p class="report-dim report-center">League winner: <strong>{{ r.winner.name }}</strong></p>
+    {% endif %}
+    {% endif %}
+
+    <p class="report-center"><a href="{{ url_for('main.analytics') }}" class="btn-small">OPEN ANALYTICS</a></p>
+</div>
+{% endblock %}

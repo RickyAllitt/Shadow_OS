@@ -20,6 +20,15 @@
     --color-text-main: #FFFFFF;
     --color-text-muted: #888888;
 
+    /* Layering: toasts sit under dialogs so they can never cover a dialog's buttons */
+    --z-nav: 100;
+    --z-toast: 1500;
+    --z-modal: 9000;
+    --z-levelup: 9500;
+
+    --color-success: #4CAF50;
+    --color-warning: #FFA726;
+
     /* Typography */
     --font-heading: 'Orbitron', sans-serif;
     --font-body: 'Roboto', sans-serif;

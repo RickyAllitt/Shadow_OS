@@ -243,8 +243,8 @@
 </style>
 
 <div class="void-container" id="menu">
-    <h1 style="color: #fff; text-shadow: 0 0 10px #fff; margin-bottom: 10px;">CONFIGURE PROTOCOL</h1>
-    <p style="color: #ccc; margin-bottom: 40px;">Customize your session. Stay Hard!</p>
+    <h1 class="focus-h1-configure-protocol">CONFIGURE PROTOCOL</h1>
+    <p class="focus-p-customize-your">Customize your session. Stay Hard!</p>
 
     <div class="input-group">
         <div class="input-wrapper">
@@ -263,11 +263,10 @@
 
     <button class="btn-void" onclick="initProtocol()">INITIATE</button>
 
-    <div style="margin-top: 50px;">
-        <p style="color: #bbb;">Total Focus Today: <span style="color: cyan;">{{ current_user.daily_focus_duration
+    <div class="focus-div">
+        <p class="focus-total-label">Total Focus Today: <span class="focus-total-value">{{ current_user.daily_focus_duration
                 }}m</span></p>
-        <a href="{{ url_for('main.dashboard') }}" class="btn-void-back"
-            style="color: var(--color-danger); text-decoration: none; border: 1px solid var(--color-danger); padding: 10px 30px; margin-top: 20px; display: inline-block; transition: all 0.3s;">ABORT
+        <a href="{{ url_for('main.dashboard') }}" class="btn-void-back focus-a-abort-session">ABORT
             SESSION</a>
         <style>
             .btn-void-back:hover {
@@ -279,27 +278,27 @@
 </div>
 
 <div class="void-container" id="session" style="display: none;">
-    <div style="color: #ccc; letter-spacing: 2px; font-weight: bold; text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);"
+    <div class="focus-round-display"
         id="roundDisplay">ROUND 1 / 4</div>
     <div class="timer-display" id="timer">00:00</div>
     <div class="status-msg" id="status">SYSTEM ACTIVE</div>
     <div class="fail-msg" id="failMsg">CONNECTION LOST.<br>PROTOCOL FAILED.</div>
 
-    <div style="display: flex; gap: 20px; margin-top: 40px; justify-content: center;">
-        <button onclick="pauseSession()"
-            style="background: transparent; border: 1px solid #ffd700; color: #ffd700; padding: 8px 20px; cursor: pointer; transition: all 0.3s;"
+    <div class="focus-div-2">
+        <button class="focus-button-pause" onclick="pauseSession()"
+
             onmouseover="this.style.backgroundColor='rgba(255, 215, 0, 0.1)'; this.style.boxShadow='0 0 10px #ffd700';"
             onmouseout="this.style.backgroundColor='transparent'; this.style.boxShadow='none';">
             PAUSE
         </button>
-        <button id="skipRestBtn" onclick="showSkipRestModal()"
-            style="display: none; background: transparent; border: 1px solid #4caf50; color: #4caf50; padding: 8px 20px; cursor: pointer; transition: all 0.3s;"
+        <button class="focus-skip-rest-btn" id="skipRestBtn" onclick="showSkipRestModal()"
+            style="display: none;"
             onmouseover="this.style.backgroundColor='rgba(76, 175, 80, 0.1)'; this.style.boxShadow='0 0 10px #4caf50';"
             onmouseout="this.style.backgroundColor='transparent'; this.style.boxShadow='none';">
             SKIP REST
         </button>
-        <button onclick="showAbortModal()"
-            style="background: transparent; border: 1px solid #333; color: #666; padding: 8px 20px; cursor: pointer; transition: all 0.3s;"
+        <button class="focus-button-abort" onclick="showAbortModal()"
+
             onmouseover="this.style.borderColor='red'; this.style.color='red';"
             onmouseout="this.style.borderColor='#333'; this.style.color='#666';">
             ABORT
@@ -310,7 +309,7 @@
     <div class="void-tasks-container">
         <div class="void-tasks-header">
             <span>VOID TASKS</span>
-            <span style="font-size: 0.8rem; color: #666;">[NO REWARDS]</span>
+            <span class="focus-span-rewards">[NO REWARDS]</span>
         </div>
         <div class="void-task-input-group">
             <input type="text" id="voidTaskInput" placeholder="Add a task for the void..."
@@ -324,39 +323,34 @@
 </div>
 
 <!-- ABORT MODAL -->
-<div id="abortModal"
-    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 999; align-items: center; justify-content: center; flex-direction: column;">
-    <h2 style="color: var(--color-danger); text-shadow: 0 0 10px var(--color-danger); margin-bottom: 20px;">SYSTEM
+<div class="focus-abort-modal" id="abortModal"
+    style="display: none;">
+    <h2 class="focus-h2-system-warning">SYSTEM
         WARNING</h2>
-    <p id="abortMsg"
-        style="color: #ccc; font-family: monospace; text-align: center; max-width: 400px; line-height: 1.5; margin-bottom: 40px;">
+    <p class="focus-abort-msg" id="abortMsg">
         ABANDON PROTOCOL?
     </p>
-    <div style="display: flex; gap: 20px;">
-        <button onclick="confirmAbort()"
-            style="background: transparent; border: 1px solid var(--color-danger); color: var(--color-danger); padding: 10px 30px; cursor: pointer;">
+    <div class="focus-div-3">
+        <button class="focus-button-confirm-abort" onclick="confirmAbort()">
             CONFIRM ABORT
         </button>
-        <button onclick="closeAbortModal()"
-            style="background: transparent; border: 1px solid cyan; color: cyan; padding: 10px 30px; cursor: pointer;">
+        <button class="focus-button-resume" onclick="closeAbortModal()">
             RESUME
         </button>
     </div>
 </div>
 
 <!-- PAUSE MODAL -->
-<div id="pauseModal"
-    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 999; align-items: center; justify-content: center; flex-direction: column;">
-    <h2 style="color: #ffd700; text-shadow: 0 0 10px #ffd700; margin-bottom: 20px;">SESSION PAUSED</h2>
-    <p
-        style="color: #ccc; font-family: monospace; text-align: center; max-width: 400px; line-height: 1.5; margin-bottom: 20px;">
+<div class="focus-abort-modal" id="pauseModal"
+    style="display: none;">
+    <h2 class="focus-h2-session-paused">SESSION PAUSED</h2>
+    <p class="focus-p-warning-sessions">
         WARNING: SESSIONS ABORT AUTOMATICALLY AFTER 5 MINUTES OF INACTIVITY. PARTIAL DATA WILL BE SALVAGED.
     </p>
-    <div class="timer-display" id="pauseTimerDisplay"
-        style="color: #ffd700; text-shadow: 0 0 20px rgba(255, 215, 0, 0.5); font-size: 4rem; margin-bottom: 40px;">
+    <div class="timer-display focus-pause-timer-display" id="pauseTimerDisplay">
         05:00</div>
-    <button onclick="resumeSession()"
-        style="background: transparent; border: 1px solid cyan; color: cyan; padding: 10px 30px; cursor: pointer; transition: all 0.3s;"
+    <button class="focus-button-resume-protocol" onclick="resumeSession()"
+
         onmouseover="this.style.backgroundColor='rgba(0, 255, 255, 0.1)'; this.style.boxShadow='0 0 10px cyan';"
         onmouseout="this.style.backgroundColor='transparent'; this.style.boxShadow='none';">
         RESUME PROTOCOL
@@ -364,35 +358,31 @@
 </div>
 
 <!-- SKIP REST MODAL -->
-<div id="skipRestModal"
-    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 999; align-items: center; justify-content: center; flex-direction: column;">
-    <h2 style="color: #4caf50; text-shadow: 0 0 10px #4caf50; margin-bottom: 20px;">SKIP RECOVERY</h2>
-    <p
-        style="color: #ccc; font-family: monospace; text-align: center; max-width: 400px; line-height: 1.5; margin-bottom: 40px;">
+<div class="focus-abort-modal" id="skipRestModal"
+    style="display: none;">
+    <h2 class="focus-h2-skip-recovery">SKIP RECOVERY</h2>
+    <p class="focus-abort-msg">
         ARE YOU SURE YOU WANT TO SKIP YOUR RECOVERY PERIOD AND RETURN IMMEDIATEY TO FOCUS?
     </p>
-    <div style="display: flex; gap: 20px;">
-        <button onclick="confirmSkipRest()"
-            style="background: transparent; border: 1px solid #4caf50; color: #4caf50; padding: 10px 30px; cursor: pointer;">
+    <div class="focus-div-3">
+        <button class="focus-button-confirm-skip" onclick="confirmSkipRest()">
             CONFIRM SKIP
         </button>
-        <button onclick="closeSkipRestModal()"
-            style="background: transparent; border: 1px solid #666; color: #666; padding: 10px 30px; cursor: pointer;">
+        <button class="focus-button-cancel" onclick="closeSkipRestModal()">
             CANCEL
         </button>
     </div>
 </div>
 
 <!-- AUTO ABORT MODAL -->
-<div id="autoAbortModal"
-    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 999; align-items: center; justify-content: center; flex-direction: column;">
-    <h2 style="color: var(--color-danger); text-shadow: 0 0 10px var(--color-danger); margin-bottom: 20px;">SESSION ABORTED</h2>
-    <p id="autoAbortMsg"
-        style="color: #ccc; font-family: monospace; text-align: center; max-width: 400px; line-height: 1.5; margin-bottom: 40px;">
+<div class="focus-abort-modal" id="autoAbortModal"
+    style="display: none;">
+    <h2 class="focus-h2-system-warning">SESSION ABORTED</h2>
+    <p class="focus-abort-msg" id="autoAbortMsg">
         SESSION PAUSED FOR MORE THAN 5 MINUTES.
     </p>
-    <button onclick="confirmAutoAbort()"
-        style="background: transparent; border: 1px solid cyan; color: cyan; padding: 10px 30px; cursor: pointer; transition: all 0.3s;"
+    <button class="focus-button-resume-protocol" onclick="confirmAutoAbort()"
+
         onmouseover="this.style.backgroundColor='rgba(0, 255, 255, 0.1)'; this.style.boxShadow='0 0 10px cyan';"
         onmouseout="this.style.backgroundColor='transparent'; this.style.boxShadow='none';">
         ACKNOWLEDGE
@@ -661,10 +651,8 @@
         // Also clear out void tasks since session is totally over
         localStorage.removeItem(TASKS_STORAGE_KEY);
 
-        setTimeout(() => {
-            alert("Session Complete. Rewards Granted.");
-            window.location.reload();
-        }, 2000);
+        // Rewards popup is flashed by /focus_complete and shown after the reload
+        setTimeout(() => window.location.reload(), 2000);
     }
 
     function failSession() {
@@ -699,16 +687,16 @@
         let htmlMsg = "TERMINATING SESSION.<br><br>";
 
         if (completedMinutesInSession > 0) {
-            htmlMsg += `PREVIOUS ROUNDS SALVAGED: <span style="color:#4caf50">${completedMinutesInSession} MINUTES</span>.<br>`;
+            htmlMsg += `PREVIOUS ROUNDS SALVAGED: <span class="focus-span-completedminutesinsession-minutes">${completedMinutesInSession} MINUTES</span>.<br>`;
         }
 
         if (partialMinutesToSave > 0) {
-            htmlMsg += `CURRENT ROUND SALVAGE: <span style="color:cyan">${partialMinutesToSave} MINUTES</span> WILL BE SAVED.`;
+            htmlMsg += `CURRENT ROUND SALVAGE: <span class="focus-span-partialminutestosave-minutes">${partialMinutesToSave} MINUTES</span> WILL BE SAVED.`;
         } else {
             if (completedMinutesInSession > 0) {
-                htmlMsg += `<span style="color:#ccc">CURRENT ROUND (REST) CANCELLED.</span>`;
+                htmlMsg += `<span class="focus-span-current-round">CURRENT ROUND (REST) CANCELLED.</span>`;
             } else {
-                htmlMsg += `<span style="color:red">WARNING: NO DATA WILL BE SAVED.</span>`;
+                htmlMsg += `<span class="focus-span-warning-data">WARNING: NO DATA WILL BE SAVED.</span>`;
             }
         }
         msgElement.innerHTML = htmlMsg;
@@ -736,7 +724,8 @@
                 });
             } catch (e) {
                 console.error("Failed to save partial progress:", e);
-                alert("Warning: Could not save progress.");
+                SystemUI.toast("Could not save progress.", "error");
+                await new Promise(r => setTimeout(r, 2500));
             }
         }
         window.location.href = "{{ url_for('main.dashboard') }}";
@@ -834,7 +823,7 @@
         }
 
         let totalSalvaged = salvagedMinutes + completedMinutesInSession;
-        document.getElementById('autoAbortMsg').innerHTML = `SESSION PAUSED FOR MORE THAN 5 MINUTES.<br>SESSION ABORTED.<br><br>DATA SALVAGED: <span style="color:cyan">${totalSalvaged} MINUTES</span>.`;
+        document.getElementById('autoAbortMsg').innerHTML = `SESSION PAUSED FOR MORE THAN 5 MINUTES.<br>SESSION ABORTED.<br><br>DATA SALVAGED: <span class="focus-span-partialminutestosave-minutes">${totalSalvaged} MINUTES</span>.`;
         document.getElementById('pauseModal').style.display = 'none';
         document.getElementById('autoAbortModal').style.display = 'flex';
     }

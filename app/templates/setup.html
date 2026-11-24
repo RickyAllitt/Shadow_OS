@@ -93,16 +93,16 @@
 
     <form method="POST">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <p style="color: #ccc; margin-bottom: 20px; text-align: center;">
+        <p class="setup-intro">
             To proceed, you must establish 4 Daily Quests. These are non-negotiable tasks required for your survival.
         </p>
 
         <div class="form-group">
             <label>DAILY QUEST 1</label>
-            <div style="display: flex; gap: 10px;">
-                <input type="text" name="quest1" class="form-control" placeholder="e.g. 100 Pushups" style="flex: 3;"
+            <div class="setup-quest-row">
+                <input type="text" name="quest1" class="form-control setup-quest-input" placeholder="e.g. 100 Pushups"
                     required>
-                <select name="quest1_rank" class="form-control" style="flex: 1;">
+                <select name="quest1_rank" class="form-control form-col">
                     <option value="E">Rank E</option>
                     <option value="D">Rank D</option>
                     <option value="C">Rank C</option>
@@ -110,7 +110,7 @@
                     <option value="A">Rank A</option>
                     <option value="S">Rank S</option>
                 </select>
-                <select name="quest1_stat" class="form-control" style="flex: 1;">
+                <select name="quest1_stat" class="form-control form-col">
                     <option value="STR">STR</option>
                     <option value="INT">INT</option>
                     <option value="AGI">AGI</option>
@@ -118,15 +118,15 @@
                     <option value="SNS">SNS</option>
                 </select>
             </div>
-            <input type="text" name="quest1_description" class="form-control"
-                placeholder="Optional detailed description..." style="margin-top: 10px;">
+            <input type="text" name="quest1_description" class="form-control setup-desc"
+                placeholder="Optional detailed description...">
         </div>
         <div class="form-group">
             <label>DAILY QUEST 2</label>
-            <div style="display: flex; gap: 10px;">
-                <input type="text" name="quest2" class="form-control" placeholder="e.g. 10km Run" style="flex: 3;"
+            <div class="setup-quest-row">
+                <input type="text" name="quest2" class="form-control setup-quest-input" placeholder="e.g. 10km Run"
                     required>
-                <select name="quest2_rank" class="form-control" style="flex: 1;">
+                <select name="quest2_rank" class="form-control form-col">
                     <option value="E">Rank E</option>
                     <option value="D">Rank D</option>
                     <option value="C">Rank C</option>
@@ -134,7 +134,7 @@
                     <option value="A">Rank A</option>
                     <option value="S">Rank S</option>
                 </select>
-                <select name="quest2_stat" class="form-control" style="flex: 1;">
+                <select name="quest2_stat" class="form-control form-col">
                     <option value="STR">STR</option>
                     <option value="INT">INT</option>
                     <option value="AGI">AGI</option>
@@ -142,15 +142,15 @@
                     <option value="SNS">SNS</option>
                 </select>
             </div>
-            <input type="text" name="quest2_description" class="form-control"
-                placeholder="Optional detailed description..." style="margin-top: 10px;">
+            <input type="text" name="quest2_description" class="form-control setup-desc"
+                placeholder="Optional detailed description...">
         </div>
         <div class="form-group">
             <label>DAILY QUEST 3</label>
-            <div style="display: flex; gap: 10px;">
-                <input type="text" name="quest3" class="form-control" placeholder="e.g. Read 10 Pages" style="flex: 3;"
+            <div class="setup-quest-row">
+                <input type="text" name="quest3" class="form-control setup-quest-input" placeholder="e.g. Read 10 Pages"
                     required>
-                <select name="quest3_rank" class="form-control" style="flex: 1;">
+                <select name="quest3_rank" class="form-control form-col">
                     <option value="E">Rank E</option>
                     <option value="D">Rank D</option>
                     <option value="C">Rank C</option>
@@ -158,7 +158,7 @@
                     <option value="A">Rank A</option>
                     <option value="S">Rank S</option>
                 </select>
-                <select name="quest3_stat" class="form-control" style="flex: 1;">
+                <select name="quest3_stat" class="form-control form-col">
                     <option value="STR">STR</option>
                     <option value="INT">INT</option>
                     <option value="AGI">AGI</option>
@@ -166,15 +166,15 @@
                     <option value="SNS">SNS</option>
                 </select>
             </div>
-            <input type="text" name="quest3_description" class="form-control"
-                placeholder="Optional detailed description..." style="margin-top: 10px;">
+            <input type="text" name="quest3_description" class="form-control setup-desc"
+                placeholder="Optional detailed description...">
         </div>
         <div class="form-group">
             <label>DAILY QUEST 4</label>
-            <div style="display: flex; gap: 10px;">
-                <input type="text" name="quest4" class="form-control" placeholder="e.g. Code for 1 Hour"
-                    style="flex: 3;" required>
-                <select name="quest4_rank" class="form-control" style="flex: 1;">
+            <div class="setup-quest-row">
+                <input type="text" name="quest4" class="form-control setup-quest-input" placeholder="e.g. Code for 1 Hour"
+                     required>
+                <select name="quest4_rank" class="form-control form-col">
                     <option value="E">Rank E</option>
                     <option value="D">Rank D</option>
                     <option value="C">Rank C</option>
@@ -182,7 +182,7 @@
                     <option value="A">Rank A</option>
                     <option value="S">Rank S</option>
                 </select>
-                <select name="quest4_stat" class="form-control" style="flex: 1;">
+                <select name="quest4_stat" class="form-control form-col">
                     <option value="STR">STR</option>
                     <option value="INT">INT</option>
                     <option value="AGI">AGI</option>
@@ -190,19 +190,18 @@
                     <option value="SNS">SNS</option>
                 </select>
             </div>
-            <input type="text" name="quest4_description" class="form-control"
-                placeholder="Optional detailed description..." style="margin-top: 10px;">
+            <input type="text" name="quest4_description" class="form-control setup-desc"
+                placeholder="Optional detailed description...">
         </div>
 
         <div class="form-group penalty-group">
             <label>PENALTY PUNISHMENT</label>
-            <p style="color: #666; font-size: 0.9em; margin-bottom: 10px;">
+            <p class="setup-penalty-hint">
                 If you fail to complete your dailies, this Penalty Quest will be issued.
                 Completion is mandatory to remove System Restrictions.
             </p>
             <input type="text" name="penalty" class="form-control" placeholder="e.g. Survival Run (10km)" required>
-            <textarea name="penalty_detail" class="form-control" placeholder="Optional detailed description..."
-                style="margin-top: 10px; height: 80px;"></textarea>
+            <textarea name="penalty_detail" class="form-control setup-penalty-detail" placeholder="Optional detailed description..."></textarea>
         </div>
 
         <button type="submit" class="btn-submit">INITIALIZE SYSTEM</button>

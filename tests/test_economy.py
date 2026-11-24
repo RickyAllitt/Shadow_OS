@@ -1,3 +1,4 @@
+from tests.utils import one_reset_ago
 import unittest
 from app import create_app
 from app.extensions import db
@@ -29,32 +30,40 @@ class TestEconomy(unittest.TestCase):
         self.app_context.pop()
 
     def test_xp_curve(self):
-        self.assertEqual(calculate_xp_required(1), 100)
-        self.assertEqual(calculate_xp_required(2), 125)
-        self.assertGreater(calculate_xp_required(6), 300)
+        """Gentle curve: 100 + 60 * level^1.4, rounded to 10, readable even at Lv 100."""
+        self.assertEqual(calculate_xp_required(1), 160)
+        self.assertEqual(calculate_xp_required(2), 260)
+        self.assertEqual(calculate_xp_required(15), 2760)
+        self.assertEqual(calculate_xp_required(50), 14450)
+        self.assertEqual(calculate_xp_required(100), 37960)
+        reqs = [calculate_xp_required(l) for l in range(1, 101)]
+        self.assertEqual(reqs, sorted(reqs))
+        self.assertTrue(all(r % 10 == 0 for r in reqs))
 
     def test_rewards(self):
-        xp, gold, coins = calculate_rewards('C')
-        self.assertEqual(xp, 5)
-        self.assertEqual(gold, 0)
-        
-        xp, gold, coins = calculate_rewards('A')
-        self.assertEqual(xp, 25)
-        self.assertEqual(gold, 100)
+        """Fixed per rank, identical at every level."""
+        self.assertEqual(calculate_rewards('C'), (150, 0, 0))
+        self.assertEqual(calculate_rewards('B'), (300, 50, 15))
+        self.assertEqual(calculate_rewards('A'), (600, 100, 30))
+        # Non-daily B/A scale with level (min = fixed); dailies and lower ranks never do
+        self.assertEqual(calculate_rewards('A', 10), (600, 100, 30))
+        self.assertEqual(calculate_rewards('A', 50)[0], 2170)   # 15% of 14,450
+        self.assertEqual(calculate_rewards('B', 100)[0], 1900)  # 5% of 37,960
+        self.assertEqual(calculate_rewards('A', 90, is_daily=True)[0], 600)
+        self.assertEqual(calculate_rewards('C', 90)[0], 150)
 
     def test_quest_completion(self):
-        quest = Quest(title="Test Quest", rank="C", xp_reward=5, player_id=self.player.id)
+        self.player.xp_required = 10_000  # no level-up noise
+        quest = Quest(title="Test Quest", rank="C", player_id=self.player.id)
         db.session.add(quest)
         db.session.commit()
-        
-        # Player has 10 INT -> +5% XP
-        # Rank C = 5 XP. +5% = 5 XP (rounds down or no change depending on logic, let's see).
-        
+
+        # Rank C = 150 XP; 10 INT => +5% => 157
         xp_gain, gold_gain, coin_gain, leveled_up, daily_bonus, can_arise = process_quest_completion(self.player, quest)
-        
-        self.assertEqual(xp_gain, 5)
-        self.assertEqual(gold_gain, 0) # Rank C gives 0 Gold now (only B+ gives gold)
-        self.assertEqual(self.player.xp, 5)
+
+        self.assertEqual(xp_gain, 157)
+        self.assertEqual(gold_gain, 0)  # Gold only from B+
+        self.assertEqual(self.player.xp, 157)
         self.assertFalse(leveled_up)
         self.assertEqual(self.player.gold, 0)
         self.assertTrue(quest.is_completed)
@@ -62,25 +71,23 @@ class TestEconomy(unittest.TestCase):
     def test_level_up(self):
         self.player.xp = 90
         self.player.xp_required = 100
-        
-        quest = Quest(title="Big Quest", rank="B", xp_reward=150, gold_reward=200, player_id=self.player.id) # 150 XP
+
+        quest = Quest(title="Big Quest", rank="B", gold_reward=200, player_id=self.player.id)
         db.session.add(quest)
         db.session.commit()
-        
-        # 150 XP + 5% = 157 XP. Total 90 + 157 = 247.
-        # Level 1 requires 100.
-        # Surplus 147. Level becomes 2. New Req = 125.
-        
-        _, _, _, leveled_up, _, _ = process_quest_completion(self.player, quest)
-        
+
+        # B = 300 XP + 5% = 315 -> 405 total. Lv1 needs 100 (305 left), Lv2 needs 260 (45 left), Lv3 needs 380.
+        _, gold, _, leveled_up, _, _ = process_quest_completion(self.player, quest)
+
         self.assertTrue(leveled_up)
         self.assertEqual(self.player.level, 3)
-        self.assertEqual(self.player.xp, 22)
-        self.assertEqual(self.player.xp_required, 156)
+        self.assertEqual(self.player.xp, 45)
+        self.assertEqual(self.player.xp_required, 380)
+        self.assertEqual(gold, 200)  # explicit gold_reward still honoured
 
     def test_penalty_stage_1_debuff(self):
         # Mock yesterday
-        yesterday = datetime.now(timezone.utc) - timedelta(days=1, hours=1)
+        yesterday = one_reset_ago()
         self.player.last_daily_reset = yesterday
         
         # Create a missed daily
@@ -98,7 +105,7 @@ class TestEconomy(unittest.TestCase):
         # Already missed one day
         self.player.consecutive_missed_days = 1
         self.player.has_debuff = True
-        yesterday = datetime.now(timezone.utc) - timedelta(days=1, hours=1)
+        yesterday = one_reset_ago()
         self.player.last_daily_reset = yesterday
         
         daily = Quest(title="Daily Routine", is_daily=True, is_completed=False, player_id=self.player.id)
@@ -123,7 +130,7 @@ class TestEconomy(unittest.TestCase):
         self.player.has_debuff = True
         self.player.in_penalty_zone = True
         
-        yesterday = datetime.now(timezone.utc) - timedelta(days=1, hours=1)
+        yesterday = one_reset_ago()
         self.player.last_daily_reset = yesterday
         
         # Create uncompleted daily
@@ -134,9 +141,11 @@ class TestEconomy(unittest.TestCase):
         check_daily_reset(self.player)
         
         self.assertEqual(self.player.consecutive_missed_days, 0) # Reset
-        self.assertEqual(self.player.level, 2) # Level Down (5 - 3 = 2)
-        self.assertEqual(self.player.xp, 0) # XP Reset
-        self.assertEqual(self.player.strength, 8) # Stat Loss (10 - 2 = 8 due to int rounding)
+        # Normal mode: XP debt (half a level) instead of losing levels or stats
+        self.assertEqual(self.player.level, 5)
+        self.assertEqual(self.player.xp, 50)
+        self.assertEqual(self.player.strength, 10)
+        self.assertEqual(self.player.xp_debt, int(round(self.player.xp_required * 0.5, -1)))
         self.assertFalse(self.player.in_penalty_zone) # Unlocked
 
     def test_penalty_clearance(self):
