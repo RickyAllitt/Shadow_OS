@@ -141,7 +141,7 @@ The system is architected with security-first principles to ensure data integrit
     SECRET_KEY=your-super-secret-key-change-this
     GEMINI_API_KEY=your-google-gemini-api-key
     # Optional
-    GEMINI_MODEL=gemini-3.1-flash-lite
+    GEMINI_MODEL=gemini-3.5-flash-lite
     DATABASE_URL=postgresql://...      # defaults to sqlite:///system.db
     VAPID_PUBLIC_KEY=...               # Web Push
     VAPID_PRIVATE_KEY=...

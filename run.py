@@ -12,17 +12,35 @@ if __name__ == '__main__' and debug_mode:
 from app import create_app
 from app.extensions import db
 from app.services import seed_database
-from app.schema_upgrades import run_schema_upgrades
+from app.schema_upgrades import create_tables, run_schema_upgrades
 
 # Background jobs are registered inside create_app (app/tasks.py), so they also run under gunicorn
 # (wsgi.py imports this module, so the block below is skipped there).
 app = create_app()
 
-# Initialize DB and Seeder
-with app.app_context():
-    db.create_all()
-    run_schema_upgrades()
-    seed_database()
+
+def init_database():
+    """
+    Create tables, apply schema upgrades and seed the shop, ONE process at a time.
+    gunicorn starts several workers that each import this module; without the lock they race
+    to CREATE the same new tables ("table already exists" crashes the deploy) and can insert
+    duplicate shop items. Later workers wait, then find everything already in place.
+    """
+    import fcntl
+    import tempfile
+    lock_path = os.path.join(tempfile.gettempdir(), 'shadow_os_db_init.lock')
+    with open(lock_path, 'a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)  # blocks until other workers finish
+        try:
+            with app.app_context():
+                create_tables()  # create_all, tolerant of users without the REFERENCES privilege
+                run_schema_upgrades()
+                seed_database()
+        finally:
+            fcntl.flock(lock, fcntl.LOCK_UN)
+
+
+init_database()
 
 if __name__ == '__main__':
     app.run(debug=debug_mode)

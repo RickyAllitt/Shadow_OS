@@ -6,8 +6,48 @@ Anything that needs to change on a live database goes here and must be safe to
 run on every startup.
 """
 from sqlalchemy import inspect, or_, text
+from sqlalchemy.exc import OperationalError
+from sqlalchemy.schema import CreateTable
 
 from app.extensions import db
+
+
+MYSQL_REFERENCES_DENIED = 1142  # "REFERENCES command denied": user may not create foreign keys
+
+
+def create_tables():
+    """
+    db.create_all(), but tolerant of database users that lack the REFERENCES privilege
+    (seen on TiDB Cloud). In that case the missing tables are created WITHOUT database-level
+    foreign keys; the ORM still enforces the relationships and cascades in the app.
+    """
+    try:
+        db.create_all()
+    except OperationalError as exc:
+        code = exc.orig.args[0] if getattr(exc, 'orig', None) is not None and exc.orig.args else None
+        if code != MYSQL_REFERENCES_DENIED:
+            raise
+        print(">> SCHEMA: Database user lacks the REFERENCES privilege; creating new tables without "
+              "foreign keys (relationships are still enforced by the app).", flush=True)
+        db.session.rollback()
+        _create_missing_tables_without_foreign_keys()
+
+
+def _create_missing_tables_without_foreign_keys():
+    engine = db.engine
+    existing = set(inspect(engine).get_table_names())
+    created = []
+    with engine.begin() as conn:
+        for table in db.metadata.sorted_tables:
+            if table.name in existing:
+                continue
+            conn.execute(CreateTable(table, include_foreign_key_constraints=[]))
+            for index in table.indexes:
+                index.create(conn)
+            created.append(table.name)
+    if created:
+        print(f">> SCHEMA: Created {', '.join(created)} (without foreign keys).", flush=True)
+    return created
 
 
 def _widen_varchar(table, column, length):
@@ -48,7 +88,10 @@ def _add_column(table, column, ddl_type):
         return  # create_all() will build the table with every column
     if column in {c['name'] for c in inspector.get_columns(table)}:
         return
-    quote = '`' if engine.dialect.name in ('mysql', 'mariadb') else '"'
+    is_mysql = engine.dialect.name in ('mysql', 'mariadb')
+    quote = '`' if is_mysql else '"'
+    if ddl_type.upper() == 'DATETIME' and not is_mysql:
+        ddl_type = 'TIMESTAMP'  # naive timestamp on Postgres/SQLite (MySQL TIMESTAMP would convert zones)
     with engine.begin() as conn:
         conn.execute(text(f'ALTER TABLE {quote}{table}{quote} ADD COLUMN {quote}{column}{quote} {ddl_type}'))
     print(f">> SCHEMA: Added {table}.{column}.")
@@ -105,7 +148,7 @@ def run_schema_upgrades():
     _add_column('player', 'xp_debt', 'INTEGER DEFAULT 0')
     _add_column('player', 'streak_freezes', 'INTEGER DEFAULT 0')
     _add_column('player', 'hardcore', 'BOOLEAN DEFAULT FALSE')
-    _add_column('player', 'hardcore_since', 'TIMESTAMP')
+    _add_column('player', 'hardcore_since', 'DATETIME')
     # Per-player timezone and reminder time
     _add_column('player', 'timezone', "VARCHAR(50) DEFAULT 'Europe/Madrid'")
     _add_column('player', 'reminder_time', "VARCHAR(5) DEFAULT '18:00'")

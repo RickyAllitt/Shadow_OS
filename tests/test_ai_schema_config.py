@@ -205,3 +205,52 @@ def test_secret_key_from_env_or_random(monkeypatch):
     finally:
         monkeypatch.undo()
         importlib.reload(config)
+
+
+# --- table creation when the DB user may not create foreign keys (TiDB error 1142) ---
+
+def _references_denied():
+    import pymysql
+    from sqlalchemy.exc import OperationalError
+    return OperationalError('CREATE TABLE activity_event (...)', {},
+                            pymysql.err.OperationalError(1142, "REFERENCES command denied to user 'x'@'%' for table 'player'"))
+
+
+def test_create_tables_falls_back_without_foreign_keys(app, monkeypatch):
+    from sqlalchemy import inspect as sa_inspect
+    from app import schema_upgrades
+    from app.models import ActivityEvent, Kudos, Player
+    # Simulate an existing production DB that has the old tables but not the new ones
+    for name in ('kudos', 'raid_contribution', 'raid', 'personal_reward', 'rivalry', 'activity_event'):
+        db.metadata.tables[name].drop(db.engine)
+    real_create_all = db.create_all
+    monkeypatch.setattr(db, 'create_all', lambda: (_ for _ in ()).throw(_references_denied()))
+
+    schema_upgrades.create_tables()
+
+    insp = sa_inspect(db.engine)
+    assert {'activity_event', 'rivalry', 'personal_reward', 'raid', 'raid_contribution', 'kudos'} <= set(insp.get_table_names())
+    assert insp.get_foreign_keys('activity_event') == []          # created without DB-level FKs
+    assert {i['name'] for i in insp.get_indexes('activity_event')} >= {'ix_activity_event_player_id', 'ix_activity_event_week_start'}
+    # ...and the app still works on them, including ORM cascades
+    p = Player(name='NoFK'); db.session.add(p); db.session.commit()
+    db.session.add(ActivityEvent(player_id=p.id, kind='quest', points=1, week_start=__import__('datetime').date(2026, 11, 23)))
+    db.session.commit()
+    db.session.delete(p); db.session.commit()
+    assert ActivityEvent.query.count() == 0
+    monkeypatch.setattr(db, 'create_all', real_create_all)
+
+
+def test_create_tables_reraises_other_errors(app, monkeypatch):
+    import pymysql
+    from sqlalchemy.exc import OperationalError
+    from app import schema_upgrades
+    boom = OperationalError('CREATE TABLE x', {}, pymysql.err.OperationalError(2003, "Can't connect"))
+    monkeypatch.setattr(db, 'create_all', lambda: (_ for _ in ()).throw(boom))
+    with pytest.raises(OperationalError):
+        schema_upgrades.create_tables()
+
+
+def test_create_tables_normal_path(app):
+    from app import schema_upgrades
+    schema_upgrades.create_tables()  # all tables already exist: no-op, no error
